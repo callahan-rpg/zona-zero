@@ -379,16 +379,31 @@ export default function Admin() {
                 </button>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '400px', overflowY: 'auto' }}>
                   {locations.map((loc) => (
-                    <div key={loc.id} className="glass-light" style={{ padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span
-                        style={{ fontSize: 13, cursor: 'pointer', fontWeight: editingLoc === loc.id ? 'bold' : 'normal', color: editingLoc === loc.id ? 'var(--accent)' : 'inherit' }}
-                        onClick={() => handleLocEdit(loc)}
-                      >
-                        {loc.name} (`{loc.slug}`)
-                      </span>
-                      <button className="btn btn-sm btn-danger" style={{ padding: '2px 8px', fontSize: 10 }} onClick={() => handleLocDelete(loc.id)}>
-                        Excluir
-                      </button>
+                    <div key={loc.id} className="glass-light" style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span
+                          style={{ fontSize: 13, cursor: 'pointer', fontWeight: editingLoc === loc.id ? 'bold' : 'normal', color: editingLoc === loc.id ? 'var(--accent)' : 'inherit' }}
+                          onClick={() => handleLocEdit(loc)}
+                          title="Clique para editar"
+                        >
+                          📂 {loc.name}
+                        </span>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <a 
+                            href={`/location/${loc.slug}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="btn btn-sm" 
+                            style={{ padding: '2px 6px', fontSize: 10, background: 'rgba(255,255,255,0.05)' }}
+                          >
+                            👁️ Ver
+                          </a>
+                          <button className="btn btn-sm btn-danger" style={{ padding: '2px 6px', fontSize: 10 }} onClick={() => handleLocDelete(loc.id)}>
+                            Excluir
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>URL: /location/{loc.slug}</div>
                     </div>
                   ))}
                 </div>
@@ -403,11 +418,38 @@ export default function Admin() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div className="form-group">
                     <label>Nome do Local</label>
-                    <input type="text" placeholder="Ex: Praça Central" value={locForm.name} onChange={(e) => setLocForm(prev => ({ ...prev, name: e.target.value }))} required />
+                    <input
+                      type="text"
+                      placeholder="Ex: Praça Central"
+                      value={locForm.name}
+                      onChange={(e) => {
+                        const name = e.target.value
+                        // Gera slug automaticamente apenas na criação (não na edição)
+                        const autoSlug = editingLoc ? locForm.slug : name
+                          .toLowerCase()
+                          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+                          .replace(/[^a-z0-9\s-]/g, '')
+                          .trim()
+                          .replace(/\s+/g, '-')
+                        setLocForm(prev => ({ ...prev, name, slug: autoSlug }))
+                      }}
+                      required
+                    />
                   </div>
                   <div className="form-group">
-                    <label>Slug (URL amigável)</label>
-                    <input type="text" placeholder="Ex: praca-central" value={locForm.slug} onChange={(e) => setLocForm(prev => ({ ...prev, slug: e.target.value }))} disabled={!!editingLoc} required />
+                    <label>ID da Sala (URL)</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: praca-central"
+                      value={locForm.slug}
+                      onChange={(e) => setLocForm(prev => ({ ...prev, slug: e.target.value }))}
+                      disabled={!!editingLoc}
+                      required
+                      style={{ opacity: editingLoc ? 0.5 : 1 }}
+                    />
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+                      {editingLoc ? '⚠️ O ID não pode ser alterado após criar a sala.' : `🔗 URL: /location/${locForm.slug || '...'}`}
+                    </div>
                   </div>
                 </div>
 
@@ -454,33 +496,55 @@ export default function Admin() {
 
                 {/* Botões de navegação */}
                 <div style={{ padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '6px', marginTop: 8 }}>
-                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Caminhos de Navegação</label>
-                  
-                  {/* Lista de botões */}
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>🗺️ Caminhos de Navegação</label>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 8px', opacity: 0.7 }}>
+                    Defina para onde o jogador pode ir a partir desta sala.
+                  </p>
+
+                  {/* Lista de botões já adicionados */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0' }}>
+                    {locForm.navigationButtons.length === 0 && (
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Nenhum caminho adicionado ainda.</span>
+                    )}
                     {locForm.navigationButtons.map((btn, i) => (
-                      <span key={i} className="glass-light" style={{ padding: '4px 10px', fontSize: 11, borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        {btn.label} → {btn.target} ({btn.position === 'left' ? 'Esquerda' : 'Direita'})
-                        <button type="button" onClick={() => removeNavButton(i)} style={{ background: 'transparent', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: 12 }}>×</button>
+                      <span key={i} className="glass-light" style={{ padding: '5px 10px', fontSize: 11, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span>{btn.position === 'left' ? '⬅️' : '➡️'}</span>
+                        <strong>{btn.label}</strong>
+                        <span style={{ color: 'var(--text-muted)' }}>→</span>
+                        <span style={{ fontFamily: 'monospace', color: 'var(--accent-blue)' }}>{btn.target}</span>
+                        <button type="button" onClick={() => removeNavButton(i)} style={{ background: 'transparent', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
                       </span>
                     ))}
                   </div>
 
-                  {/* Adicionar botão */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px 60px', gap: 6, alignItems: 'end' }}>
+                  {/* Adicionar novo caminho */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px 60px', gap: 6, alignItems: 'end', marginTop: 8 }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: 10 }}>Rótulo (Label)</label>
-                      <input type="text" placeholder="Ir para a UTI" value={newNavBtn.label} onChange={(e) => setNewNavBtn(prev => ({ ...prev, label: e.target.value }))} />
+                      <label style={{ fontSize: 10 }}>Texto do Botão</label>
+                      <input type="text" placeholder="Ex: Ir para a UTI" value={newNavBtn.label} onChange={(e) => setNewNavBtn(prev => ({ ...prev, label: e.target.value }))} />
                     </div>
                     <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: 10 }}>Slug Destino</label>
-                      <input type="text" placeholder="hospital-uti" value={newNavBtn.target} onChange={(e) => setNewNavBtn(prev => ({ ...prev, target: e.target.value }))} />
+                      <label style={{ fontSize: 10 }}>Sala de Destino</label>
+                      <select
+                        value={newNavBtn.target}
+                        onChange={(e) => setNewNavBtn(prev => ({ ...prev, target: e.target.value }))}
+                        style={{ width: '100%' }}
+                      >
+                        <option value="">— Selecione uma sala —</option>
+                        {locations
+                          .filter(loc => loc.slug !== locForm.slug) // exclui a própria sala
+                          .map(loc => (
+                            <option key={loc.id} value={loc.slug}>
+                              {loc.name}
+                            </option>
+                          ))}
+                      </select>
                     </div>
                     <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: 10 }}>Posição</label>
+                      <label style={{ fontSize: 10 }}>Lado da Tela</label>
                       <select value={newNavBtn.position} onChange={(e) => setNewNavBtn(prev => ({ ...prev, position: e.target.value }))}>
-                        <option value="right">Direita</option>
-                        <option value="left">Esquerda</option>
+                        <option value="right">➡️ Direita</option>
+                        <option value="left">⬅️ Esquerda</option>
                       </select>
                     </div>
                     <button type="button" className="btn btn-sm btn-primary" onClick={addNavButton} style={{ padding: '10px 0', width: '100%' }}>
@@ -491,7 +555,7 @@ export default function Admin() {
 
                 <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
                   <button type="button" className="btn" style={{ flex: 1 }} onClick={resetLocForm}>Cancelar</button>
-                  <button type="submit" className="btn btn-primary" style={{ flex: 2 }}>Salvar Locação</button>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 2 }}>💾 Salvar Locação</button>
                 </div>
               </form>
             </div>
