@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Usuários: leitura por qualquer logado.
+    // Criação/deleção apenas pelo próprio dono ou admin.
+    // Atualização pelo dono, admin ou por terceiros limitados à transferência de itens.
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow update: if request.auth != null && (
+        request.auth.uid == uid ||
+        isAdmin() ||
+        (
+          // Permite que outros modifiquem APENAS o inventário (transferência de itens)
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['character']) &&
+          request.resource.data.character.diff(resource.data.character).affectedKeys().hasOnly(['inventory'])
+        )
+      );
+    }
+
+    // Locações: qualquer logado pode ler; só admin pode escrever
+    match /locations/{locationId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // Configuração global do jogo: todos logados leem; só admin escreve
+    match /game_config/{configId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // Histórico de dados (dice rolls): todos logados leem e criam
+    match /dice_rolls/{rollId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.playerUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Catálogo de itens: leitura pública, escrita só admin
+    match /items_db/{itemId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // Função auxiliar: verifica se o usuário é admin
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+  }
+}

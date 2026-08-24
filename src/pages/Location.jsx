@@ -1,0 +1,263 @@
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore'
+import { db } from '../firebase/config'
+import { useAuth } from '../contexts/AuthContext.jsx'
+import HUD from '../components/HUD.jsx'
+
+// Locação padrão de teste (sala do hospital)
+// Em produção, todos os dados virão do Firestore via admin panel
+const DEFAULT_LOCATION = {
+  name: 'Sala do Hospital',
+  slug: 'sala-hospital',
+  description: 'Corredores úmidos e escuros. O cheiro de antisséptico misturado com algo pior paira no ar. Equipamentos médicos tombados pelo chão.',
+  backgroundImage: null, // Coloque a URL de uma imagem de fundo aqui
+  xatIframe: `https://xat.com/embed/chat.php#id=220535128&gn=CachoeiraAltheris_acerpg`,
+  navigationButtons: [],
+  loot: {
+    enabled: true,
+    cooldownMinutes: 30,
+    emptyChance: 0.35,
+    maxItemsPerSearch: 2,
+    table: [
+      { itemId: 'atadura',     name: 'Atadura',     icon: '🩹', chance: 0.65, min: 1, max: 3 },
+      { itemId: 'analgesico',  name: 'Analgésico',  icon: '💊', chance: 0.45, min: 1, max: 2 },
+      { itemId: 'seringa',     name: 'Seringa',     icon: '💉', chance: 0.25, min: 1, max: 1 },
+      { itemId: 'antibiotico', name: 'Antibiótico', icon: '🧪', chance: 0.15, min: 1, max: 1 },
+      { itemId: 'ataduraster', name: 'Kit de Sutura',icon:'🧵', chance: 0.08, min: 1, max: 1 },
+    ],
+  },
+}
+
+function rollLoot(lootConfig) {
+  if (Math.random() < lootConfig.emptyChance) return []
+
+  const found = []
+  const shuffled = [...lootConfig.table].sort(() => Math.random() - 0.5)
+
+  for (const item of shuffled) {
+    if (found.length >= lootConfig.maxItemsPerSearch) break
+    if (Math.random() < item.chance) {
+      const qty = Math.floor(Math.random() * (item.max - item.min + 1)) + item.min
+      found.push({ ...item, quantity: qty })
+    }
+  }
+  return found
+}
+
+export default function Location() {
+  const { slug } = useParams()
+  const { user, character, refreshCharacter } = useAuth()
+  const navigate = useNavigate()
+
+  const [location, setLocation] = useState(null)
+  const [loadingLocation, setLoadingLocation] = useState(true)
+
+  // Loot state
+  const [lootState, setLootState] = useState('idle') // idle | searching | result
+  const [lootResult, setLootResult] = useState([])
+  const [lootCooldown, setLootCooldown] = useState(false)
+
+  // Carrega dados da locação do Firestore (ou usa padrão para teste)
+  useEffect(() => {
+    async function loadLocation() {
+      setLoadingLocation(true)
+      try {
+        const docRef = doc(db, 'locations', slug)
+        const docSnap = await getDoc(docRef)
+        if (docSnap.exists()) {
+          setLocation(docSnap.data())
+        } else {
+          // Fallback para locação padrão de teste
+          setLocation(DEFAULT_LOCATION)
+        }
+      } catch {
+        setLocation(DEFAULT_LOCATION)
+      } finally {
+        setLoadingLocation(false)
+      }
+    }
+    loadLocation()
+  }, [slug])
+
+  // Verifica cooldown de loot para esta locação
+  useEffect(() => {
+    if (!character?.lastLootByLocation || !location) return
+    const lastLoot = character.lastLootByLocation[slug]
+    if (!lastLoot) { setLootCooldown(false); return }
+
+    const lastDate = lastLoot.toDate ? lastLoot.toDate() : new Date(lastLoot)
+    const cooldownMs = (location.loot?.cooldownMinutes || 30) * 60 * 1000
+    const elapsed = Date.now() - lastDate.getTime()
+    setLootCooldown(elapsed < cooldownMs)
+  }, [character, location, slug])
+
+  async function handleLoot() {
+    if (lootState !== 'idle' || lootCooldown || !location?.loot?.enabled) return
+
+    setLootState('searching')
+    await new Promise((r) => setTimeout(r, 2500)) // animação
+
+    const items = rollLoot(location.loot)
+    setLootResult(items)
+    setLootState('result')
+
+    // Salva itens no inventário + atualiza timestamp de loot
+    if (items.length > 0 && user) {
+      const userRef = doc(db, 'users', user.uid)
+      const inventoryItems = items.map((item) => ({
+        instanceId: crypto.randomUUID(),
+        itemId: item.itemId,
+        name: item.name,
+        icon: item.icon,
+        quantity: item.quantity,
+        obtainedAt: new Date().toISOString(),
+        obtainedFrom: slug,
+      }))
+      await updateDoc(userRef, {
+        'character.inventory': arrayUnion(...inventoryItems),
+        [`character.lastLootByLocation.${slug}`]: new Date(),
+      })
+      await refreshCharacter()
+      setLootCooldown(true)
+    }
+  }
+
+  function closeLootModal() {
+    setLootState('idle')
+    setLootResult([])
+  }
+
+  if (loadingLocation) {
+    return (
+      <div className="loading-screen">
+        <span className="loading-dot" />
+      </div>
+    )
+  }
+
+  if (!location) return null
+
+  const hasBackground = !!location.backgroundImage
+
+  return (
+    <div className="location-page">
+      {/* Background */}
+      <div
+        className={`location-bg ${hasBackground ? '' : 'fallback'}`}
+        style={hasBackground ? { backgroundImage: `url(${location.backgroundImage})` } : {}}
+      />
+      <div className="location-overlay" />
+
+      {/* HUD */}
+      <HUD locationName={location.name} />
+
+      {/* Conteúdo principal */}
+      <div className="location-content">
+        <div className="location-main">
+          {/* Botões de saída (esquerda) */}
+          <div className="nav-buttons-left">
+            {location.navigationButtons?.filter(b => b.position === 'left').map((btn, i) => (
+              <button
+                key={i}
+                className="nav-btn"
+                onClick={() => btn.target && navigate(`/location/${btn.target}`)}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Chat central */}
+          <div className="chat-container">
+            <div className="chat-location-label">{location.name}</div>
+
+            <div className="chat-wrapper">
+              <iframe
+                src={location.xatIframe}
+                allow="clipboard-write"
+                width="100%"
+                height="500"
+                frameBorder="0"
+                scrolling="no"
+                title={`Chat — ${location.name}`}
+              />
+            </div>
+
+            {/* Botão de busca de recursos */}
+            {location.loot?.enabled && (
+              <div className="loot-section">
+                <button
+                  className={`loot-btn ${lootState === 'searching' ? 'searching' : ''}`}
+                  onClick={handleLoot}
+                  disabled={lootState !== 'idle' || lootCooldown}
+                  title={lootCooldown ? 'Você já procurou aqui recentemente. Aguarde o cooldown.' : ''}
+                >
+                  <span>{lootState === 'searching' ? '🔍' : lootCooldown ? '⏳' : '🔦'}</span>
+                  {lootState === 'searching'
+                    ? 'Procurando...'
+                    : lootCooldown
+                    ? 'Cooldown ativo'
+                    : 'Procurar Recursos'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Botões direita */}
+          <div className="nav-buttons-right">
+            {location.navigationButtons?.filter(b => b.position !== 'left').map((btn, i) => (
+              <button
+                key={i}
+                className="nav-btn"
+                onClick={() => btn.target && navigate(`/location/${btn.target}`)}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Modal de resultado do loot */}
+      {lootState === 'result' && (
+        <div className="loot-modal-overlay" onClick={closeLootModal}>
+          <div
+            className={`loot-modal ${lootResult.length === 0 ? 'empty' : ''}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {lootResult.length > 0 ? (
+              <>
+                <h3>🔦 Você encontrou!</h3>
+                <div className="loot-items">
+                  {lootResult.map((item, i) => (
+                    <div className="loot-item" key={i}>
+                      <div className="loot-item-info">
+                        <span className="loot-item-icon">{item.icon}</span>
+                        <span>{item.name}</span>
+                      </div>
+                      <span className="loot-item-qty">×{item.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+                  Itens adicionados ao inventário.
+                </p>
+              </>
+            ) : (
+              <>
+                <h3>😶 Nada encontrado</h3>
+                <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 24 }}>
+                  Você vasculhou o local mas não encontrou nada útil desta vez.
+                </p>
+              </>
+            )}
+            <button className="btn btn-primary btn-sm" onClick={closeLootModal}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
