@@ -80,46 +80,69 @@ export default function Location() {
     loadLocation()
   }, [slug])
 
-  // Verifica cooldown de loot para esta locação
+  // Verifica cooldown de loot para esta locação com atualização em tempo real
   useEffect(() => {
-    if (!character?.lastLootByLocation || !location) return
-    const lastLoot = character.lastLootByLocation[slug]
-    if (!lastLoot) { setLootCooldown(false); return }
+    if (!location) return
 
-    const lastDate = lastLoot.toDate ? lastLoot.toDate() : new Date(lastLoot)
-    const cooldownMs = (location.loot?.cooldownMinutes || 30) * 60 * 1000
-    const elapsed = Date.now() - lastDate.getTime()
-    setLootCooldown(elapsed < cooldownMs)
+    const checkCooldown = () => {
+      if (!character?.lastLootByLocation) {
+        setLootCooldown(false)
+        return
+      }
+      const lastLoot = character.lastLootByLocation[slug]
+      if (!lastLoot) {
+        setLootCooldown(false)
+        return
+      }
+
+      const lastDate = lastLoot.toDate ? lastLoot.toDate() : new Date(lastLoot)
+      const cooldownMs = (location.loot?.cooldownMinutes || 30) * 60 * 1000
+      const elapsed = Date.now() - lastDate.getTime()
+      setLootCooldown(elapsed < cooldownMs)
+    }
+
+    checkCooldown()
+    const timer = setInterval(checkCooldown, 2000) // Reavalia a cada 2 segundos
+    return () => clearInterval(timer)
   }, [character, location, slug])
 
   async function handleLoot() {
     if (lootState !== 'idle' || lootCooldown || !location?.loot?.enabled) return
 
     setLootState('searching')
-    await new Promise((r) => setTimeout(r, 2500)) // animação
+    await new Promise((r) => setTimeout(r, 2500)) // animação de busca
 
     const items = rollLoot(location.loot)
     setLootResult(items)
     setLootState('result')
 
-    // Salva itens no inventário + atualiza timestamp de loot
-    if (items.length > 0 && user) {
+    // Salva timestamp de busca de recursos (mesmo se vier vazio para trigger do cooldown!)
+    if (user) {
       const userRef = doc(db, 'users', user.uid)
-      const inventoryItems = items.map((item) => ({
-        instanceId: crypto.randomUUID(),
-        itemId: item.itemId,
-        name: item.name,
-        icon: item.icon,
-        quantity: item.quantity,
-        obtainedAt: new Date().toISOString(),
-        obtainedFrom: slug,
-      }))
-      await updateDoc(userRef, {
-        'character.inventory': arrayUnion(...inventoryItems),
-        [`character.lastLootByLocation.${slug}`]: new Date(),
-      })
-      await refreshCharacter()
-      setLootCooldown(true)
+      const updates = {
+        [`character.lastLootByLocation.${slug}`]: new Date()
+      }
+
+      if (items.length > 0) {
+        const inventoryItems = items.map((item) => ({
+          instanceId: Math.random().toString(36).substring(2) + Date.now().toString(36),
+          itemId: item.itemId,
+          name: item.name,
+          icon: item.icon,
+          quantity: item.quantity,
+          obtainedAt: new Date().toISOString(),
+          obtainedFrom: slug,
+        }))
+        updates['character.inventory'] = arrayUnion(...inventoryItems)
+      }
+
+      try {
+        await updateDoc(userRef, updates)
+        await refreshCharacter()
+        setLootCooldown(true) // Força bloqueio visual imediato
+      } catch (err) {
+        console.error("Erro ao salvar loot:", err)
+      }
     }
   }
 

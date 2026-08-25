@@ -79,11 +79,18 @@ export default function Admin() {
     lootEnabled: true,
     cooldownMinutes: 30,
     emptyChance: 0.3,
-    navigationButtons: []
+    navigationButtons: [],
+    lootTable: [
+      { itemId: 'atadura',     name: 'Atadura',     icon: '🩹', chance: 0.65, min: 1, max: 3 },
+      { itemId: 'analgesico',  name: 'Analgésico',  icon: '💊', chance: 0.45, min: 1, max: 2 },
+      { itemId: 'seringa',     name: 'Seringa',     icon: '💉', chance: 0.25, min: 1, max: 1 },
+      { itemId: 'antibiotico', name: 'Antibiótico', icon: '🧪', chance: 0.15, min: 1, max: 1 },
+    ]
   })
 
-  // Formulário auxiliar para botões de navegação
+  // Formulário auxiliar para botões de navegação e itens de loot
   const [newNavBtn, setNewNavBtn] = useState({ label: '', target: '', position: 'right' })
+  const [newLootItem, setNewLootItem] = useState({ itemId: '', name: '', icon: '📦', chance: 0.5, min: 1, max: 1 })
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'locations'), (snap) => {
@@ -103,7 +110,8 @@ export default function Admin() {
       lootEnabled: loc.loot?.enabled !== false,
       cooldownMinutes: loc.loot?.cooldownMinutes || 30,
       emptyChance: loc.loot?.emptyChance || 0.3,
-      navigationButtons: loc.navigationButtons || []
+      navigationButtons: loc.navigationButtons || [],
+      lootTable: loc.loot?.table || []
     })
   }
 
@@ -118,8 +126,15 @@ export default function Admin() {
       lootEnabled: true,
       cooldownMinutes: 30,
       emptyChance: 0.3,
-      navigationButtons: []
+      navigationButtons: [],
+      lootTable: [
+        { itemId: 'atadura',     name: 'Atadura',     icon: '🩹', chance: 0.65, min: 1, max: 3 },
+        { itemId: 'analgesico',  name: 'Analgésico',  icon: '💊', chance: 0.45, min: 1, max: 2 },
+        { itemId: 'seringa',     name: 'Seringa',     icon: '💉', chance: 0.25, min: 1, max: 1 },
+        { itemId: 'antibiotico', name: 'Antibiótico', icon: '🧪', chance: 0.15, min: 1, max: 1 },
+      ]
     })
+    setNewLootItem({ itemId: '', name: '', icon: '📦', chance: 0.5, min: 1, max: 1 })
   }
 
   async function handleLocSubmit(e) {
@@ -138,12 +153,7 @@ export default function Admin() {
         cooldownMinutes: Number(locForm.cooldownMinutes),
         emptyChance: Number(locForm.emptyChance),
         maxItemsPerSearch: 2,
-        table: [
-          { itemId: 'atadura',     name: 'Atadura',     icon: '🩹', chance: 0.65, min: 1, max: 3 },
-          { itemId: 'analgesico',  name: 'Analgésico',  icon: '💊', chance: 0.45, min: 1, max: 2 },
-          { itemId: 'seringa',     name: 'Seringa',     icon: '💉', chance: 0.25, min: 1, max: 1 },
-          { itemId: 'antibiotico', name: 'Antibiótico', icon: '🧪', chance: 0.15, min: 1, max: 1 },
-        ]
+        table: locForm.lootTable
       },
       navigationButtons: locForm.navigationButtons
     }
@@ -186,6 +196,29 @@ export default function Admin() {
     setLocForm(prev => ({
       ...prev,
       navigationButtons: prev.navigationButtons.filter((_, i) => i !== idx)
+    }))
+  }
+
+  function addLootItem() {
+    if (!newLootItem.itemId || !newLootItem.name) return alert('Preencha o ID e o Nome do Item de Loot')
+    setLocForm(prev => ({
+      ...prev,
+      lootTable: [...prev.lootTable, {
+        itemId: newLootItem.itemId.trim().toLowerCase(),
+        name: newLootItem.name.trim(),
+        icon: newLootItem.icon.trim(),
+        chance: Number(newLootItem.chance),
+        min: Number(newLootItem.min),
+        max: Number(newLootItem.max)
+      }]
+    }))
+    setNewLootItem({ itemId: '', name: '', icon: '📦', chance: 0.5, min: 1, max: 2 })
+  }
+
+  function removeLootItem(idx) {
+    setLocForm(prev => ({
+      ...prev,
+      lootTable: prev.lootTable.filter((_, i) => i !== idx)
     }))
   }
 
@@ -481,16 +514,75 @@ export default function Admin() {
                     <label htmlFor="lootEn" style={{ margin: 0, cursor: 'pointer' }}>Habilitar Busca de Recursos (Loot)</label>
                   </div>
                   {locForm.lootEnabled && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label>Tempo de Cooldown (Minutos)</label>
-                        <input type="number" value={locForm.cooldownMinutes} onChange={(e) => setLocForm(prev => ({ ...prev, cooldownMinutes: e.target.value }))} />
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Tempo de Cooldown (Minutos)</label>
+                          <input type="number" value={locForm.cooldownMinutes} onChange={(e) => setLocForm(prev => ({ ...prev, cooldownMinutes: e.target.value }))} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Chance de vir vazio (0 a 1)</label>
+                          <input type="number" step="0.1" min="0" max="1" value={locForm.emptyChance} onChange={(e) => setLocForm(prev => ({ ...prev, emptyChance: e.target.value }))} />
+                        </div>
                       </div>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label>Chance de vir vazio (0 a 1)</label>
-                        <input type="number" step="0.1" min="0" max="1" value={locForm.emptyChance} onChange={(e) => setLocForm(prev => ({ ...prev, emptyChance: e.target.value }))} />
+
+                      {/* Configuração da Tabela de Itens de Loot */}
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12, marginTop: 12 }}>
+                        <label style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>📦 Tabela de Recursos (Itens)</label>
+                        
+                        {/* Lista de itens na tabela de loot */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '8px 0' }}>
+                          {locForm.lootTable.length === 0 && (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Nenhum item configurado. A busca virá sempre vazia.</span>
+                          )}
+                          {locForm.lootTable.map((item, idx) => (
+                            <div key={idx} className="glass-light" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 6, fontSize: 11 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 16 }}>{item.icon}</span>
+                                <strong>{item.name}</strong>
+                                <span style={{ color: 'var(--text-muted)' }}>({item.itemId})</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <span>Chance: <strong>{(item.chance * 100).toFixed(0)}%</strong></span>
+                                <span>Qtd: <strong>{item.min}-{item.max}</strong></span>
+                                <button type="button" onClick={() => removeLootItem(idx)} style={{ background: 'transparent', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Campos para adicionar novo item à tabela de loot */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '80px 120px 45px 1fr 1fr 1fr 40px', gap: 6, alignItems: 'end', marginTop: 8 }}>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 9 }}>ID Item</label>
+                            <input type="text" placeholder="Ex: faca" value={newLootItem.itemId} onChange={(e) => setNewLootItem(prev => ({ ...prev, itemId: e.target.value }))} style={{ padding: '8px' }} />
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 9 }}>Nome</label>
+                            <input type="text" placeholder="Ex: Faca Amolada" value={newLootItem.name} onChange={(e) => setNewLootItem(prev => ({ ...prev, name: e.target.value }))} style={{ padding: '8px' }} />
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 9 }}>Ícone</label>
+                            <input type="text" placeholder="Ex: 🔪" value={newLootItem.icon} onChange={(e) => setNewLootItem(prev => ({ ...prev, icon: e.target.value }))} style={{ padding: '8px', textAlign: 'center' }} />
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 9 }}>Chance (0-1)</label>
+                            <input type="number" step="0.05" min="0" max="1" placeholder="Chance" value={newLootItem.chance} onChange={(e) => setNewLootItem(prev => ({ ...prev, chance: e.target.value }))} style={{ padding: '8px' }} />
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 9 }}>Min</label>
+                            <input type="number" min="1" value={newLootItem.min} onChange={(e) => setNewLootItem(prev => ({ ...prev, min: e.target.value }))} style={{ padding: '8px' }} />
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 9 }}>Max</label>
+                            <input type="number" min="1" value={newLootItem.max} onChange={(e) => setNewLootItem(prev => ({ ...prev, max: e.target.value }))} style={{ padding: '8px' }} />
+                          </div>
+                          <button type="button" className="btn btn-sm btn-primary" onClick={addLootItem} style={{ padding: '10px 0', width: '100%', borderRadius: 6 }}>
+                            +
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
 

@@ -4,6 +4,7 @@ import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import DiceRoller from './DiceRoller.jsx'
+import CharacterPopup from './CharacterPopup.jsx'
 
 const WEATHER_ICONS = {
   sunny: '☀️',
@@ -19,6 +20,7 @@ export default function HUD({ locationName }) {
   const location = useLocation()
   const [gameConfig, setGameConfig] = useState(null)
   const [showDice, setShowDice] = useState(false)
+  const [showCharacter, setShowCharacter] = useState(false)
   const [currentTime, setCurrentTime] = useState('')
 
   // Escuta configurações globais do jogo em tempo real
@@ -103,15 +105,20 @@ export default function HUD({ locationName }) {
             Sobreviventes
           </Link>
 
-          <Link
-            to="/character"
-            className={`hud-btn ${location.pathname === '/character' ? 'active' : ''}`}
+          <button
+            className={`hud-btn ${showCharacter ? 'active' : ''}`}
+            onClick={() => setShowCharacter((prev) => !prev)}
+            title="Ver Personagem"
           >
             <span className="hud-btn-icon">👤</span>
             Personagem
-          </Link>
+          </button>
 
-          <button className="hud-btn" onClick={() => setShowDice(true)}>
+          <button
+            className={`hud-btn ${showDice ? 'active' : ''}`}
+            onClick={() => setShowDice((prev) => !prev)}
+            title="Rolar Dados"
+          >
             <span className="hud-btn-icon">🎲</span>
             Dados
           </button>
@@ -132,14 +139,14 @@ export default function HUD({ locationName }) {
               className="hud-avatar"
               src={character.avatarUrl}
               alt={character.name}
-              onClick={() => navigate('/character')}
-              title={character.name}
+              onClick={() => setShowCharacter((prev) => !prev)}
+              title={`${character.name} (Clique para abrir ficha)`}
             />
           ) : (
             <div
               className="hud-avatar-placeholder"
-              onClick={() => navigate('/character')}
-              title={character?.name}
+              onClick={() => setShowCharacter((prev) => !prev)}
+              title={`${character?.name || 'Personagem'} (Clique para abrir ficha)`}
             >
               🧟
             </div>
@@ -153,6 +160,7 @@ export default function HUD({ locationName }) {
       </header>
 
       {showDice && <DiceRoller onClose={() => setShowDice(false)} />}
+      {showCharacter && <CharacterPopup onClose={() => setShowCharacter(false)} />}
     </>
   )
 }
