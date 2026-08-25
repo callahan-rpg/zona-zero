@@ -456,7 +456,7 @@ body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  filter: brightness(0.78);
+  filter: brightness(0.90);
   transition: background-image 0.5s ease;
 }
 
@@ -557,15 +557,6 @@ body {
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--accent-dim);
-}
-
-.chat-wrapper {
-  background: rgba(4, 10, 4, 0.82);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(92, 255, 122, 0.08);
 }
 
 .chat-wrapper iframe {
