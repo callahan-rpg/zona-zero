@@ -223,7 +223,6 @@ export default function Location() {
 
           {/* Chat central */}
           <div className="chat-container">
-            <div className="chat-location-label">{location.name}</div>
 
             <div className="chat-wrapper">
               <iframe
