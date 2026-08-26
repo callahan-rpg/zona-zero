@@ -1,27 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { doc, onSnapshot } from 'firebase/firestore'
+import { doc, onSnapshot, collection } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import DiceRoller from './DiceRoller.jsx'
 import CharacterPopup from './CharacterPopup.jsx'
-
-const WEATHER_ICONS = {
-  sunny: '☀️',
-  cloudy: '☁️',
-  rainy: '🌧️',
-  foggy: '🌫️',
-  storm: '⛈️',
-}
+import CalendarModal from './CalendarModal.jsx'
+import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 
 export default function HUD({ locationName }) {
   const { character, role, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [gameConfig, setGameConfig] = useState(null)
+  const [calendarEvents, setCalendarEvents] = useState([])
   const [showDice, setShowDice] = useState(false)
   const [showCharacter, setShowCharacter] = useState(false)
-  const [currentTime, setCurrentTime] = useState('')
+  const [showCalendar, setShowCalendar] = useState(false)
+  const [showWeatherPopover, setShowWeatherPopover] = useState(false)
+  const [tickCounter, setTickCounter] = useState(0)
   const [weatherFxEnabled, setWeatherFxEnabled] = useState(() => {
     return localStorage.getItem('zz_weather_fx') !== 'false'
   })
@@ -43,14 +40,19 @@ export default function HUD({ locationName }) {
     return unsub
   }, [])
 
-  // Relógio local (atualiza a cada minuto)
+  // Escuta eventos do calendário cadastrados no Firestore
   useEffect(() => {
-    const tick = () => {
-      const now = new Date()
-      setCurrentTime(now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
-    }
-    tick()
-    const interval = setInterval(tick, 60000)
+    const unsub = onSnapshot(collection(db, 'calendar_events'), (snap) => {
+      setCalendarEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+    return unsub
+  }, [])
+
+  // Relógio do jogo (atualiza periodicamente a simulação)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTickCounter(prev => prev + 1)
+    }, 1000) // 1s de atualização para fluidez temporal
     return () => clearInterval(interval)
   }, [])
 
@@ -59,30 +61,102 @@ export default function HUD({ locationName }) {
     navigate('/login')
   }
 
-  const weather = gameConfig?.weather
-  const displayTime = gameConfig?.time?.mode === 'manual'
-    ? gameConfig.time.value
-    : currentTime
+  // Cálculo temporal e climático
+  const gameTime = calculateGameTime(gameConfig)
+  const weather = getDynamicWeather(gameConfig, gameTime)
 
   return (
     <>
       <header className="hud">
-        {/* Esquerda: logo + localização + clima */}
+        {/* Esquerda: logo + localização + clima dinâmico e interativo */}
         <div className="hud-left">
           <span className="hud-logo">ZONA ZERO</span>
           {locationName && (
             <span className="hud-location-name">{locationName}</span>
           )}
-          {weather && (
-            <div className="hud-weather" title={`${weather.label} · ${weather.temperature}°C`}>
-              <span className="weather-icon">
-                {WEATHER_ICONS[weather.condition] || '🌡️'}
-              </span>
+
+          {/* Widget de Clima e Horário Dinâmico */}
+          <div className="hud-weather-container">
+            <button
+              className={`hud-weather ${showWeatherPopover ? 'active' : ''}`}
+              onClick={() => setShowWeatherPopover(prev => !prev)}
+              title="Clique para ver detalhes do clima, lua e estação"
+            >
+              <span className="weather-icon">{weather.icon}</span>
               <span className="temp">{weather.temperature}°C</span>
               <span className="separator">|</span>
-              <span className="time">{displayTime}</span>
-            </div>
-          )}
+              <span className="time">{gameTime.timeString}</span>
+              <span className="season-icon" title={gameTime.season.name}>{gameTime.season.icon}</span>
+              <span className="moon-icon" title={gameTime.moonPhase.name}>{gameTime.moonPhase.icon}</span>
+            </button>
+
+            {/* Popover Expandido de Ambiente e Horário */}
+            {showWeatherPopover && (
+              <div className="weather-popover glass">
+                <div className="weather-popover-header">
+                  <div className="popover-title-row">
+                    <span className="popover-location">📍 {weather.region || 'Leste Europeu'}</span>
+                    <span className="popover-date">{gameTime.formattedDate}</span>
+                  </div>
+                  <button className="popover-close-btn" onClick={() => setShowWeatherPopover(false)}>✕</button>
+                </div>
+
+                <div className="weather-popover-body">
+                  {/* Linha de Clima e Temperatura */}
+                  <div className="popover-grid-card">
+                    <div className="popover-card-icon">{weather.icon}</div>
+                    <div className="popover-card-info">
+                      <div className="popover-card-label">Condição Climática</div>
+                      <div className="popover-card-val">{weather.label} ({weather.temperature}°C)</div>
+                    </div>
+                  </div>
+
+                  {/* Estação do Ano */}
+                  <div className="popover-grid-card">
+                    <div className="popover-card-icon">{gameTime.season.icon}</div>
+                    <div className="popover-card-info">
+                      <div className="popover-card-label">Estação Atual</div>
+                      <div className="popover-card-val">{gameTime.season.name}</div>
+                      <div className="popover-card-sub">{gameTime.season.desc}</div>
+                    </div>
+                  </div>
+
+                  {/* Fase da Lua & Impacto nos Zumbis */}
+                  <div className="popover-grid-card moon-card">
+                    <div className="popover-card-icon">{gameTime.moonPhase.icon}</div>
+                    <div className="popover-card-info">
+                      <div className="popover-card-label">Fase Lunar · {gameTime.moonPhase.name}</div>
+                      <div className="popover-card-zombie">{gameTime.moonPhase.zombieEffect}</div>
+                    </div>
+                  </div>
+
+                  {/* Relógio & Proporção */}
+                  <div className="popover-time-bar">
+                    <div className="time-bar-left">
+                      <span>⏰ Horário In-Game: <strong>{gameTime.timeString}</strong> ({gameTime.period === 'day' ? '☀️ Dia' : '🌙 Noite'})</span>
+                    </div>
+                    <div className="time-bar-right">
+                      <span>{gameTime.isDynamic ? '⚡ Simulação (12h real = 24h jogo)' : '🔒 Horário Manual'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botão de Ação para Abrir Calendário */}
+                <div className="weather-popover-footer">
+                  <button
+                    className="btn btn-sm btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={() => {
+                      setShowWeatherPopover(false)
+                      setShowCalendar(true)
+                    }}
+                  >
+                    📅 Abrir Calendário & Eventos
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Direita: botões de navegação */}
@@ -102,6 +176,15 @@ export default function HUD({ locationName }) {
             <span className="hud-btn-icon">🗺️</span>
             Mapa
           </Link>
+
+          <button
+            className={`hud-btn ${showCalendar ? 'active' : ''}`}
+            onClick={() => setShowCalendar(prev => !prev)}
+            title="Calendário de Sobrevivência & Eventos"
+          >
+            <span className="hud-btn-icon">📅</span>
+            Calendário
+          </button>
 
           <a
             href="/characters"
@@ -167,8 +250,16 @@ export default function HUD({ locationName }) {
         </div>
       </header>
 
+      {/* Popups flutuantes */}
       {showDice && <DiceRoller onClose={() => setShowDice(false)} />}
       {showCharacter && <CharacterPopup onClose={() => setShowCharacter(false)} />}
+      {showCalendar && (
+        <CalendarModal
+          gameTime={gameTime}
+          events={calendarEvents}
+          onClose={() => setShowCalendar(false)}
+        />
+      )}
     </>
   )
 }

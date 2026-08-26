@@ -30,6 +30,23 @@ export default function WeatherEffects({ condition = 'sunny', enabled = true, is
     // Configuração de partículas de acordo com o clima
     const particles = []
 
+    // 🌨️ NEVE / NEVASCA
+    if (condition === 'snowy') {
+      const flakeCount = 130
+      for (let i = 0; i < flakeCount; i++) {
+        particles.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          radius: Math.random() * 2.5 + 1.2,
+          speed: Math.random() * 1.5 + 0.8,
+          drift: (Math.random() - 0.5) * 0.8,
+          opacity: Math.random() * 0.6 + 0.3,
+          swing: Math.random() * Math.PI * 2,
+          swingSpeed: Math.random() * 0.03 + 0.01,
+        })
+      }
+    }
+
     // 🌧️ CHUVA & TEMPESTADE
     if (condition === 'rainy' || condition === 'storm') {
       const dropCount = condition === 'storm' ? 350 : 180
@@ -64,9 +81,49 @@ export default function WeatherEffects({ condition = 'sunny', enabled = true, is
     let lightningOpacity = 0
     let nextLightningTime = Date.now() + Math.random() * 5000 + 3000
 
+    // ☁️ CÉU NUBLADO / ENCOBERTO / CINZENTO
+    if (condition === 'cloudy') {
+      const cloudCount = 18
+      for (let i = 0; i < cloudCount; i++) {
+        particles.push({
+          x: Math.random() * width,
+          y: Math.random() * (height * 0.7),
+          radius: Math.random() * 200 + 140,
+          vx: (Math.random() * 0.3 + 0.1), // movimento suave lateral
+          opacity: Math.random() * 0.08 + 0.04,
+        })
+      }
+    }
+
     // Loop de renderização
     const render = () => {
       ctx.clearRect(0, 0, width, height)
+
+      // EFEITO CÉU NUBLADO / CINZENTO (CLOUDY)
+      if (condition === 'cloudy') {
+        // Tom suave cinzento escurecido sobre a cena
+        ctx.fillStyle = 'rgba(25, 30, 38, 0.25)'
+        ctx.fillRect(0, 0, width, height)
+
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i]
+          const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius)
+          gradient.addColorStop(0, `rgba(40, 48, 58, ${p.opacity})`)
+          gradient.addColorStop(0.6, `rgba(30, 38, 48, ${p.opacity * 0.6})`)
+          gradient.addColorStop(1, 'rgba(30, 38, 48, 0)')
+
+          ctx.fillStyle = gradient
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
+          ctx.fill()
+
+          p.x += p.vx
+          if (p.x - p.radius > width) {
+            p.x = -p.radius
+            p.y = Math.random() * (height * 0.7)
+          }
+        }
+      }
 
       // EFEITO RELÂMPAGO (STORM)
       if (condition === 'storm') {
@@ -79,6 +136,29 @@ export default function WeatherEffects({ condition = 'sunny', enabled = true, is
           ctx.fillStyle = `rgba(215, 235, 255, ${lightningOpacity})`
           ctx.fillRect(0, 0, width, height)
           lightningOpacity -= 0.04
+        }
+      }
+
+      // RENDERIZAR NEVE
+      if (condition === 'snowy') {
+        ctx.fillStyle = 'rgba(240, 248, 255, 0.8)'
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i]
+          p.swing += p.swingSpeed
+          p.y += p.speed
+          p.x += Math.sin(p.swing) * 0.8 + p.drift
+
+          if (p.y > height) {
+            p.y = -5
+            p.x = Math.random() * width
+          }
+          if (p.x < -10) p.x = width + 10
+          if (p.x > width + 10) p.x = -10
+
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
+          ctx.fillStyle = `rgba(235, 245, 255, ${p.opacity})`
+          ctx.fill()
         }
       }
 
@@ -138,7 +218,7 @@ export default function WeatherEffects({ condition = 'sunny', enabled = true, is
     }
   }, [condition, enabled, isIndoor])
 
-  if (!enabled || isIndoor || !['rainy', 'storm', 'foggy'].includes(condition)) {
+  if (!enabled || isIndoor || !['rainy', 'storm', 'foggy', 'snowy', 'cloudy'].includes(condition)) {
     return null
   }
 

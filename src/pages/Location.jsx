@@ -5,6 +5,7 @@ import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
 import WeatherEffects from '../components/WeatherEffects.jsx'
+import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 
 // Locação padrão de teste (sala do hospital)
 // Em produção, todos os dados virão do Firestore via admin panel
@@ -185,6 +186,10 @@ export default function Location() {
 
   const hasBackground = !!location.backgroundImage
 
+  // Calcula o clima dinâmico sincronizado com o HUD e o Calendário
+  const gameTime = calculateGameTime(gameConfig)
+  const weather = getDynamicWeather(gameConfig, gameTime)
+
   return (
     <div className="location-page">
       {/* Background */}
@@ -195,7 +200,7 @@ export default function Location() {
 
       {/* Efeitos Climáticos (Renderizados no Canvas sobre o background) */}
       <WeatherEffects
-        condition={gameConfig?.weather?.condition || 'sunny'}
+        condition={weather?.condition || 'sunny'}
         enabled={weatherFxEnabled}
         isIndoor={!!location.isIndoor}
       />
@@ -223,6 +228,7 @@ export default function Location() {
 
           {/* Chat central */}
           <div className="chat-container">
+            <div className="chat-location-label">{location.name}</div>
 
             <div className="chat-wrapper">
               <iframe
