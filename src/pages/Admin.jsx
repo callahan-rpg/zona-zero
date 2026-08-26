@@ -107,6 +107,7 @@ export default function Admin() {
       description: loc.description || '',
       backgroundImage: loc.backgroundImage || '',
       xatIframe: loc.xatIframe || '',
+      isIndoor: !!loc.isIndoor,
       lootEnabled: loc.loot?.enabled !== false,
       cooldownMinutes: loc.loot?.cooldownMinutes || 30,
       emptyChance: loc.loot?.emptyChance || 0.3,
@@ -123,6 +124,7 @@ export default function Admin() {
       description: '',
       backgroundImage: '',
       xatIframe: '',
+      isIndoor: false,
       lootEnabled: true,
       cooldownMinutes: 30,
       emptyChance: 0.3,
@@ -148,6 +150,7 @@ export default function Admin() {
       description: locForm.description.trim(),
       backgroundImage: locForm.backgroundImage.trim() || null,
       xatIframe: locForm.xatIframe.trim(),
+      isIndoor: !!locForm.isIndoor,
       loot: {
         enabled: locForm.lootEnabled,
         cooldownMinutes: Number(locForm.cooldownMinutes),
@@ -413,15 +416,17 @@ export default function Admin() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '400px', overflowY: 'auto' }}>
                   {locations.map((loc) => (
                     <div key={loc.id} className="glass-light" style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span
-                          style={{ fontSize: 13, cursor: 'pointer', fontWeight: editingLoc === loc.id ? 'bold' : 'normal', color: editingLoc === loc.id ? 'var(--accent)' : 'inherit' }}
-                          onClick={() => handleLocEdit(loc)}
-                          title="Clique para editar"
-                        >
-                          📂 {loc.name}
-                        </span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <strong style={{ fontSize: 13, cursor: 'pointer', color: editingLoc === loc.id ? 'var(--accent)' : 'inherit' }} onClick={() => handleLocEdit(loc)}>{loc.name}</strong>
+                          <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: loc.isIndoor ? 'rgba(255,255,255,0.06)' : 'rgba(92,255,122,0.1)', color: loc.isIndoor ? 'var(--text-muted)' : 'var(--accent)' }}>
+                            {loc.isIndoor ? '🏠 Interior' : '🌳 Aberto'}
+                          </span>
+                        </div>
                         <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn-sm" style={{ padding: '2px 6px', fontSize: 10 }} onClick={() => handleLocEdit(loc)}>
+                            Editar
+                          </button>
                           <a 
                             href={`/location/${loc.slug}`} 
                             target="_blank" 
@@ -505,6 +510,25 @@ export default function Admin() {
                 <div className="form-group">
                   <label>Iframe do Chat xat.com</label>
                   <input type="text" placeholder="https://xat.com/embed/chat.php#id=..." value={locForm.xatIframe} onChange={(e) => setLocForm(prev => ({ ...prev, xatIframe: e.target.value }))} required />
+                </div>
+
+                {/* Tipo de Ambiente: Aberto vs Fechado */}
+                <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '6px', marginBottom: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      type="checkbox"
+                      id="isIndoor"
+                      checked={locForm.isIndoor}
+                      onChange={(e) => setLocForm(prev => ({ ...prev, isIndoor: e.target.checked }))}
+                      style={{ width: 'auto', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="isIndoor" style={{ margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: 600 }}>🏠 Ambiente Fechado (Interior / Sala Coberta)</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        Se marcado, efeitos climáticos externos (como chuva e tempestade) não caem dentro deste local.
+                      </span>
+                    </label>
+                  </div>
                 </div>
 
                 {/* Loot Config */}

@@ -22,6 +22,18 @@ export default function HUD({ locationName }) {
   const [showDice, setShowDice] = useState(false)
   const [showCharacter, setShowCharacter] = useState(false)
   const [currentTime, setCurrentTime] = useState('')
+  const [weatherFxEnabled, setWeatherFxEnabled] = useState(() => {
+    return localStorage.getItem('zz_weather_fx') !== 'false'
+  })
+
+  function toggleWeatherFx() {
+    setWeatherFxEnabled(prev => {
+      const next = !prev
+      localStorage.setItem('zz_weather_fx', String(next))
+      window.dispatchEvent(new Event('weather_fx_toggle'))
+      return next
+    })
+  }
 
   // Escuta configurações globais do jogo em tempo real
   useEffect(() => {
@@ -55,24 +67,18 @@ export default function HUD({ locationName }) {
   return (
     <>
       <header className="hud">
-        {/* Esquerda: logo + localização */}
+        {/* Esquerda: logo + localização + clima */}
         <div className="hud-left">
           <span className="hud-logo">ZONA ZERO</span>
           {locationName && (
             <span className="hud-location-name">{locationName}</span>
           )}
-        </div>
-
-        {/* Centro: clima + hora */}
-        <div className="hud-center">
           {weather && (
-            <div className="hud-weather">
+            <div className="hud-weather" title={`${weather.label} · ${weather.temperature}°C`}>
               <span className="weather-icon">
                 {WEATHER_ICONS[weather.condition] || '🌡️'}
               </span>
               <span className="temp">{weather.temperature}°C</span>
-              <span className="separator">·</span>
-              <span>{weather.label}</span>
               <span className="separator">|</span>
               <span className="time">{displayTime}</span>
             </div>
@@ -108,21 +114,21 @@ export default function HUD({ locationName }) {
           </a>
 
           <button
-            className={`hud-btn ${showCharacter ? 'active' : ''}`}
-            onClick={() => setShowCharacter((prev) => !prev)}
-            title="Ver Personagem"
-          >
-            <span className="hud-btn-icon">👤</span>
-            Personagem
-          </button>
-
-          <button
             className={`hud-btn ${showDice ? 'active' : ''}`}
             onClick={() => setShowDice((prev) => !prev)}
             title="Rolar Dados"
           >
             <span className="hud-btn-icon">🎲</span>
             Dados
+          </button>
+
+          <button
+            className={`hud-btn ${weatherFxEnabled ? 'active' : ''}`}
+            onClick={toggleWeatherFx}
+            title={weatherFxEnabled ? 'Efeitos Climáticos: Ligados (Clique para desligar)' : 'Efeitos Climáticos: Desligados (Clique para ligar)'}
+            style={{ padding: '7px 10px' }}
+          >
+            <span className="hud-btn-icon" style={{ fontSize: 15 }}>{weatherFxEnabled ? '✨' : '💤'}</span>
           </button>
 
           {role === 'admin' && (

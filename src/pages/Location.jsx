@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
+import WeatherEffects from '../components/WeatherEffects.jsx'
 
 // Locação padrão de teste (sala do hospital)
 // Em produção, todos os dados virão do Firestore via admin panel
@@ -52,6 +53,27 @@ export default function Location() {
 
   const [location, setLocation] = useState(null)
   const [loadingLocation, setLoadingLocation] = useState(true)
+  const [gameConfig, setGameConfig] = useState(null)
+  const [weatherFxEnabled, setWeatherFxEnabled] = useState(() => {
+    return localStorage.getItem('zz_weather_fx') !== 'false'
+  })
+
+  // Escuta alterações no toggle de efeitos visuais disparados pelo HUD
+  useEffect(() => {
+    const handleFxToggle = () => {
+      setWeatherFxEnabled(localStorage.getItem('zz_weather_fx') !== 'false')
+    }
+    window.addEventListener('weather_fx_toggle', handleFxToggle)
+    return () => window.removeEventListener('weather_fx_toggle', handleFxToggle)
+  }, [])
+
+  // Escuta configurações de clima global em tempo real
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'game_config', 'global'), (snap) => {
+      if (snap.exists()) setGameConfig(snap.data())
+    })
+    return unsub
+  }, [])
 
   // Loot state
   const [lootState, setLootState] = useState('idle') // idle | searching | result
@@ -170,6 +192,14 @@ export default function Location() {
         className={`location-bg ${hasBackground ? '' : 'fallback'}`}
         style={hasBackground ? { backgroundImage: `url(${location.backgroundImage})` } : {}}
       />
+
+      {/* Efeitos Climáticos (Renderizados no Canvas sobre o background) */}
+      <WeatherEffects
+        condition={gameConfig?.weather?.condition || 'sunny'}
+        enabled={weatherFxEnabled}
+        isIndoor={!!location.isIndoor}
+      />
+
       <div className="location-overlay" />
 
       {/* HUD */}
@@ -193,6 +223,7 @@ export default function Location() {
 
           {/* Chat central */}
           <div className="chat-container">
+            <div className="chat-location-label">{location.name}</div>
 
             <div className="chat-wrapper">
               <iframe

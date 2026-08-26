@@ -492,24 +492,30 @@ body {
 
 .location-main {
   flex: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 680px 1fr;
   align-items: center;
   justify-content: center;
   padding: 20px;
-  gap: 28px;
-  position: relative;
+  gap: 20px;
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
 }
 
-/* Botões de navegação (esquerda/direita) */
+/* Botões de navegação da esquerda colados ao lado do chat */
 .nav-buttons-left {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 12px;
 }
 
+/* Botões de navegação da direita colados ao lado do chat */
 .nav-buttons-right {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 12px;
 }
 
@@ -541,13 +547,14 @@ body {
   transform: translateY(-2px);
 }
 
-/* Chat container */
+/* Chat container com largura fixa e sempre na coluna central */
 .chat-container {
   width: 100%;
   max-width: 680px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  grid-column: 2;
 }
 
 .chat-wrapper iframe {
