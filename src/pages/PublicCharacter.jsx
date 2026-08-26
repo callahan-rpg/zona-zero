@@ -176,20 +176,6 @@ export default function PublicCharacter() {
                   Total de itens: <strong style={{ color: 'var(--accent)' }}>{inventory.length}</strong>
                 </span>
               </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  padding: '4px 10px',
-                  borderRadius: 'var(--radius-pill)',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid var(--glass-border)',
-                  color: 'var(--text-muted)',
-                  letterSpacing: 1,
-                  textTransform: 'uppercase',
-                }}
-              >
-                👁️ Somente leitura
-              </div>
             </div>
 
             {/* Abas de Categoria */}
