@@ -1576,12 +1576,6 @@ body {
   opacity: 0.8;
 }
 
-.character-float-hint {
-  text-align: center;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
 /* ===========================
    INVENTÁRIO AVANÇADO — Abas e Cards
    =========================== */
