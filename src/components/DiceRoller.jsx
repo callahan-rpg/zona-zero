@@ -328,17 +328,35 @@ export default function DiceRoller({ onClose }) {
             {history.map((entry) => {
               const faces = entry.faces || 20
               const entryCount = entry.count || 1
+              const rolls = Array.isArray(entry.rolls) ? entry.rolls : []
               let itemClass = ''
               if (entry.result === 1 || entry.result === entryCount) itemClass = 'crit-fail'
               else if (entry.result === faces || entry.result === entryCount * faces) itemClass = 'crit-success'
               return (
                 <div key={entry.id} className="dice-history-item">
-                  <span className="dice-history-player">{entry.playerName}</span>
-                  <span className="dice-history-type">{entry.diceType}</span>
-                  <span className={`dice-history-result ${itemClass}`}>{entry.result}</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 'auto' }}>
-                    {formatTime(entry.timestamp)}
-                  </span>
+                  <div className="dice-history-main-row">
+                    <span className="dice-history-player">{entry.playerName}</span>
+                    <span className="dice-history-type">{entry.diceType}</span>
+                    <span className={`dice-history-result ${itemClass}`}>{entry.result}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                      {formatTime(entry.timestamp)}
+                    </span>
+                  </div>
+                  {rolls.length > 1 && (
+                    <div className="dice-history-breakdown">
+                      {rolls.map((r, i) => {
+                        let rClass = ''
+                        if (r === 1) rClass = 'crit-fail'
+                        else if (r === faces) rClass = 'crit-success'
+                        return (
+                          <span key={i}>
+                            <span className={`dice-val-tag ${rClass}`}>{r}</span>
+                            {i < rolls.length - 1 && <span className="dice-breakdown-sep"> + </span>}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             })}

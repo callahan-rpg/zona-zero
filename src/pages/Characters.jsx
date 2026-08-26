@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { useNavigate } from 'react-router-dom'
 import HUD from '../components/HUD.jsx'
 
 export default function Characters() {
   const [characters, setCharacters] = useState([])
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
     async function load() {
@@ -49,7 +51,13 @@ export default function Characters() {
         ) : (
           <div className="characters-grid">
             {characters.map((char) => (
-              <div className="character-card-sm" key={char.uid}>
+              <div
+                className="character-card-sm"
+                key={char.uid}
+                onClick={() => navigate(`/characters/${char.uid}`)}
+                title={`Ver ficha de ${char.name}`}
+                style={{ cursor: 'pointer' }}
+              >
                 {char.avatarUrl ? (
                   <img
                     className="character-card-sm-avatar"
@@ -68,12 +76,25 @@ export default function Characters() {
                 </div>
 
                 <div style={{
-                  fontFamily: 'Share Tech Mono, monospace',
-                  fontSize: 11,
-                  color: 'var(--text-muted)',
-                  textAlign: 'right'
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-end',
+                  gap: 4,
                 }}>
-                  {char.xp || 0} XP
+                  <span style={{
+                    fontFamily: 'Share Tech Mono, monospace',
+                    fontSize: 11,
+                    color: 'var(--text-muted)',
+                  }}>
+                    {char.xp || 0} XP
+                  </span>
+                  <span style={{
+                    fontSize: 10,
+                    color: 'var(--accent-dim)',
+                    letterSpacing: 0.5,
+                  }}>
+                    Ver ficha →
+                  </span>
                 </div>
               </div>
             ))}
@@ -83,3 +104,4 @@ export default function Characters() {
     </div>
   )
 }
+

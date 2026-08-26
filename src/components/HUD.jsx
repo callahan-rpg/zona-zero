@@ -97,13 +97,15 @@ export default function HUD({ locationName }) {
             Mapa
           </Link>
 
-          <Link
-            to="/characters"
+          <a
+            href="/characters"
+            target="_blank"
+            rel="noopener noreferrer"
             className={`hud-btn ${location.pathname === '/characters' ? 'active' : ''}`}
           >
             <span className="hud-btn-icon">👥</span>
             Sobreviventes
-          </Link>
+          </a>
 
           <button
             className={`hud-btn ${showCharacter ? 'active' : ''}`}

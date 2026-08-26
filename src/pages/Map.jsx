@@ -52,11 +52,11 @@ export default function Map() {
   const activeLocations = locations.length > 0 ? locations : defaultLocations
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', overflowY: 'auto' }}>
+    <div style={{ minHeight: '100vh', width: '100%', background: 'var(--bg-primary)', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <HUD locationName="Mapa do Setor" />
 
-      <div style={{ padding: 'calc(var(--hud-height) + 24px) 24px 24px', maxWidth: '800px', margin: '0 auto' }}>
-        <div className="glass" style={{ padding: '32px', textAlign: 'center', marginBottom: '24px' }}>
+      <div style={{ padding: 'calc(var(--hud-height) + 24px) 20px 48px', maxWidth: '800px', margin: '0 auto' }}>
+        <div className="glass" style={{ padding: '24px 28px', textAlign: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontFamily: 'Oswald', letterSpacing: 3, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '8px' }}>
             🗺️ Mapa de Sobrevivência
           </h1>
