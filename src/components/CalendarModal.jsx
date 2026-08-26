@@ -5,6 +5,7 @@ export default function CalendarModal({ gameTime, events = [], onClose }) {
   const [selectedMonth, setSelectedMonth] = useState((gameTime?.month ? gameTime.month - 1 : 0))
   const [selectedYear, setSelectedYear] = useState(gameTime?.year || 2026)
   const [hoveredEvent, setHoveredEvent] = useState(null)
+  const [selectedDayEvents, setSelectedDayEvents] = useState(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
   // Draggable window state
@@ -55,10 +56,10 @@ export default function CalendarModal({ gameTime, events = [], onClose }) {
   const totalDays = currentMonthData?.days || 31
 
   // Descobre o primeiro dia da semana do mês para alinhar o grid
-  // Criamos uma data UTC para o dia 1 do ano e mês selecionados
   const firstDayOfWeek = new Date(Date.UTC(selectedYear, selectedMonth, 1)).getUTCDay() // 0 = Domingo
 
   const prevMonth = () => {
+    setSelectedDayEvents(null)
     if (selectedMonth === 0) {
       setSelectedMonth(11)
       setSelectedYear(y => y - 1)
@@ -68,6 +69,7 @@ export default function CalendarModal({ gameTime, events = [], onClose }) {
   }
 
   const nextMonth = () => {
+    setSelectedDayEvents(null)
     if (selectedMonth === 11) {
       setSelectedMonth(0)
       setSelectedYear(y => y + 1)
@@ -88,6 +90,19 @@ export default function CalendarModal({ gameTime, events = [], onClose }) {
 
   const handleMouseLeaveDay = () => {
     setHoveredEvent(null)
+  }
+
+  const handleDayClick = (dayEvents, dayNum) => {
+    if (selectedDayEvents?.day === dayNum) {
+      setSelectedDayEvents(null) // Fecha se clicar no mesmo dia
+    } else {
+      setSelectedDayEvents({
+        day: dayNum,
+        monthName: currentMonthData.name,
+        year: selectedYear,
+        events: dayEvents
+      })
+    }
   }
 
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -166,10 +181,11 @@ export default function CalendarModal({ gameTime, events = [], onClose }) {
               gameTime?.month === selectedMonth + 1 &&
               gameTime?.year === selectedYear
 
+            const isSelected = selectedDayEvents?.day === dayNum
+
             // Eventos cadastrados para este dia
             const dayEvents = events.filter(ev => {
               const evDate = new Date(ev.date)
-              // Se tiver date string YYYY-MM-DD ou dia/mês configurados
               if (ev.day && ev.month) {
                 return Number(ev.day) === dayNum && Number(ev.month) === selectedMonth + 1 && (!ev.year || Number(ev.year) === selectedYear)
               }
@@ -183,9 +199,12 @@ export default function CalendarModal({ gameTime, events = [], onClose }) {
             return (
               <div
                 key={dayNum}
-                className={`calendar-day ${isToday ? 'today' : ''} ${dayEvents.length > 0 ? 'has-event' : ''}`}
+                className={`calendar-day ${isToday ? 'today' : ''} ${dayEvents.length > 0 ? 'has-event' : ''} ${isSelected ? 'selected-day' : ''}`}
+                onClick={() => handleDayClick(dayEvents, dayNum)}
                 onMouseEnter={(e) => handleMouseEnterDay(e, dayEvents, dayNum)}
                 onMouseLeave={handleMouseLeaveDay}
+                style={{ cursor: 'pointer' }}
+                title={`Clique para ver detalhes do dia ${dayNum}`}
               >
                 <span className="day-number">{dayNum}</span>
                 {dayEvents.length > 0 && (
@@ -205,8 +224,61 @@ export default function CalendarModal({ gameTime, events = [], onClose }) {
         </div>
       </div>
 
+      {/* PAINEL DE DETALHES DO DIA AO CLICAR */}
+      {selectedDayEvents && (
+        <div className="calendar-day-details-panel">
+          <div className="day-details-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 14 }}>📌</span>
+              <strong>{selectedDayEvents.day} de {selectedDayEvents.monthName}, {selectedDayEvents.year}</strong>
+            </div>
+            <button
+              className="day-details-close"
+              onClick={() => setSelectedDayEvents(null)}
+              title="Fechar detalhes"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="day-details-content">
+            {selectedDayEvents.events.length === 0 ? (
+              <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '6px 0' }}>
+                Nenhum evento registrado para este dia. Um dia relativamente calmo na Zona Zero.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {selectedDayEvents.events.map((ev, idx) => (
+                  <div key={idx} className="day-detail-card" style={{ borderLeft: `3px solid ${ev.color || 'var(--accent-red)'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <strong style={{ fontSize: 12.5, color: 'var(--text-primary)' }}>{ev.title}</strong>
+                      <span className="event-tag" style={{ background: ev.color || 'var(--accent-blue)', fontSize: 9.5 }}>
+                        {ev.type || 'Evento'}
+                      </span>
+                    </div>
+
+                    {ev.description && (
+                      <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.35, margin: '4px 0' }}>
+                        {ev.description}
+                      </p>
+                    )}
+
+                    {ev.dangerLevel && (
+                      <div style={{ fontSize: 10.5, color: 'var(--accent-yellow)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span>⚠️ Nível de Perigo:</span>
+                        <strong>{ev.dangerLevel}</strong>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Tooltip flutuante de eventos ao passar o mouse */}
-      {hoveredEvent && (
+      {hoveredEvent && !selectedDayEvents && (
         <div
           className="calendar-event-tooltip glass"
           style={{
@@ -246,7 +318,7 @@ export default function CalendarModal({ gameTime, events = [], onClose }) {
 
       {/* Rodapé explicativo */}
       <div className="calendar-footer">
-        <span className="calendar-hint">💡 Arraste o calendário pela barra superior para reposicionar na tela.</span>
+        <span className="calendar-hint">💡 Clique em qualquer dia com evento para abrir os detalhes completos.</span>
       </div>
     </div>
   )
