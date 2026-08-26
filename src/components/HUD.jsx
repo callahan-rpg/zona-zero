@@ -75,88 +75,19 @@ export default function HUD({ locationName }) {
             <span className="hud-location-name">{locationName}</span>
           )}
 
-          {/* Widget de Clima e Horário Dinâmico */}
-          <div className="hud-weather-container">
-            <button
-              className={`hud-weather ${showWeatherPopover ? 'active' : ''}`}
-              onClick={() => setShowWeatherPopover(prev => !prev)}
-              title="Clique para ver detalhes do clima, lua e estação"
-            >
-              <span className="weather-icon">{weather.icon}</span>
-              <span className="temp">{weather.temperature}°C</span>
-              <span className="separator">|</span>
-              <span className="time">{gameTime.timeString}</span>
-              <span className="season-icon" title={gameTime.season.name}>{gameTime.season.icon}</span>
-              <span className="moon-icon" title={gameTime.moonPhase.name}>{gameTime.moonPhase.icon}</span>
-            </button>
-
-            {/* Popover Expandido de Ambiente e Horário */}
-            {showWeatherPopover && (
-              <div className="weather-popover glass">
-                <div className="weather-popover-header">
-                  <div className="popover-title-row">
-                    <span className="popover-location">📍 {weather.region || 'Leste Europeu'}</span>
-                    <span className="popover-date">{gameTime.formattedDate}</span>
-                  </div>
-                  <button className="popover-close-btn" onClick={() => setShowWeatherPopover(false)}>✕</button>
-                </div>
-
-                <div className="weather-popover-body">
-                  {/* Linha de Clima e Temperatura */}
-                  <div className="popover-grid-card">
-                    <div className="popover-card-icon">{weather.icon}</div>
-                    <div className="popover-card-info">
-                      <div className="popover-card-label">Condição Climática</div>
-                      <div className="popover-card-val">{weather.label} ({weather.temperature}°C)</div>
-                    </div>
-                  </div>
-
-                  {/* Estação do Ano */}
-                  <div className="popover-grid-card">
-                    <div className="popover-card-icon">{gameTime.season.icon}</div>
-                    <div className="popover-card-info">
-                      <div className="popover-card-label">Estação Atual</div>
-                      <div className="popover-card-val">{gameTime.season.name}</div>
-                      <div className="popover-card-sub">{gameTime.season.desc}</div>
-                    </div>
-                  </div>
-
-                  {/* Fase da Lua & Impacto nos Zumbis */}
-                  <div className="popover-grid-card moon-card">
-                    <div className="popover-card-icon">{gameTime.moonPhase.icon}</div>
-                    <div className="popover-card-info">
-                      <div className="popover-card-label">Fase Lunar · {gameTime.moonPhase.name}</div>
-                      <div className="popover-card-zombie">{gameTime.moonPhase.zombieEffect}</div>
-                    </div>
-                  </div>
-
-                  {/* Relógio & Proporção */}
-                  <div className="popover-time-bar">
-                    <div className="time-bar-left">
-                      <span>⏰ Horário In-Game: <strong>{gameTime.timeString}</strong> ({gameTime.period === 'day' ? '☀️ Dia' : '🌙 Noite'})</span>
-                    </div>
-                    <div className="time-bar-right">
-                      <span>{gameTime.isDynamic ? '⚡ Simulação (12h real = 24h jogo)' : '🔒 Horário Manual'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Botão de Ação para Abrir Calendário */}
-                <div className="weather-popover-footer">
-                  <button
-                    className="btn btn-sm btn-primary"
-                    style={{ width: '100%' }}
-                    onClick={() => {
-                      setShowWeatherPopover(false)
-                      setShowCalendar(true)
-                    }}
-                  >
-                    📅 Abrir Calendário & Eventos
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Widget de Clima e Horário Dinâmico (Clique para abrir o Calendário) */}
+          <button
+            className={`hud-weather ${showCalendar ? 'active' : ''}`}
+            onClick={() => setShowCalendar(prev => !prev)}
+            title="Clique para abrir o Calendário de Sobrevivência & Eventos"
+          >
+            <span className="weather-icon">{weather.icon}</span>
+            <span className="temp">{weather.temperature}°C</span>
+            <span className="separator">|</span>
+            <span className="time">{gameTime.timeString}</span>
+            <span className="season-icon" title={gameTime.season.name}>{gameTime.season.icon}</span>
+            <span className="moon-icon" title={gameTime.moonPhase.name}>{gameTime.moonPhase.icon}</span>
+          </button>
         </div>
 
         {/* Direita: botões de navegação */}
@@ -176,15 +107,6 @@ export default function HUD({ locationName }) {
             <span className="hud-btn-icon">🗺️</span>
             Mapa
           </Link>
-
-          <button
-            className={`hud-btn ${showCalendar ? 'active' : ''}`}
-            onClick={() => setShowCalendar(prev => !prev)}
-            title="Calendário de Sobrevivência & Eventos"
-          >
-            <span className="hud-btn-icon">📅</span>
-            Calendário
-          </button>
 
           <a
             href="/characters"

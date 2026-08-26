@@ -118,21 +118,29 @@ export default function CalendarModal({ gameTime, events = [], onClose }) {
         </div>
       </div>
 
-      {/* Info da Estação e Fase da Lua no Calendário */}
+      {/* Info da Estação, Clima, Fase da Lua e Zumbis no Calendário */}
       <div className="calendar-season-bar">
-        <div className="calendar-badge">
+        <div className="calendar-badge" title={gameTime?.season?.desc}>
           <span>{gameTime?.season?.icon}</span>
           <span>{gameTime?.season?.name}</span>
         </div>
-        <div className="calendar-badge">
+        <div className="calendar-badge" title={gameTime?.moonPhase?.zombieEffect}>
           <span>{gameTime?.moonPhase?.icon}</span>
           <span>{gameTime?.moonPhase?.name}</span>
         </div>
         <div className="calendar-badge current-time-badge">
           <span>⏰</span>
-          <span>{gameTime?.timeString || '12:00'}</span>
+          <span>{gameTime?.timeString || '12:00'} ({gameTime?.period === 'day' ? 'Dia' : 'Noite'})</span>
         </div>
       </div>
+
+      {/* Banner de Impacto nos Zumbis */}
+      {gameTime?.moonPhase?.zombieEffect && (
+        <div style={{ padding: '6px 14px', background: 'rgba(139, 92, 246, 0.1)', borderBottom: '1px solid rgba(139, 92, 246, 0.2)', fontSize: 10.5, color: '#c4b5fd', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>🧟</span>
+          <span>{gameTime.moonPhase.zombieEffect}</span>
+        </div>
+      )}
 
       {/* Grid do Calendário */}
       <div className="calendar-grid-container">
