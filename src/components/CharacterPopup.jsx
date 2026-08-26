@@ -134,9 +134,6 @@ export default function CharacterPopup({ onClose }) {
             <span>Expandir Inventário</span>
             <span className="btn-external-indicator">↗</span>
           </button>
-          <div className="character-float-hint">
-            Abre em uma nova aba para não interromper seu jogo/chat
-          </div>
         </div>
       </div>
     </div>
