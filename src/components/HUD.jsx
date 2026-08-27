@@ -16,6 +16,7 @@ export default function HUD({ locationName }) {
   const location = useLocation()
   const [gameConfig, setGameConfig] = useState(null)
   const [calendarEvents, setCalendarEvents] = useState([])
+  const [hasActiveCombat, setHasActiveCombat] = useState(false)
   const [showDice, setShowDice] = useState(false)
   const [showCharacter, setShowCharacter] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
@@ -26,6 +27,16 @@ export default function HUD({ locationName }) {
   const [weatherFxEnabled, setWeatherFxEnabled] = useState(() => {
     return localStorage.getItem('zz_weather_fx') !== 'false'
   })
+
+  // Escuta combates ativos no Firestore para exibir o botão com badge pulsante
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'active_combats'), (snap) => {
+      const anyActive = snap.docs.some(d => d.data().active)
+      setHasActiveCombat(anyActive)
+    })
+    return unsub
+  }, [])
+
 
   function toggleWeatherFx() {
     setWeatherFxEnabled(prev => {
@@ -146,6 +157,24 @@ export default function HUD({ locationName }) {
             <span className="hud-btn-icon">👥</span>
             Sobreviventes
           </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (location.pathname === '/combat') return
+              if (location.pathname.startsWith('/location')) {
+                window.open('/combat', '_blank', 'noopener,noreferrer')
+              } else {
+                navigate('/combat')
+              }
+            }}
+            className={`hud-btn combat-hud-icon-btn ${location.pathname === '/combat' ? 'active' : ''} ${hasActiveCombat ? 'combat-pulsing-active' : ''}`}
+            title={hasActiveCombat ? "⚔️ Mesa de Combate Tático (EM ANDAMENTO)" : "⚔️ Mesa de Combate Tático"}
+          >
+            <span className="hud-btn-icon" style={{ fontSize: 18, margin: 0 }}>⚔️</span>
+          </button>
+
+
 
           <button
             className={`hud-btn ${showDice ? 'active' : ''}`}

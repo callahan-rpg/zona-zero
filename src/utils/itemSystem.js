@@ -323,3 +323,12 @@ export function rollUniqueLoot(locationUniqueConfig) {
     selected: false
   }))
 }
+
+/**
+ * Calcula a vida (HP/Sangue) máxima do personagem: 50 + (Constituição * 10)
+ */
+export function getMaxHp(character) {
+  const con = Number(character?.attributes?.constituicao) || 0
+  return 50 + (con * 10)
+}
+

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { getVitalsDebuffs } from '../utils/itemSystem'
+import { getVitalsDebuffs, getMaxHp } from '../utils/itemSystem'
 
 const ATTRIBUTES = [
   { key: 'forca',        label: 'Força',        icon: '💪' },
@@ -152,18 +152,26 @@ export default function CharacterPopup({ onClose }) {
             </div>
 
             {/* Vida */}
-            <div className="vital-row">
-              <div className="vital-label">
-                <span style={{ color: '#ef4444', fontWeight: 600 }}>Vida</span>
-                <span>{character.vitals?.blood ?? 100}%</span>
-              </div>
-              <div className="vital-progress-track">
-                <div
-                  className="vital-progress-fill vital-blood"
-                  style={{ width: `${character.vitals?.blood ?? 100}%` }}
-                />
-              </div>
-            </div>
+            {(() => {
+              const maxHp = getMaxHp(character)
+              const currentHp = Math.min(character.vitals?.blood ?? maxHp, maxHp)
+              const hpPercent = Math.max(0, Math.min(100, Math.round((currentHp / maxHp) * 100)))
+              return (
+                <div className="vital-row">
+                  <div className="vital-label">
+                    <span style={{ color: '#ef4444', fontWeight: 600 }}>Vida (HP)</span>
+                    <span>{currentHp} / {maxHp} ({hpPercent}%)</span>
+                  </div>
+                  <div className="vital-progress-track">
+                    <div
+                      className="vital-progress-fill vital-blood"
+                      style={{ width: `${hpPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })()}
+
           </div>
         </div>
 

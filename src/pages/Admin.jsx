@@ -11,7 +11,8 @@ import {
 import { db } from '../firebase/config'
 import HUD from '../components/HUD.jsx'
 import { SEASONS, MOON_PHASES, MONTHS, calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
-import { RARITY_META, DEFAULT_PRESET_ITEMS, SUPPLY_RARITIES, UNIQUE_RARITIES } from '../utils/itemSystem'
+import { RARITY_META, DEFAULT_PRESET_ITEMS, SUPPLY_RARITIES, UNIQUE_RARITIES, getMaxHp } from '../utils/itemSystem'
+import { COMBAT_STATUS_EFFECTS, MONSTER_TEMPLATES, ATTRIBUTE_ICONS } from '../utils/combatSystem'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -647,25 +648,282 @@ export default function Admin() {
     }
   }
 
-  async function handleRemoveInventoryItem(instanceId) {
-    if (!selectedPlayer) return
-    const playerRef = doc(db, 'users', selectedPlayer.uid)
-    const currentInventory = selectedPlayer.character.inventory.filter(i => i.instanceId !== instanceId)
+  // ==========================================
+  // TAB 5: COMBATE & ENCONTROS TÁTICOS
+  // ==========================================
+  const [combatLocations, setCombatLocations] = useState([])
+  const [selectedCombatSlug, setSelectedCombatSlug] = useState('sala-hospital')
+  const [activeCombatData, setActiveCombatData] = useState(null)
+  const [combatTitle, setCombatTitle] = useState('Emboscada nos Corredores')
+  const [selectedCombatPlayers, setSelectedCombatPlayers] = useState([]) // array de uids
+  const [combatEnemies, setCombatEnemies] = useState([])
+  const [combatLogInput, setCombatLogInput] = useState('')
+  const [customEnemyForm, setCustomEnemyForm] = useState({
+    name: 'Infectado Rápido',
+    icon: '🏃‍♂️🧟',
+    avatarUrl: '',
+    maxHp: 40,
+    forca: 2,
+    destreza: 3,
+    constituicao: 2,
+    sabedoria: 1,
+    carisma: 0,
+    isBoss: false
+  })
+
+  // Escuta locações para o seletor de combate
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'locations'), (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      setCombatLocations(list)
+      if (list.length > 0 && !selectedCombatSlug) {
+        setSelectedCombatSlug(list[0].slug || list[0].id)
+      }
+    })
+    return unsub
+  }, [])
+
+  // Escuta dados do combate ativo na locação selecionada
+  useEffect(() => {
+    if (!selectedCombatSlug) return
+    const unsub = onSnapshot(doc(db, 'active_combats', selectedCombatSlug), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data()
+        setActiveCombatData(data)
+        if (data.active) {
+          setCombatTitle(data.title || 'Combate')
+          setSelectedCombatPlayers(data.participantUids || [])
+          setCombatEnemies(data.enemies || [])
+        }
+      } else {
+        setActiveCombatData(null)
+      }
+    })
+    return unsub
+  }, [selectedCombatSlug])
+
+  // Iniciar / Atualizar Combate no Firestore
+  async function handleStartOrUpdateCombat(e) {
+    if (e) e.preventDefault()
+    if (!selectedCombatSlug) return alert('Selecione uma sala/locação para o combate')
+    if (selectedCombatPlayers.length === 0 && combatEnemies.length === 0) {
+      return alert('Selecione ao menos 1 sobrevivente ou 1 inimigo para o combate')
+    }
 
     try {
-      await updateDoc(playerRef, {
-        'character.inventory': currentInventory
-      })
-      setSelectedPlayer(prev => ({
-        ...prev,
-        character: { ...prev.character, inventory: currentInventory }
-      }))
+      const docRef = doc(db, 'active_combats', selectedCombatSlug)
+      await setDoc(docRef, {
+        active: true,
+        locationSlug: selectedCombatSlug,
+        title: combatTitle.trim() || 'Combate Ativo',
+        participantUids: selectedCombatPlayers,
+        enemies: combatEnemies,
+        combatLog: activeCombatData?.combatLog || [
+          { id: Math.random().toString(36).substring(2), text: `Combate iniciado em ${selectedCombatSlug}!`, timestamp: Date.now() }
+        ],
+        lastImpact: activeCombatData?.lastImpact || null,
+        updatedAt: new Date().toISOString()
+      }, { merge: true })
+      alert('Encontro de combate sincronizado com sucesso!')
     } catch (err) {
-      alert('Erro: ' + err.message)
+      alert('Erro ao iniciar combate: ' + err.message)
+    }
+  }
+
+  // Encerrar Combate
+  async function handleEndCombat() {
+    if (!confirm('Deseja encerrar o combate nesta sala? O banner desaparecerá para os jogadores.')) return
+    try {
+      const docRef = doc(db, 'active_combats', selectedCombatSlug)
+      await setDoc(docRef, {
+        active: false,
+        updatedAt: new Date().toISOString()
+      }, { merge: true })
+      setCombatEnemies([])
+      alert('Combate finalizado!')
+    } catch (err) {
+      alert('Erro ao finalizar combate: ' + err.message)
+    }
+  }
+
+  // Adicionar Monstro por Template
+  function handleAddMonsterTemplate(templateId) {
+    const tmpl = MONSTER_TEMPLATES.find(m => m.id === templateId)
+    if (!tmpl) return
+    const newEnemy = {
+      id: 'enemy_' + Math.random().toString(36).substring(2, 8),
+      name: `${tmpl.name} #${combatEnemies.length + 1}`,
+      icon: tmpl.icon,
+      avatarUrl: tmpl.avatarUrl || '',
+      maxHp: tmpl.maxHp,
+      currentHp: tmpl.maxHp,
+      attributes: { ...tmpl.attributes },
+      status: [],
+      isBoss: !!tmpl.isBoss
+    }
+    setCombatEnemies(prev => [...prev, newEnemy])
+  }
+
+  // Adicionar Inimigo Customizado
+  function handleAddCustomEnemy(e) {
+    e.preventDefault()
+    if (!customEnemyForm.name) return alert('Digite o nome do inimigo')
+    const hp = Number(customEnemyForm.maxHp) || 40
+    const newEnemy = {
+      id: 'enemy_' + Math.random().toString(36).substring(2, 8),
+      name: customEnemyForm.name.trim(),
+      icon: customEnemyForm.icon || '🧟',
+      avatarUrl: customEnemyForm.avatarUrl || '',
+      maxHp: hp,
+      currentHp: hp,
+      attributes: {
+        forca: Number(customEnemyForm.forca) || 0,
+        destreza: Number(customEnemyForm.destreza) || 0,
+        constituicao: Number(customEnemyForm.constituicao) || 0,
+        sabedoria: Number(customEnemyForm.sabedoria) || 0,
+        carisma: Number(customEnemyForm.carisma) || 0
+      },
+      status: [],
+      isBoss: !!customEnemyForm.isBoss
+    }
+    setCombatEnemies(prev => [...prev, newEnemy])
+  }
+
+  function handleRemoveEnemy(enemyId) {
+    setCombatEnemies(prev => prev.filter(e => e.id !== enemyId))
+  }
+
+  // Aplica dano ou cura em um INIMIGO
+  async function applyEnemyHpDelta(enemyId, delta, reason = '') {
+    const updatedEnemies = combatEnemies.map(en => {
+      if (en.id === enemyId) {
+        const nextHp = Math.max(0, Math.min(en.maxHp, (en.currentHp ?? en.maxHp) + delta))
+        return { ...en, currentHp: nextHp }
+      }
+      return en
+    })
+    setCombatEnemies(updatedEnemies)
+
+    const enemy = combatEnemies.find(e => e.id === enemyId)
+    const logText = delta < 0
+      ? `${enemy?.name || 'Inimigo'} sofreu ${Math.abs(delta)} de dano! ${reason ? `(${reason})` : ''}`
+      : `${enemy?.name || 'Inimigo'} recuperou ${delta} de HP! ${reason ? `(${reason})` : ''}`
+
+    try {
+      const docRef = doc(db, 'active_combats', selectedCombatSlug)
+      await updateDoc(docRef, {
+        enemies: updatedEnemies,
+        lastImpact: {
+          targetId: enemyId,
+          type: delta < 0 ? 'damage' : 'heal',
+          value: Math.abs(delta),
+          timestamp: Date.now()
+        },
+        combatLog: [
+          ...(activeCombatData?.combatLog || []).slice(-15),
+          { id: Math.random().toString(36).substring(2), text: logText, timestamp: Date.now() }
+        ]
+      })
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // Toggle de Status em um INIMIGO
+  async function toggleEnemyStatus(enemyId, statusId) {
+    const updatedEnemies = combatEnemies.map(en => {
+      if (en.id === enemyId) {
+        const hasSt = (en.status || []).includes(statusId)
+        const newStatus = hasSt ? en.status.filter(s => s !== statusId) : [...(en.status || []), statusId]
+        return { ...en, status: newStatus }
+      }
+      return en
+    })
+    setCombatEnemies(updatedEnemies)
+
+    try {
+      const docRef = doc(db, 'active_combats', selectedCombatSlug)
+      await updateDoc(docRef, { enemies: updatedEnemies })
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // Aplica dano ou cura em um JOGADOR (atualiza Firestore do usuário diretamente + dispara animação)
+  async function applyPlayerHpDelta(playerUid, delta, reason = '') {
+    const p = players.find(pl => pl.uid === playerUid)
+    if (!p) return
+
+    const maxHp = getMaxHp(p.character)
+    const currentHp = p.character?.vitals?.blood ?? maxHp
+    const nextHp = Math.max(0, Math.min(maxHp, currentHp + delta))
+
+    try {
+      // 1. Atualiza ficha do usuário
+      const userRef = doc(db, 'users', playerUid)
+      await updateDoc(userRef, {
+        'character.vitals.blood': nextHp
+      })
+
+      // 2. Dispara animação de impacto e log no combate
+      const logText = delta < 0
+        ? `${p.character?.name || 'Sobrevivente'} sofreu ${Math.abs(delta)} de dano! ${reason ? `(${reason})` : ''}`
+        : `${p.character?.name || 'Sobrevivente'} recuperou ${delta} de HP! ${reason ? `(${reason})` : ''}`
+
+      const docRef = doc(db, 'active_combats', selectedCombatSlug)
+      await updateDoc(docRef, {
+        lastImpact: {
+          targetId: playerUid,
+          type: delta < 0 ? 'damage' : 'heal',
+          value: Math.abs(delta),
+          timestamp: Date.now()
+        },
+        combatLog: [
+          ...(activeCombatData?.combatLog || []).slice(-15),
+          { id: Math.random().toString(36).substring(2), text: logText, timestamp: Date.now() }
+        ]
+      })
+    } catch (err) {
+      alert('Erro ao aplicar vida no jogador: ' + err.message)
+    }
+  }
+
+  // Toggle de Status em um JOGADOR
+  async function togglePlayerStatus(playerUid, statusId) {
+    const currentParticipantStatus = activeCombatData?.participantStatus || {}
+    const charStatus = currentParticipantStatus[playerUid] || []
+    const hasSt = charStatus.includes(statusId)
+    const newStatus = hasSt ? charStatus.filter(s => s !== statusId) : [...charStatus, statusId]
+
+    const updated = { ...currentParticipantStatus, [playerUid]: newStatus }
+    try {
+      const docRef = doc(db, 'active_combats', selectedCombatSlug)
+      await updateDoc(docRef, { participantStatus: updated })
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // Enviar Log Manual Narrativo
+  async function handleSendCombatLog(e) {
+    e.preventDefault()
+    if (!combatLogInput.trim()) return
+    try {
+      const docRef = doc(db, 'active_combats', selectedCombatSlug)
+      await updateDoc(docRef, {
+        combatLog: [
+          ...(activeCombatData?.combatLog || []).slice(-15),
+          { id: Math.random().toString(36).substring(2), text: combatLogInput.trim(), timestamp: Date.now() }
+        ]
+      })
+      setCombatLogInput('')
+    } catch (err) {
+      alert('Erro ao enviar log: ' + err.message)
     }
   }
 
   return (
+
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', overflowY: 'auto' }}>
       <HUD />
 
@@ -692,7 +950,11 @@ export default function Admin() {
             <button className={`btn btn-sm ${activeTab === 'players' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('players')}>
               👥 Sobreviventes
             </button>
+            <button className={`btn btn-sm ${activeTab === 'combat' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('combat')} style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: activeTab === 'combat' ? '#fff' : '#f87171' }}>
+              ⚔️ Mesa de Combate {activeCombatData?.active && '🔴'}
+            </button>
           </div>
+
 
           {/* CONTEÚDO DA TAB CATALOG: CATÁLOGO GERAL DE ITENS */}
           {activeTab === 'catalog' && (
@@ -2108,8 +2370,268 @@ export default function Admin() {
               )}
             </div>
           )}
+
+          {/* ========================================== */}
+          {/* CONTEÚDO DA TAB 5: COMBATE & ENCONTROS TÁTICOS */}
+          {/* ========================================== */}
+          {activeTab === 'combat' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Barra superior de controle do encontro */}
+              <div className="glass-light" style={{ padding: '16px 20px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.3)', background: 'linear-gradient(180deg, rgba(239,68,68,0.06) 0%, rgba(0,0,0,0.3) 100%)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 16, color: '#f87171', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      ⚔️ Gerenciador de Encontro de Combate
+                      {activeCombatData?.active && (
+                        <span style={{ fontSize: 10, background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: 12, fontWeight: 'bold', animation: 'pulseGlow 1.8s infinite' }}>
+                          AO VIVO
+                        </span>
+                      )}
+                    </h3>
+                    <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+                      Selecione a sala, escolha os jogadores da cena e gerencie os monstros em tempo real.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    {activeCombatData?.active ? (
+                      <>
+                        <button type="button" className="btn btn-sm btn-primary" onClick={handleStartOrUpdateCombat} style={{ background: '#2563eb' }}>
+                          🔄 Atualizar Cena
+                        </button>
+                        <button type="button" className="btn btn-sm btn-danger" onClick={handleEndCombat}>
+                          ⏹️ Encerrar Combate
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" className="btn btn-sm btn-danger" onClick={handleStartOrUpdateCombat} style={{ fontWeight: 700, padding: '8px 16px' }}>
+                        ▶️ Iniciar Combate na Sala
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Seletores de Locação e Título do Encontro */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 14, marginTop: 16 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Locação / Sala do Combate</label>
+                    <select
+                      value={selectedCombatSlug}
+                      onChange={e => setSelectedCombatSlug(e.target.value)}
+                      style={{ width: '100%', padding: '8px 10px', fontSize: 13 }}
+                    >
+                      {combatLocations.map(loc => (
+                        <option key={loc.id} value={loc.slug || loc.id}>
+                          {loc.name} ({loc.slug || loc.id})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Título / Descrição Curta da Cena</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Emboscada nos Corredores do 2º Andar"
+                      value={combatTitle}
+                      onChange={e => setCombatTitle(e.target.value)}
+                      style={{ width: '100%', padding: '8px 10px', fontSize: 13 }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* GRID PRINCIPAL: LADO ESQUERDO (JOGADORES SELECIONÁVEIS) | LADO DIREITO (INIMIGOS / PRESETS) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                {/* 1. SELEÇÃO E CONTROLE DOS SOBREVIVENTES */}
+                <div className="glass-light" style={{ padding: '16px', borderRadius: 12, border: '1px solid rgba(56,189,248,0.25)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <h4 style={{ margin: 0, fontSize: 13, textTransform: 'uppercase', color: '#38bdf8' }}>
+                      🛡️ Sobreviventes na Cena ({selectedCombatPlayers.length})
+                    </h4>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Marque quem participará</span>
+                  </div>
+
+                  {/* Lista de Checkboxes de Jogadores */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto', paddingRight: 4 }}>
+                    {players.map(p => {
+                      const isSelected = selectedCombatPlayers.includes(p.uid)
+                      const maxHp = getMaxHp(p.character)
+                      const currentHp = p.character?.vitals?.blood ?? maxHp
+                      return (
+                        <label
+                          key={p.uid}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '8px 10px',
+                            borderRadius: 8,
+                            background: isSelected ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.02)',
+                            border: `1px solid ${isSelected ? 'rgba(56,189,248,0.4)' : 'var(--glass-border)'}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedCombatPlayers(prev => [...prev, p.uid])
+                              } else {
+                                setSelectedCombatPlayers(prev => prev.filter(id => id !== p.uid))
+                              }
+                            }}
+                            style={{ width: 'auto' }}
+                          />
+                          <span style={{ fontSize: 18 }}>{p.character?.avatarUrl ? '👤' : '🧟'}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <strong style={{ fontSize: 12, color: 'var(--text-primary)' }}>{p.character?.name || 'Incompleto'}</strong>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                              Nv {p.character?.level || 1} · CON: {p.character?.attributes?.constituicao ?? 1}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: currentHp <= 20 ? '#ef4444' : '#22c55e' }}>
+                            {currentHp}/{maxHp} HP
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. ADICIONAR INIMIGOS / NPCS */}
+                <div className="glass-light" style={{ padding: '16px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.25)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <h4 style={{ margin: 0, fontSize: 13, textTransform: 'uppercase', color: '#f87171' }}>
+                      👹 Inimigos no Combate ({combatEnemies.length})
+                    </h4>
+                  </div>
+
+                  {/* Templates Rápidos de Inimigos */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                      ⚡ Adicionar Template Rápido:
+                    </label>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {MONSTER_TEMPLATES.map(m => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handleAddMonsterTemplate(m.id)}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            background: m.isBoss ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${m.isBoss ? '#f59e0b' : 'var(--glass-border)'}`,
+                            color: m.isBoss ? '#fbbf24' : 'var(--text-primary)',
+                            borderRadius: 6,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {m.icon} +{m.name} ({m.maxHp} HP)
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Lista de Inimigos Vivos no Combate */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 160, overflowY: 'auto', marginBottom: 14 }}>
+                    {combatEnemies.length === 0 ? (
+                      <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
+                        Nenhum inimigo adicionado ainda.
+                      </p>
+                    ) : (
+                      combatEnemies.map(enemy => {
+                        const currentHp = enemy.currentHp ?? enemy.maxHp
+                        return (
+                          <div
+                            key={enemy.id}
+                            style={{
+                              background: 'rgba(0,0,0,0.3)',
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              border: `1px solid ${enemy.isBoss ? '#f59e0b' : 'rgba(239,68,68,0.3)'}`,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 16 }}>{enemy.icon}</span>
+                              <strong style={{ fontSize: 12, color: enemy.isBoss ? '#fbbf24' : '#f87171' }}>
+                                {enemy.name}
+                              </strong>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#ef4444' }}>
+                                {currentHp} / {enemy.maxHp} HP
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveEnemy(enemy.id)}
+                                style={{ background: 'transparent', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: 14 }}
+                                title="Remover da cena"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+
+                  {/* Form de Inimigo Customizado */}
+                  <form onSubmit={handleAddCustomEnemy} style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 10 }}>
+                    <label style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                      ➕ Criar Inimigo / NPC Customizado
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px', gap: 6, marginBottom: 6 }}>
+                      <input
+                        type="text"
+                        placeholder="Nome do Inimigo"
+                        value={customEnemyForm.name}
+                        onChange={e => setCustomEnemyForm(prev => ({ ...prev, name: e.target.value }))}
+                        style={{ padding: '6px', fontSize: 11 }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="🧟"
+                        value={customEnemyForm.icon}
+                        onChange={e => setCustomEnemyForm(prev => ({ ...prev, icon: e.target.value }))}
+                        style={{ padding: '6px', fontSize: 11, textAlign: 'center' }}
+                      />
+                      <input
+                        type="number"
+                        placeholder="HP Max"
+                        value={customEnemyForm.maxHp}
+                        onChange={e => setCustomEnemyForm(prev => ({ ...prev, maxHp: e.target.value }))}
+                        style={{ padding: '6px', fontSize: 11 }}
+                      />
+                    </div>
+                    <button type="submit" className="btn btn-sm btn-primary" style={{ width: '100%', fontSize: 11 }}>
+                      + Adicionar Inimigo
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* Botão de Atalho para a Mesa de Combate Oficial */}
+              {activeCombatData?.active && (
+                <div style={{ textAlign: 'center', padding: '14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10 }}>
+                  <a href="/combat" target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ display: 'inline-flex', padding: '8px 20px', textDecoration: 'none', fontSize: 13 }}>
+                    ⚔️ Abrir Mesa de Combate Tático Oficial (Editar e Narrar ao Vivo) ↗
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
+
+

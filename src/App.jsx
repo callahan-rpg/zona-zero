@@ -8,6 +8,7 @@ import Characters from './pages/Characters.jsx'
 import Admin from './pages/Admin.jsx'
 import Map from './pages/Map.jsx'
 import PublicCharacter from './pages/PublicCharacter.jsx'
+import Combat from './pages/Combat.jsx'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -40,9 +41,11 @@ export default function App() {
         <Route path="/location/:slug" element={<ProtectedRoute><Location /></ProtectedRoute>} />
         <Route path="/character" element={<ProtectedRoute><Character /></ProtectedRoute>} />
         <Route path="/characters" element={<ProtectedRoute><Characters /></ProtectedRoute>} />
+        <Route path="/combat" element={<ProtectedRoute><Combat /></ProtectedRoute>} />
         <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
         <Route path="/map" element={<ProtectedRoute><Map /></ProtectedRoute>} />
         <Route path="/characters/:uid" element={<ProtectedRoute><PublicCharacter /></ProtectedRoute>} />
+
 
         {/* Redirecionamentos */}
         <Route path="/" element={<Navigate to="/location/sala-hospital" replace />} />

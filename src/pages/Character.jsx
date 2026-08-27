@@ -3,7 +3,7 @@ import { collection, getDocs } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
-import { getVitalsDebuffs } from '../utils/itemSystem'
+import { getVitalsDebuffs, getMaxHp } from '../utils/itemSystem'
 
 const ATTRIBUTES = [
   { key: 'forca',        label: 'Força',        icon: '💪' },
@@ -329,15 +329,24 @@ export default function Character() {
                   </div>
                 </div>
 
-                <div className="vital-row">
-                  <div className="vital-label" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                    <span style={{ color: '#ef4444', fontWeight: 600 }}>Vida</span>
-                    <strong>{character.vitals?.blood ?? 100}%</strong>
-                  </div>
-                  <div className="vital-progress-track">
-                    <div className="vital-progress-fill vital-blood" style={{ width: `${character.vitals?.blood ?? 100}%` }} />
-                  </div>
-                </div>
+                {/* Vida */}
+                {(() => {
+                  const maxHp = getMaxHp(character)
+                  const currentHp = Math.min(character.vitals?.blood ?? maxHp, maxHp)
+                  const hpPercent = Math.max(0, Math.min(100, Math.round((currentHp / maxHp) * 100)))
+                  return (
+                    <div className="vital-row">
+                      <div className="vital-label" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                        <span style={{ color: '#ef4444', fontWeight: 600 }}>Vida (HP)</span>
+                        <strong>{currentHp} / {maxHp} ({hpPercent}%)</strong>
+                      </div>
+                      <div className="vital-progress-track">
+                        <div className="vital-progress-fill vital-blood" style={{ width: `${hpPercent}%` }} />
+                      </div>
+                    </div>
+                  )
+                })()}
+
               </div>
             </div>
 

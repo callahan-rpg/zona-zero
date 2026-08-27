@@ -4,6 +4,7 @@ import { doc, getDoc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firesto
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
+import CombatHUD from '../components/CombatHUD.jsx'
 import WeatherEffects from '../components/WeatherEffects.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
@@ -291,6 +292,8 @@ export default function Location() {
       {/* Conteúdo principal */}
       <div className="location-content">
         <div className="location-main">
+
+
           {/* Botões de saída (esquerda) */}
           <div className="nav-buttons-left">
             {location.navigationButtons?.filter(b => b.position === 'left').map((btn, i) => {
