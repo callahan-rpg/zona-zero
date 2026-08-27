@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { getVitalsDebuffs } from '../utils/itemSystem'
 
 const ATTRIBUTES = [
   { key: 'forca',        label: 'Força',        icon: '💪' },
@@ -57,9 +58,18 @@ export default function CharacterPopup({ onClose }) {
   const xpMax = xpForNextLevel(character.level)
   const xpCurrent = character.xp || 0
   const xpProgress = Math.min((xpCurrent / xpMax) * 100, 100)
+  const debuffInfo = getVitalsDebuffs(character.vitals || {})
 
   const handleOpenFullInventory = () => {
-    window.open('/character', '_blank', 'noopener,noreferrer')
+    onClose?.()
+    if (window.location.pathname === '/character') {
+      return
+    }
+    if (window.location.pathname.startsWith('/location')) {
+      window.open('/character', '_blank', 'noopener,noreferrer')
+    } else {
+      window.location.href = '/character'
+    }
   }
 
   return (
@@ -109,17 +119,88 @@ export default function CharacterPopup({ onClose }) {
           </div>
         </div>
 
+        {/* Vitais de Sobrevivência (Sede, Fome, Vida) */}
+        <div className="character-float-vitals-section">
+          <div className="character-float-section-title">Vitais de Sobrevivência</div>
+          <div className="character-vitals-bars">
+            {/* Sede */}
+            <div className="vital-row">
+              <div className="vital-label">
+                <span style={{ color: '#38bdf8', fontWeight: 600 }}>Sede</span>
+                <span>{character.vitals?.thirst ?? 100}%</span>
+              </div>
+              <div className="vital-progress-track">
+                <div
+                  className="vital-progress-fill vital-thirst"
+                  style={{ width: `${character.vitals?.thirst ?? 100}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Fome */}
+            <div className="vital-row">
+              <div className="vital-label">
+                <span style={{ color: '#facc15', fontWeight: 600 }}>Fome</span>
+                <span>{character.vitals?.hunger ?? 100}%</span>
+              </div>
+              <div className="vital-progress-track">
+                <div
+                  className="vital-progress-fill vital-hunger"
+                  style={{ width: `${character.vitals?.hunger ?? 100}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Vida */}
+            <div className="vital-row">
+              <div className="vital-label">
+                <span style={{ color: '#ef4444', fontWeight: 600 }}>Vida</span>
+                <span>{character.vitals?.blood ?? 100}%</span>
+              </div>
+              <div className="vital-progress-track">
+                <div
+                  className="vital-progress-fill vital-blood"
+                  style={{ width: `${character.vitals?.blood ?? 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Atributos */}
         <div className="character-float-attr-section">
-          <div className="character-float-section-title">Atributos Principais</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div className="character-float-section-title" style={{ margin: 0 }}>Atributos Principais</div>
+            {debuffInfo.hasDebuff && (
+              <span style={{ fontSize: 9, color: '#f87171', fontWeight: 'bold', background: 'rgba(239, 68, 68, 0.15)', padding: '1px 5px', borderRadius: 4 }}>
+                ⚠️ Debuff
+              </span>
+            )}
+          </div>
           <div className="character-float-attributes-grid">
-            {ATTRIBUTES.map(({ key, label, icon }) => (
-              <div key={key} className="character-float-attr-card" title={label}>
-                <span className="character-float-attr-icon">{icon}</span>
-                <span className="character-float-attr-val">{character.attributes?.[key] ?? 1}</span>
-                <span className="character-float-attr-lbl">{label}</span>
-              </div>
-            ))}
+            {ATTRIBUTES.map(({ key, label, icon }) => {
+              const baseVal = character.attributes?.[key] ?? 1
+              const penalty = debuffInfo.penalties[key] || 0
+              const effectiveVal = Math.max(1, baseVal + penalty)
+              const isDebuffed = penalty < 0
+
+              return (
+                <div key={key} className={`character-float-attr-card ${isDebuffed ? 'attr-debuffed' : ''}`} title={isDebuffed ? `${label}: ${baseVal} (${penalty} por Fome/Sede)` : `${label}: ${baseVal}`}>
+                  <span className="character-float-attr-icon">{icon}</span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                    <span className="character-float-attr-val" style={{ color: isDebuffed ? '#f87171' : 'inherit' }}>
+                      {effectiveVal}
+                    </span>
+                    {isDebuffed && (
+                      <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 'bold' }}>
+                        ({penalty})
+                      </span>
+                    )}
+                  </div>
+                  <span className="character-float-attr-lbl">{label}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
 
@@ -131,12 +212,8 @@ export default function CharacterPopup({ onClose }) {
             onClick={handleOpenFullInventory}
           >
             <span className="btn-icon-pack">📦</span>
-            <span>Expandir Inventário</span>
-            <span className="btn-external-indicator">↗</span>
+            <span>Mochila & Inventário</span>
           </button>
-          <div className="character-float-hint">
-            Abre em uma nova aba para não interromper seu jogo/chat
-          </div>
         </div>
       </div>
     </div>

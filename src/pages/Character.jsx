@@ -3,6 +3,7 @@ import { collection, getDocs } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
+import { getVitalsDebuffs } from '../utils/itemSystem'
 
 const ATTRIBUTES = [
   { key: 'forca',        label: 'Força',        icon: '💪' },
@@ -13,11 +14,12 @@ const ATTRIBUTES = [
 ]
 
 export const INVENTORY_CATEGORIES = [
-  { id: 'all',      label: 'Todos',              icon: '📦' },
-  { id: 'general',  label: 'Itens Gerais',       icon: '🎒' },
-  { id: 'clothing', label: 'Roupas',             icon: '👕' },
-  { id: 'melee',    label: 'Armas Brancas',      icon: '🗡️' },
-  { id: 'firearms', label: 'Armas de Fogo',      icon: '🔫' },
+  { id: 'all',      label: 'Todos',               icon: '📦' },
+  { id: 'general',  label: 'Itens Gerais',        icon: '🎒' },
+  { id: 'supplies', label: 'Mantimentos',         icon: '🌾' },
+  { id: 'clothing', label: 'Roupas',              icon: '👕' },
+  { id: 'melee',    label: 'Armas Brancas',       icon: '🗡️' },
+  { id: 'firearms', label: 'Armas de Fogo',       icon: '🔫' },
   { id: 'medical',  label: 'Suprimentos Médicos', icon: '💉' },
 ]
 
@@ -25,6 +27,7 @@ export function getItemCategory(item) {
   if (item.category) {
     const cat = item.category.toLowerCase().trim()
     if (['general', 'geral', 'itens gerais'].includes(cat)) return 'general'
+    if (['supplies', 'mantimentos', 'comida', 'bebida', 'alimento'].includes(cat)) return 'supplies'
     if (['clothing', 'roupas', 'roupa', 'vestimenta', 'equipamento'].includes(cat)) return 'clothing'
     if (['melee', 'armas brancas', 'branca', 'corpo a corpo'].includes(cat)) return 'melee'
     if (['firearms', 'armas de fogo', 'fogo', 'armas'].includes(cat)) return 'firearms'
@@ -67,11 +70,12 @@ export function getItemCategory(item) {
 }
 
 const CATEGORY_LABELS = {
-  general:  { label: 'Item Geral',         color: 'var(--text-muted)' },
-  clothing: { label: 'Roupa / Vestuário',  color: '#70d6ff' },
-  melee:    { label: 'Arma Branca',        color: '#ff9770' },
-  firearms: { label: 'Arma de Fogo',       color: '#ff70a6' },
-  medical:  { label: 'Suprimento Médico',  color: '#5cff7a' },
+  general:   { label: 'Item Geral',         color: 'var(--text-muted)' },
+  clothing:  { label: 'Roupa / Vestuário',  color: '#70d6ff' },
+  melee:     { label: 'Arma Branca',        color: '#ff9770' },
+  firearms:  { label: 'Arma de Fogo',       color: '#ff70a6' },
+  medical:   { label: 'Suprimento Médico',  color: '#5cff7a' },
+  supplies:  { label: 'Mantimentos',        color: '#fbbf24' },
 }
 
 function xpForNextLevel(level) {
@@ -79,7 +83,9 @@ function xpForNextLevel(level) {
 }
 
 export default function Character() {
-  const { user, character, transferItem } = useAuth()
+  const { user, character, transferItem, consumeItem, discardItem } = useAuth()
+
+  const debuffInfo = getVitalsDebuffs(character?.vitals || {})
 
   // Filtro de aba ativo
   const [activeCategory, setActiveCategory] = useState('all')
@@ -95,6 +101,16 @@ export default function Character() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  // Estados de Consumo e Descarte
+  const [showConsumeModal, setShowConsumeModal] = useState(false)
+  const [consumeItemTarget, setConsumeItemTarget] = useState(null)
+  const [consumeQty, setConsumeQty] = useState(1)
+  const [actionLoading, setActionLoading] = useState(false)
+
+  const [showDiscardModal, setShowDiscardModal] = useState(false)
+  const [discardItemTarget, setDiscardItemTarget] = useState(null)
+  const [discardQty, setDiscardQty] = useState(1)
+
   // Carrega lista de outros sobreviventes para transferência
   useEffect(() => {
     if (!showTransfer || !user) return
@@ -105,7 +121,7 @@ export default function Character() {
         const snap = await getDocs(collection(db, 'users'))
         const list = snap.docs
           .map((d) => ({ uid: d.id, ...d.data().character }))
-          .filter((c) => c.uid !== user.uid && !!c.name) // Remove eu mesmo e contas incompletas
+          .filter((c) => c.uid !== user.uid && !!c.name)
         setSurvivors(list)
         if (list.length > 0) {
           setRecipientUid(list[0].uid)
@@ -127,6 +143,7 @@ export default function Character() {
     const counts = {
       all: inventory.length,
       general: 0,
+      supplies: 0,
       clothing: 0,
       melee: 0,
       firearms: 0,
@@ -159,6 +176,7 @@ export default function Character() {
   const xpCurrent = character.xp || 0
   const xpProgress = Math.min((xpCurrent / xpMax) * 100, 100)
 
+  // Modal Transfer
   function openTransfer(item) {
     setSelectedItem(item)
     setTransferQty(1)
@@ -177,7 +195,6 @@ export default function Character() {
     try {
       await transferItem(recipientUid, selectedItem.instanceId, Number(transferQty))
       setSuccess('Item transferido com sucesso!')
-      // Espera 1.5s e fecha o modal
       setTimeout(() => {
         setShowTransfer(false)
         setSelectedItem(null)
@@ -189,13 +206,73 @@ export default function Character() {
     }
   }
 
+  // Modal Consumo
+  function openConsume(item) {
+    setConsumeItemTarget(item)
+    setConsumeQty(1)
+    setError('')
+    setSuccess('')
+    setShowConsumeModal(true)
+  }
+
+  async function handleConsumeSubmit(e) {
+    e.preventDefault()
+    if (!consumeItemTarget) return
+    setError('')
+    setSuccess('')
+    setActionLoading(true)
+
+    try {
+      await consumeItem(consumeItemTarget.instanceId, Number(consumeQty), consumeItemTarget.consumeEffect)
+      setSuccess('Item consumido com sucesso!')
+      setTimeout(() => {
+        setShowConsumeModal(false)
+        setConsumeItemTarget(null)
+      }, 1200)
+    } catch (err) {
+      setError(err.message || 'Erro ao consumir item.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // Modal Descarte
+  function openDiscard(item) {
+    setDiscardItemTarget(item)
+    setDiscardQty(1)
+    setError('')
+    setSuccess('')
+    setShowDiscardModal(true)
+  }
+
+  async function handleDiscardSubmit(e) {
+    e.preventDefault()
+    if (!discardItemTarget) return
+    setError('')
+    setSuccess('')
+    setActionLoading(true)
+
+    try {
+      await discardItem(discardItemTarget.instanceId, Number(discardQty))
+      setSuccess('Item descartado do inventário.')
+      setTimeout(() => {
+        setShowDiscardModal(false)
+        setDiscardItemTarget(null)
+      }, 1200)
+    } catch (err) {
+      setError(err.message || 'Erro ao descartar item.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       <HUD />
 
       <div className="character-page">
         <div className="character-layout-grid">
-          {/* COLUNA ESQUERDA: Perfil + Nível + XP + Atributos */}
+          {/* COLUNA ESQUERDA: Perfil + Nível + XP + Vitais + Atributos */}
           <div className="character-profile-panel">
             {/* Header: avatar + nome + nível */}
             <div className="character-header">
@@ -228,17 +305,88 @@ export default function Character() {
               </div>
             </div>
 
-            {/* Atributos */}
-            <div className="character-attributes">
-              <p className="section-title">Atributos de Sobrevivência</p>
-              <div className="attributes-grid">
-                {ATTRIBUTES.map(({ key, label, icon }) => (
-                  <div className="attr-card" key={key}>
-                    <span className="attr-icon">{icon}</span>
-                    <span className="attr-value">{character.attributes?.[key] ?? 1}</span>
-                    <span className="attr-name">{label}</span>
+            {/* Vitais de Sobrevivência (Sede, Fome, Vida) */}
+            <div className="character-vitals-box" style={{ marginBottom: 18, background: 'rgba(0,0,0,0.25)', padding: 12, borderRadius: 8, border: '1px solid var(--glass-border)' }}>
+              <p className="section-title" style={{ marginBottom: 10 }}>Vitais de Sobrevivência</p>
+              <div className="character-vitals-bars">
+                <div className="vital-row" style={{ marginBottom: 8 }}>
+                  <div className="vital-label" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: '#38bdf8', fontWeight: 600 }}>Sede</span>
+                    <strong>{character.vitals?.thirst ?? 100}%</strong>
                   </div>
-                ))}
+                  <div className="vital-progress-track">
+                    <div className="vital-progress-fill vital-thirst" style={{ width: `${character.vitals?.thirst ?? 100}%` }} />
+                  </div>
+                </div>
+
+                <div className="vital-row" style={{ marginBottom: 8 }}>
+                  <div className="vital-label" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: '#facc15', fontWeight: 600 }}>Fome</span>
+                    <strong>{character.vitals?.hunger ?? 100}%</strong>
+                  </div>
+                  <div className="vital-progress-track">
+                    <div className="vital-progress-fill vital-hunger" style={{ width: `${character.vitals?.hunger ?? 100}%` }} />
+                  </div>
+                </div>
+
+                <div className="vital-row">
+                  <div className="vital-label" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: '#ef4444', fontWeight: 600 }}>Vida</span>
+                    <strong>{character.vitals?.blood ?? 100}%</strong>
+                  </div>
+                  <div className="vital-progress-track">
+                    <div className="vital-progress-fill vital-blood" style={{ width: `${character.vitals?.blood ?? 100}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Atributos com Efeitos de Debuffs */}
+            <div className="character-attributes">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <p className="section-title" style={{ margin: 0 }}>Atributos de Sobrevivência</p>
+                {debuffInfo.hasDebuff && (
+                  <span style={{ fontSize: 10, color: '#f87171', fontWeight: 'bold', background: 'rgba(239, 68, 68, 0.15)', padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                    ⚠️ Debuff Ativo
+                  </span>
+                )}
+              </div>
+
+              {debuffInfo.hasDebuff && (
+                <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: 6, padding: '8px 10px', marginBottom: 12, fontSize: 11, color: '#fca5a5' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: 2 }}>Impacto nos Atributos:</div>
+                  <ul style={{ margin: 0, paddingLeft: 16, lineHeight: 1.4 }}>
+                    {debuffInfo.reasons.map((r, idx) => (
+                      <li key={idx}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="attributes-grid">
+                {ATTRIBUTES.map(({ key, label, icon }) => {
+                  const baseVal = character.attributes?.[key] ?? 1
+                  const penalty = debuffInfo.penalties[key] || 0
+                  const effectiveVal = Math.max(1, baseVal + penalty)
+                  const isDebuffed = penalty < 0
+
+                  return (
+                    <div className={`attr-card ${isDebuffed ? 'attr-debuffed' : ''}`} key={key} title={isDebuffed ? `Base: ${baseVal} | Penalidade: ${penalty}` : `Valor: ${baseVal}`}>
+                      <span className="attr-icon">{icon}</span>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                        <span className="attr-value" style={{ color: isDebuffed ? '#f87171' : 'inherit' }}>
+                          {effectiveVal}
+                        </span>
+                        {isDebuffed && (
+                          <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 'bold' }}>
+                            ({penalty})
+                          </span>
+                        )}
+                      </div>
+                      <span className="attr-name">{label}</span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -292,6 +440,7 @@ export default function Character() {
               <div className="inventory-grid">
                 {filteredItems.map((item) => {
                   const catMeta = CATEGORY_LABELS[item._category] || CATEGORY_LABELS.general
+                  const isConsumable = item.consumable === true || (item.consumeEffect && Object.keys(item.consumeEffect).length > 0)
                   return (
                     <div className="inventory-item-card" key={item.instanceId}>
                       <div className="inventory-item-top">
@@ -311,16 +460,44 @@ export default function Character() {
                         <div className="inventory-item-card-qty">
                           Quantidade: <span>×{item.quantity}</span>
                         </div>
+                        {item.description && (
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, lineClamp: 2 }}>
+                            {item.description}
+                          </div>
+                        )}
                       </div>
 
-                      <button
-                        className="btn btn-sm inventory-transfer-btn"
-                        onClick={() => openTransfer(item)}
-                        title="Transferir item para outro sobrevivente"
-                      >
-                        <span>🤝</span>
-                        <span>Transferir</span>
-                      </button>
+                      {/* Ações do Item */}
+                      <div className="inventory-item-actions" style={{ display: 'grid', gridTemplateColumns: isConsumable ? '1fr 1fr 1fr' : '1fr 1fr', gap: 4, marginTop: 8 }}>
+                        {isConsumable && (
+                          <button
+                            className="btn btn-sm"
+                            style={{ background: 'rgba(92, 255, 122, 0.15)', borderColor: '#5cff7a', color: '#5cff7a', padding: '4px 6px', fontSize: 11 }}
+                            onClick={() => openConsume(item)}
+                            title="Consumir / Usar Item"
+                          >
+                            <span>🍽️ Usar</span>
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-sm inventory-transfer-btn"
+                          style={{ padding: '4px 6px', fontSize: 11 }}
+                          onClick={() => openTransfer(item)}
+                          title="Transferir para outro sobrevivente"
+                        >
+                          <span>🤝 Enviar</span>
+                        </button>
+                        {!item.isQuestItem && (
+                          <button
+                            className="btn btn-sm btn-danger"
+                            style={{ padding: '4px 6px', fontSize: 11 }}
+                            onClick={() => openDiscard(item)}
+                            title="Descartar Item"
+                          >
+                            <span>🗑️ Lixo</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
@@ -398,6 +575,127 @@ export default function Character() {
                   disabled={transferLoading || survivors.length === 0}
                 >
                   {transferLoading ? 'Transferindo...' : 'Confirmar Envio'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Consumir / Usar Item */}
+      {showConsumeModal && consumeItemTarget && (
+        <div className="loot-modal-overlay" onClick={() => !actionLoading && setShowConsumeModal(false)}>
+          <div className="loot-modal" onClick={(e) => e.stopPropagation()} style={{ width: '360px', textAlign: 'left' }}>
+            <h3 style={{ color: '#5cff7a', marginBottom: 14 }}>🍽️ Usar / Consumir Item</h3>
+
+            {error && <div className="form-error">{error}</div>}
+            {success && <div className="form-error" style={{ color: '#5cff7a', borderColor: 'rgba(92, 255, 122, 0.3)', background: 'rgba(92, 255, 122, 0.1)' }}>{success}</div>}
+
+            <form onSubmit={handleConsumeSubmit}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', marginBottom: 14 }}>
+                <span style={{ fontSize: 24 }}>{consumeItemTarget.icon}</span>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 'bold' }}>{consumeItemTarget.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Disponível: {consumeItemTarget.quantity}</div>
+                </div>
+              </div>
+
+              {consumeItemTarget.consumeEffect && (
+                <div style={{ fontSize: 12, background: 'rgba(92, 255, 122, 0.08)', padding: '8px 10px', borderRadius: 6, marginBottom: 14, border: '1px solid rgba(92, 255, 122, 0.2)' }}>
+                  <strong>Efeito por unidade:</strong>
+                  {consumeItemTarget.consumeEffect.hunger && <div>🍗 Fome: +{consumeItemTarget.consumeEffect.hunger}%</div>}
+                  {consumeItemTarget.consumeEffect.thirst && <div>💧 Sede: +{consumeItemTarget.consumeEffect.thirst}%</div>}
+                  {consumeItemTarget.consumeEffect.blood  && <div>🩸 Sangue/HP: +{consumeItemTarget.consumeEffect.blood}%</div>}
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>Quantidade a consumir</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={consumeItemTarget.quantity}
+                  value={consumeQty}
+                  onChange={(e) => setConsumeQty(Math.min(consumeItemTarget.quantity, Math.max(1, Number(e.target.value))))}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ flex: 1 }}
+                  onClick={() => setShowConsumeModal(false)}
+                  disabled={actionLoading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ flex: 2, background: '#2e7d32', borderColor: '#4caf50' }}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Consumindo...' : 'Consumir Agora'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Descarte de Item */}
+      {showDiscardModal && discardItemTarget && (
+        <div className="loot-modal-overlay" onClick={() => !actionLoading && setShowDiscardModal(false)}>
+          <div className="loot-modal" onClick={(e) => e.stopPropagation()} style={{ width: '360px', textAlign: 'left' }}>
+            <h3 style={{ color: 'var(--accent-red)', marginBottom: 14 }}>🗑️ Descartar Item</h3>
+
+            {error && <div className="form-error">{error}</div>}
+            {success && <div className="form-error" style={{ color: 'var(--accent-red)', borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.1)' }}>{success}</div>}
+
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14 }}>
+              Tem certeza que deseja jogar fora este item? Ele será permanentemente destruído da sua mochila.
+            </p>
+
+            <form onSubmit={handleDiscardSubmit}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', marginBottom: 14 }}>
+                <span style={{ fontSize: 24 }}>{discardItemTarget.icon}</span>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 'bold' }}>{discardItemTarget.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Você possui: {discardItemTarget.quantity}</div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Quantidade a descartar</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={discardItemTarget.quantity}
+                  value={discardQty}
+                  onChange={(e) => setDiscardQty(Math.min(discardItemTarget.quantity, Math.max(1, Number(e.target.value))))}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ flex: 1 }}
+                  onClick={() => setShowDiscardModal(false)}
+                  disabled={actionLoading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-danger"
+                  style={{ flex: 2 }}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Descartando...' : 'Confirmar Descarte'}
                 </button>
               </div>
             </form>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * WeatherEffects: Renderiza efeitos visuais em Canvas diretamente sobre a imagem de fundo.
@@ -9,6 +9,23 @@ import { useEffect, useRef } from 'react'
  */
 export default function WeatherEffects({ condition = 'sunny', enabled = true, isIndoor = false }) {
   const canvasRef = useRef(null)
+  const [opacity, setOpacity] = useState(() => {
+    const saved = localStorage.getItem('zz_weather_opacity')
+    return saved ? Number(saved) : 100
+  })
+
+  useEffect(() => {
+    const handleOpacityChange = (e) => {
+      if (e.detail !== undefined) {
+        setOpacity(e.detail)
+      } else {
+        const saved = localStorage.getItem('zz_weather_opacity')
+        setOpacity(saved ? Number(saved) : 100)
+      }
+    }
+    window.addEventListener('weather_opacity_change', handleOpacityChange)
+    return () => window.removeEventListener('weather_opacity_change', handleOpacityChange)
+  }, [])
 
   useEffect(() => {
     if (!enabled || isIndoor) return
@@ -62,130 +79,88 @@ export default function WeatherEffects({ condition = 'sunny', enabled = true, is
       }
     }
 
-    // 🌫️ NEBLINA / NÉVOA / RADIAÇÃO EM SUSPENSÃO
-    if (condition === 'foggy') {
-      const fogCount = 45
+    // 🌫️ NEBLINA / NÉVOA
+    if (condition === 'foggy' || condition === 'cloudy') {
+      const fogCount = 25
       for (let i = 0; i < fogCount; i++) {
         particles.push({
           x: Math.random() * width,
           y: Math.random() * height,
-          radius: Math.random() * 120 + 80,
-          vx: (Math.random() - 0.5) * 0.4,
-          vy: (Math.random() - 0.5) * 0.2,
+          radius: Math.random() * 140 + 80,
+          vx: (Math.random() - 0.5) * 0.35,
+          vy: (Math.random() - 0.5) * 0.15,
           opacity: Math.random() * 0.08 + 0.03,
         })
       }
     }
 
-    // Variáveis de Relâmpago para Tempestade
+    // Relâmpagos em tempestade
     let lightningOpacity = 0
-    let nextLightningTime = Date.now() + Math.random() * 5000 + 3000
-
-    // ☁️ CÉU NUBLADO / ENCOBERTO / CINZENTO
-    if (condition === 'cloudy') {
-      const cloudCount = 18
-      for (let i = 0; i < cloudCount; i++) {
-        particles.push({
-          x: Math.random() * width,
-          y: Math.random() * (height * 0.7),
-          radius: Math.random() * 200 + 140,
-          vx: (Math.random() * 0.3 + 0.1), // movimento suave lateral
-          opacity: Math.random() * 0.08 + 0.04,
-        })
-      }
-    }
+    let nextLightningTime = Date.now() + Math.random() * 6000 + 4000
 
     // Loop de renderização
     const render = () => {
       ctx.clearRect(0, 0, width, height)
 
-      // EFEITO CÉU NUBLADO / CINZENTO (CLOUDY)
-      if (condition === 'cloudy') {
-        // Tom suave cinzento escurecido sobre a cena
-        ctx.fillStyle = 'rgba(25, 30, 38, 0.25)'
-        ctx.fillRect(0, 0, width, height)
-
-        for (let i = 0; i < particles.length; i++) {
-          const p = particles[i]
-          const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius)
-          gradient.addColorStop(0, `rgba(40, 48, 58, ${p.opacity})`)
-          gradient.addColorStop(0.6, `rgba(30, 38, 48, ${p.opacity * 0.6})`)
-          gradient.addColorStop(1, 'rgba(30, 38, 48, 0)')
-
-          ctx.fillStyle = gradient
-          ctx.beginPath()
-          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
-          ctx.fill()
-
-          p.x += p.vx
-          if (p.x - p.radius > width) {
-            p.x = -p.radius
-            p.y = Math.random() * (height * 0.7)
-          }
-        }
-      }
-
-      // EFEITO RELÂMPAGO (STORM)
+      // Renderiza relâmpago
       if (condition === 'storm') {
         const now = Date.now()
         if (now > nextLightningTime) {
-          lightningOpacity = Math.random() * 0.65 + 0.35
-          nextLightningTime = now + Math.random() * 7000 + 4000
+          lightningOpacity = 0.8
+          nextLightningTime = now + Math.random() * 8000 + 5000
         }
         if (lightningOpacity > 0) {
-          ctx.fillStyle = `rgba(215, 235, 255, ${lightningOpacity})`
+          ctx.fillStyle = `rgba(230, 245, 255, ${lightningOpacity})`
           ctx.fillRect(0, 0, width, height)
           lightningOpacity -= 0.04
         }
       }
 
-      // RENDERIZAR NEVE
+      // Renderiza partículas
       if (condition === 'snowy') {
-        ctx.fillStyle = 'rgba(240, 248, 255, 0.8)'
+        ctx.fillStyle = 'white'
         for (let i = 0; i < particles.length; i++) {
           const p = particles[i]
-          p.swing += p.swingSpeed
-          p.y += p.speed
-          p.x += Math.sin(p.swing) * 0.8 + p.drift
-
-          if (p.y > height) {
-            p.y = -5
-            p.x = Math.random() * width
-          }
-          if (p.x < -10) p.x = width + 10
-          if (p.x > width + 10) p.x = -10
-
           ctx.beginPath()
           ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
-          ctx.fillStyle = `rgba(235, 245, 255, ${p.opacity})`
+          ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`
           ctx.fill()
+
+          p.y += p.speed
+          p.x += p.drift + Math.sin(p.swing) * 0.4
+          p.swing += p.swingSpeed
+
+          if (p.y > height) {
+            p.y = -p.radius
+            p.x = Math.random() * width
+          }
+          if (p.x > width) p.x = 0
+          if (p.x < 0) p.x = width
         }
       }
 
-      // RENDERIZAR CHUVA
       if (condition === 'rainy' || condition === 'storm') {
-        ctx.strokeStyle = condition === 'storm' ? 'rgba(180, 215, 255, 0.65)' : 'rgba(170, 205, 240, 0.45)'
         ctx.lineWidth = condition === 'storm' ? 1.5 : 1.2
-        ctx.beginPath()
+        ctx.strokeStyle = condition === 'storm' ? 'rgba(190, 220, 255, 0.7)' : 'rgba(210, 230, 255, 0.55)'
 
         for (let i = 0; i < particles.length; i++) {
           const p = particles[i]
+          ctx.beginPath()
           ctx.moveTo(p.x, p.y)
           ctx.lineTo(p.x + p.slant, p.y + p.length)
+          ctx.stroke()
 
           p.y += p.speed
-          p.x += p.slant
+          p.x += p.slant * (p.speed / 10)
 
           if (p.y > height) {
             p.y = -p.length
             p.x = Math.random() * width
           }
         }
-        ctx.stroke()
       }
 
-      // RENDERIZAR NEBLINA
-      if (condition === 'foggy') {
+      if (condition === 'foggy' || condition === 'cloudy') {
         for (let i = 0; i < particles.length; i++) {
           const p = particles[i]
           const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius)
@@ -233,6 +208,8 @@ export default function WeatherEffects({ condition = 'sunny', enabled = true, is
         height: '100%',
         pointerEvents: 'none',
         zIndex: 2,
+        opacity: opacity / 100,
+        transition: 'opacity 0.2s ease',
       }}
     />
   )

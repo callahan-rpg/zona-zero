@@ -6,50 +6,42 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
 import WeatherEffects from '../components/WeatherEffects.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
+import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
 
 // Locação padrão de teste (sala do hospital)
-// Em produção, todos os dados virão do Firestore via admin panel
 const DEFAULT_LOCATION = {
   name: 'Sala do Hospital',
   slug: 'sala-hospital',
   description: 'Corredores úmidos e escuros. O cheiro de antisséptico misturado com algo pior paira no ar. Equipamentos médicos tombados pelo chão.',
-  backgroundImage: null, // Coloque a URL de uma imagem de fundo aqui
+  backgroundImage: null,
   xatIframe: `https://xat.com/embed/chat.php#id=220535128&gn=CachoeiraAltheris_acerpg`,
   navigationButtons: [],
   loot: {
     enabled: true,
     cooldownMinutes: 30,
-    emptyChance: 0.35,
+    emptyChance: 0.25,
     maxItemsPerSearch: 2,
     table: [
-      { itemId: 'atadura',     name: 'Atadura',     icon: '🩹', chance: 0.65, min: 1, max: 3 },
-      { itemId: 'analgesico',  name: 'Analgésico',  icon: '💊', chance: 0.45, min: 1, max: 2 },
-      { itemId: 'seringa',     name: 'Seringa',     icon: '💉', chance: 0.25, min: 1, max: 1 },
-      { itemId: 'antibiotico', name: 'Antibiótico', icon: '🧪', chance: 0.15, min: 1, max: 1 },
-      { itemId: 'ataduraster', name: 'Kit de Sutura',icon:'🧵', chance: 0.08, min: 1, max: 1 },
+      { itemId: 'saco_lixo', name: 'Sacos de Lixo', icon: '🗑️', rarity: 'junk', chance: 0.60, min: 1, max: 2 },
+      { itemId: 'bandagem', name: 'Bandagem Estéril', icon: '🩹', rarity: 'common', chance: 0.40, min: 1, max: 3 },
+      { itemId: 'remedio_basico', name: 'Remédios Básicos', icon: '💊', rarity: 'common', chance: 0.30, min: 1, max: 2 },
+      { itemId: 'alcool_antisseptico', name: 'Álcool 70%', icon: '🧪', rarity: 'uncommon', chance: 0.15, min: 1, max: 1 },
     ],
   },
-}
-
-function rollLoot(lootConfig) {
-  if (Math.random() < lootConfig.emptyChance) return []
-
-  const found = []
-  const shuffled = [...lootConfig.table].sort(() => Math.random() - 0.5)
-
-  for (const item of shuffled) {
-    if (found.length >= lootConfig.maxItemsPerSearch) break
-    if (Math.random() < item.chance) {
-      const qty = Math.floor(Math.random() * (item.max - item.min + 1)) + item.min
-      found.push({ ...item, quantity: qty })
-    }
+  uniqueSearch: {
+    enabled: true,
+    maxCarry: 2,
+    items: [
+      { itemId: 'kit_cirurgico', name: 'Kit Médico Avançado', icon: '🩺', rarity: 'rare', quantity: 1, consumable: true, consumeEffect: { blood: 60, thirst: 10 } },
+      { itemId: 'relogio_pulso', name: 'Relógio de Pulso', icon: '⌚', rarity: 'rare', quantity: 1, unlocks: ['hud_clock'] },
+      { itemId: 'pistola_glock', name: 'Pistola 9mm', icon: '🔫', rarity: 'rare', quantity: 1, category: 'firearms' },
+    ]
   }
-  return found
 }
 
 export default function Location() {
   const { slug } = useParams()
-  const { user, character, refreshCharacter } = useAuth()
+  const { user, character, refreshCharacter, recordUniqueSearch } = useAuth()
   const navigate = useNavigate()
 
   const [location, setLocation] = useState(null)
@@ -58,6 +50,25 @@ export default function Location() {
   const [weatherFxEnabled, setWeatherFxEnabled] = useState(() => {
     return localStorage.getItem('zz_weather_fx') !== 'false'
   })
+
+  // Toast de aviso (porta trancada, etc.)
+  const [toastMessage, setToastMessage] = useState(null)
+
+  // Estados de busca comum (Suprimentos)
+  const [supplySearchState, setSupplySearchState] = useState('idle') // idle | searching | result
+  const [supplyLootResult, setSupplyLootResult] = useState([])
+  const [supplyCooldown, setSupplyCooldown] = useState(false)
+
+  // Estados de Busca Única
+  const [uniqueSearchState, setUniqueSearchState] = useState('idle') // idle | searching | choose_modal
+  const [uniqueFoundItems, setUniqueFoundItems] = useState([])
+  const [selectedUniqueIndices, setSelectedUniqueIndices] = useState([])
+  const [uniqueSaving, setUniqueSaving] = useState(false)
+
+  const showToast = (msg) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(null), 3500)
+  }
 
   // Escuta alterações no toggle de efeitos visuais disparados pelo HUD
   useEffect(() => {
@@ -76,12 +87,7 @@ export default function Location() {
     return unsub
   }, [])
 
-  // Loot state
-  const [lootState, setLootState] = useState('idle') // idle | searching | result
-  const [lootResult, setLootResult] = useState([])
-  const [lootCooldown, setLootCooldown] = useState(false)
-
-  // Carrega dados da locação do Firestore (ou usa padrão para teste)
+  // Carrega dados da locação do Firestore
   useEffect(() => {
     async function loadLocation() {
       setLoadingLocation(true)
@@ -91,7 +97,6 @@ export default function Location() {
         if (docSnap.exists()) {
           setLocation(docSnap.data())
         } else {
-          // Fallback para locação padrão de teste
           setLocation(DEFAULT_LOCATION)
         }
       } catch {
@@ -103,43 +108,46 @@ export default function Location() {
     loadLocation()
   }, [slug])
 
-  // Verifica cooldown de loot para esta locação com atualização em tempo real
+  // Verifica cooldown de busca de suprimentos para esta locação
   useEffect(() => {
     if (!location) return
 
     const checkCooldown = () => {
       if (!character?.lastLootByLocation) {
-        setLootCooldown(false)
+        setSupplyCooldown(false)
         return
       }
       const lastLoot = character.lastLootByLocation[slug]
       if (!lastLoot) {
-        setLootCooldown(false)
+        setSupplyCooldown(false)
         return
       }
 
       const lastDate = lastLoot.toDate ? lastLoot.toDate() : new Date(lastLoot)
       const cooldownMs = (location.loot?.cooldownMinutes || 30) * 60 * 1000
       const elapsed = Date.now() - lastDate.getTime()
-      setLootCooldown(elapsed < cooldownMs)
+      setSupplyCooldown(elapsed < cooldownMs)
     }
 
     checkCooldown()
-    const timer = setInterval(checkCooldown, 2000) // Reavalia a cada 2 segundos
+    const timer = setInterval(checkCooldown, 2000)
     return () => clearInterval(timer)
   }, [character, location, slug])
 
-  async function handleLoot() {
-    if (lootState !== 'idle' || lootCooldown || !location?.loot?.enabled) return
+  // Verifica se o personagem já fez a Busca Única deste local
+  const isUniqueDone = !!(character?.uniqueSearchesDone && character.uniqueSearchesDone[slug])
 
-    setLootState('searching')
-    await new Promise((r) => setTimeout(r, 2500)) // animação de busca
+  // Lógica de Busca de Suprimentos (Repetível com Cooldown - Sucata, Comum e Incomum)
+  async function handleSupplySearch() {
+    if (supplySearchState !== 'idle' || supplyCooldown || !location?.loot?.enabled) return
 
-    const items = rollLoot(location.loot)
-    setLootResult(items)
-    setLootState('result')
+    setSupplySearchState('searching')
+    await new Promise((r) => setTimeout(r, 2000))
 
-    // Salva timestamp de busca de recursos (mesmo se vier vazio para trigger do cooldown!)
+    const items = rollSupplyLoot(location.loot)
+    setSupplyLootResult(items)
+    setSupplySearchState('result')
+
     if (user) {
       const userRef = doc(db, 'users', user.uid)
       const updates = {
@@ -152,9 +160,15 @@ export default function Location() {
           itemId: item.itemId,
           name: item.name,
           icon: item.icon,
+          rarity: item.rarity || 'common',
           quantity: item.quantity,
+          category: item.category || 'general',
+          consumable: item.consumable ?? false,
+          consumeEffect: item.consumeEffect || null,
+          isQuestItem: item.isQuestItem ?? false,
+          unlocks: item.unlocks || [],
           obtainedAt: new Date().toISOString(),
-          obtainedFrom: slug,
+          obtainedFrom: `Suprimentos (${slug})`,
         }))
         updates['character.inventory'] = arrayUnion(...inventoryItems)
       }
@@ -162,16 +176,74 @@ export default function Location() {
       try {
         await updateDoc(userRef, updates)
         await refreshCharacter()
-        setLootCooldown(true) // Força bloqueio visual imediato
+        setSupplyCooldown(true)
       } catch (err) {
-        console.error("Erro ao salvar loot:", err)
+        console.error("Erro ao salvar busca de suprimentos:", err)
       }
     }
   }
 
-  function closeLootModal() {
-    setLootState('idle')
-    setLootResult([])
+  // Lógica da Busca Única (One-shot - Raro, Muito Raro e Excepcional)
+  async function handleUniqueSearch() {
+    if (uniqueSearchState !== 'idle' || isUniqueDone || !location?.uniqueSearch?.enabled) return
+
+    setUniqueSearchState('searching')
+    await new Promise((r) => setTimeout(r, 2500))
+
+    const items = rollUniqueLoot(location.uniqueSearch)
+    setUniqueFoundItems(items)
+    setSelectedUniqueIndices([])
+    setUniqueSearchState('choose_modal')
+  }
+
+  // Toggle de seleção de item no modal de Busca Única
+  function toggleSelectUniqueItem(index) {
+    const maxCarry = location?.uniqueSearch?.maxCarry || 1
+    if (selectedUniqueIndices.includes(index)) {
+      setSelectedUniqueIndices(prev => prev.filter(i => i !== index))
+    } else {
+      if (selectedUniqueIndices.length >= maxCarry) {
+        showToast(`Você só pode carregar no máximo ${maxCarry} item(ns) deste local!`)
+        return
+      }
+      setSelectedUniqueIndices(prev => [...prev, index])
+    }
+  }
+
+  // Confirmar itens selecionados da Busca Única
+  async function handleConfirmUniqueLoot() {
+    if (selectedUniqueIndices.length === 0) {
+      showToast('Selecione ao menos 1 item para levar!')
+      return
+    }
+
+    setUniqueSaving(true)
+    try {
+      const chosen = selectedUniqueIndices.map(idx => uniqueFoundItems[idx])
+      await recordUniqueSearch(slug, chosen)
+      setUniqueSearchState('idle')
+      setUniqueFoundItems([])
+      setSelectedUniqueIndices([])
+      showToast(`Você coletou ${chosen.length} item(ns) raros e deixou o resto para trás.`)
+    } catch (err) {
+      showToast(err.message || 'Erro ao coletar itens da busca única.')
+    } finally {
+      setUniqueSaving(false)
+    }
+  }
+
+  // Tratamento de clique nos botões de navegação (com verificação de tranca/chave)
+  function handleNavigationClick(btn) {
+    if (btn.requiredItem) {
+      const hasKey = hasItem(character?.inventory, btn.requiredItem)
+      if (!hasKey) {
+        showToast(btn.lockedMessage || '🔒 Porta trancada! Você não possui a chave necessária.')
+        return
+      }
+    }
+    if (btn.target) {
+      navigate(`/location/${btn.target}`)
+    }
   }
 
   if (loadingLocation) {
@@ -185,20 +257,26 @@ export default function Location() {
   if (!location) return null
 
   const hasBackground = !!location.backgroundImage
-
-  // Calcula o clima dinâmico sincronizado com o HUD e o Calendário
   const gameTime = calculateGameTime(gameConfig)
   const weather = getDynamicWeather(gameConfig, gameTime)
+  const maxCarry = location.uniqueSearch?.maxCarry || 1
 
   return (
     <div className="location-page">
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="game-toast-alert">
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Background */}
       <div
         className={`location-bg ${hasBackground ? '' : 'fallback'}`}
         style={hasBackground ? { backgroundImage: `url(${location.backgroundImage})` } : {}}
       />
 
-      {/* Efeitos Climáticos (Renderizados no Canvas sobre o background) */}
+      {/* Efeitos Climáticos */}
       <WeatherEffects
         condition={weather?.condition || 'sunny'}
         enabled={weatherFxEnabled}
@@ -215,15 +293,20 @@ export default function Location() {
         <div className="location-main">
           {/* Botões de saída (esquerda) */}
           <div className="nav-buttons-left">
-            {location.navigationButtons?.filter(b => b.position === 'left').map((btn, i) => (
-              <button
-                key={i}
-                className="nav-btn"
-                onClick={() => btn.target && navigate(`/location/${btn.target}`)}
-              >
-                {btn.label}
-              </button>
-            ))}
+            {location.navigationButtons?.filter(b => b.position === 'left').map((btn, i) => {
+              const isLocked = btn.requiredItem && !hasItem(character?.inventory, btn.requiredItem)
+              return (
+                <button
+                  key={i}
+                  className={`nav-btn ${isLocked ? 'nav-btn-locked' : ''}`}
+                  onClick={() => handleNavigationClick(btn)}
+                  title={isLocked ? '🔒 Trancado (Requer chave)' : ''}
+                >
+                  {isLocked && <span style={{ marginRight: 6 }}>🔒</span>}
+                  {btn.label}
+                </button>
+              )
+            })}
           </div>
 
           {/* Chat central */}
@@ -240,80 +323,166 @@ export default function Location() {
               />
             </div>
 
-            {/* Botão de busca de recursos */}
-            {location.loot?.enabled && (
-              <div className="loot-section">
+            {/* Painel de Ações de Busca (Suprimentos + Busca Única) */}
+            <div className="loot-search-actions-bar">
+              {/* Botão 1: Buscar Suprimentos (Repetível / Cooldown / Sucata & Comuns) */}
+              {location.loot?.enabled && (
                 <button
-                  className={`loot-btn ${lootState === 'searching' ? 'searching' : ''}`}
-                  onClick={handleLoot}
-                  disabled={lootState !== 'idle' || lootCooldown}
-                  title={lootCooldown ? 'Você já procurou aqui recentemente. Aguarde o cooldown.' : ''}
+                  className={`loot-btn loot-btn-supply ${supplySearchState === 'searching' ? 'searching' : ''}`}
+                  onClick={handleSupplySearch}
+                  disabled={supplySearchState !== 'idle' || supplyCooldown}
+                  title={supplyCooldown ? 'Você já procurou aqui recentemente. Aguarde o cooldown.' : 'Buscar itens comuns, mantimentos e sucatas no local.'}
                 >
-                  <span>{lootState === 'searching' ? '🔍' : lootCooldown ? '⏳' : '🔦'}</span>
-                  {lootState === 'searching'
-                    ? 'Procurando...'
-                    : lootCooldown
-                    ? 'Cooldown ativo'
-                    : 'Procurar Recursos'}
+                  <span>{supplySearchState === 'searching' ? '🔍' : supplyCooldown ? '⏳' : '🔦'}</span>
+                  {supplySearchState === 'searching'
+                    ? 'Vasculhando...'
+                    : supplyCooldown
+                    ? 'Cooldown Suprimentos'
+                    : 'Buscar Suprimentos'}
                 </button>
-              </div>
-            )}
+              )}
+
+              {/* Botão 2: Busca Única (One-Shot / Raros, Muito Raros e Excepcionais) */}
+              {location.uniqueSearch?.enabled && (
+                <button
+                  className={`loot-btn loot-btn-unique ${uniqueSearchState === 'searching' ? 'searching' : ''} ${isUniqueDone ? 'unique-done' : ''}`}
+                  onClick={handleUniqueSearch}
+                  disabled={uniqueSearchState !== 'idle' || isUniqueDone}
+                  title={isUniqueDone ? 'Você já fez a busca única deste local com este personagem.' : 'Busca especial de itens raros, equipamentos e segredos. Pode ser feita apenas 1 vez!'}
+                >
+                  <span>{isUniqueDone ? '🔒' : uniqueSearchState === 'searching' ? '✨' : '⭐'}</span>
+                  {isUniqueDone
+                    ? 'Busca Única Realizada'
+                    : uniqueSearchState === 'searching'
+                    ? 'Explorando Segredos...'
+                    : 'Busca Única (Raros)'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Botões direita */}
           <div className="nav-buttons-right">
-            {location.navigationButtons?.filter(b => b.position !== 'left').map((btn, i) => (
-              <button
-                key={i}
-                className="nav-btn"
-                onClick={() => btn.target && navigate(`/location/${btn.target}`)}
-              >
-                {btn.label}
-              </button>
-            ))}
+            {location.navigationButtons?.filter(b => b.position !== 'left').map((btn, i) => {
+              const isLocked = btn.requiredItem && !hasItem(character?.inventory, btn.requiredItem)
+              return (
+                <button
+                  key={i}
+                  className={`nav-btn ${isLocked ? 'nav-btn-locked' : ''}`}
+                  onClick={() => handleNavigationClick(btn)}
+                  title={isLocked ? '🔒 Trancado (Requer chave)' : ''}
+                >
+                  {isLocked && <span style={{ marginRight: 6 }}>🔒</span>}
+                  {btn.label}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
 
-      {/* Modal de resultado do loot */}
-      {lootState === 'result' && (
-        <div className="loot-modal-overlay" onClick={closeLootModal}>
+      {/* Modal de Resultado: Busca de Suprimentos */}
+      {supplySearchState === 'result' && (
+        <div className="loot-modal-overlay" onClick={() => { setSupplySearchState('idle'); setSupplyLootResult([]); }}>
           <div
-            className={`loot-modal ${lootResult.length === 0 ? 'empty' : ''}`}
+            className={`loot-modal ${supplyLootResult.length === 0 ? 'empty' : ''}`}
             onClick={(e) => e.stopPropagation()}
           >
-            {lootResult.length > 0 ? (
+            {supplyLootResult.length > 0 ? (
               <>
-                <h3>🔦 Você encontrou!</h3>
+                <h3>🔦 Você encontrou suprimentos!</h3>
                 <div className="loot-items">
-                  {lootResult.map((item, i) => (
-                    <div className="loot-item" key={i}>
-                      <div className="loot-item-info">
-                        <span className="loot-item-icon">{item.icon}</span>
-                        <span>{item.name}</span>
+                  {supplyLootResult.map((item, i) => {
+                    const rMeta = RARITY_META[item.rarity] || RARITY_META.common
+                    return (
+                      <div className="loot-item" key={i} style={{ borderLeft: `3px solid ${rMeta.color}` }}>
+                        <div className="loot-item-info">
+                          <span className="loot-item-icon">{item.icon}</span>
+                          <div>
+                            <span style={{ fontWeight: 600 }}>{item.name}</span>
+                            <div style={{ fontSize: 11, color: rMeta.color }}>{rMeta.label}</div>
+                          </div>
+                        </div>
+                        <span className="loot-item-qty">×{item.quantity}</span>
                       </div>
-                      <span className="loot-item-qty">×{item.quantity}</span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-                  Itens adicionados ao inventário.
+                  Itens adicionados diretamente à sua mochila.
                 </p>
               </>
             ) : (
               <>
-                <h3>😶 Nada encontrado</h3>
+                <h3>😶 Nada de útil</h3>
                 <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 24 }}>
-                  Você vasculhou o local mas não encontrou nada útil desta vez.
+                  Você revirou o local mas só encontrou poeira e escombros vazios desta vez.
                 </p>
               </>
             )}
-            <button className="btn btn-primary btn-sm" onClick={closeLootModal}>
+            <button className="btn btn-primary btn-sm" onClick={() => { setSupplySearchState('idle'); setSupplyLootResult([]); }}>
               Fechar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Escolha: Busca Única (Obrigatório escolher quais levar até maxCarry) */}
+      {uniqueSearchState === 'choose_modal' && (
+        <div className="loot-modal-overlay">
+          <div className="loot-modal unique-loot-modal" onClick={(e) => e.stopPropagation()} style={{ width: '480px', maxWidth: '95vw' }}>
+            <div className="unique-modal-badge">⭐ BUSCA ÚNICA</div>
+            <h3 style={{ color: 'var(--accent-yellow)', marginTop: 6, marginBottom: 4 }}>
+              Descoberta Valiosa!
+            </h3>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14 }}>
+              Você encontrou os itens abaixo, mas só tem capacidade para carregar{' '}
+              <strong style={{ color: '#fff' }}>até {maxCarry} item(ns)</strong>. Escolha com sabedoria, o restante será deixado para trás!
+            </p>
+
+            <div className="unique-items-grid">
+              {uniqueFoundItems.map((item, idx) => {
+                const isSelected = selectedUniqueIndices.includes(idx)
+                const rMeta = RARITY_META[item.rarity] || RARITY_META.rare
+                return (
+                  <div
+                    key={idx}
+                    className={`unique-item-card ${isSelected ? 'selected' : ''}`}
+                    onClick={() => toggleSelectUniqueItem(idx)}
+                    style={{ borderColor: isSelected ? 'var(--accent-yellow)' : rMeta.border }}
+                  >
+                    <div className="unique-card-top">
+                      <span className="unique-item-icon">{item.icon}</span>
+                      <span className="unique-rarity-pill" style={{ color: rMeta.color, background: rMeta.bg }}>
+                        {rMeta.label}
+                      </span>
+                    </div>
+                    <div className="unique-card-name">{item.name}</div>
+                    <div className="unique-card-qty">Quantidade: ×{item.quantity}</div>
+                    <div className="unique-card-select-indicator">
+                      {isSelected ? '✓ Selecionado' : '+ Escolher'}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="unique-modal-footer">
+              <div className="unique-counter">
+                Selecionados: <strong>{selectedUniqueIndices.length}</strong> / {maxCarry}
+              </div>
+              <button
+                className="btn btn-primary"
+                onClick={handleConfirmUniqueLoot}
+                disabled={uniqueSaving || selectedUniqueIndices.length === 0}
+              >
+                {uniqueSaving ? 'Guardando na mochila...' : `Pegar Selecionados (${selectedUniqueIndices.length})`}
+              </button>
+            </div>
           </div>
         </div>
       )}
     </div>
   )
 }
+

@@ -6,7 +6,9 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import DiceRoller from './DiceRoller.jsx'
 import CharacterPopup from './CharacterPopup.jsx'
 import CalendarModal from './CalendarModal.jsx'
+import SettingsModal from './SettingsModal.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
+import { hasFeatureUnlocked, getTimeOfDay, getVitalsDebuffs } from '../utils/itemSystem'
 
 export default function HUD({ locationName }) {
   const { character, role, logout } = useAuth()
@@ -17,8 +19,10 @@ export default function HUD({ locationName }) {
   const [showDice, setShowDice] = useState(false)
   const [showCharacter, setShowCharacter] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [showWeatherPopover, setShowWeatherPopover] = useState(false)
   const [tickCounter, setTickCounter] = useState(0)
+  const [dismissedVitalAlert, setDismissedVitalAlert] = useState(false)
   const [weatherFxEnabled, setWeatherFxEnabled] = useState(() => {
     return localStorage.getItem('zz_weather_fx') !== 'false'
   })
@@ -65,6 +69,18 @@ export default function HUD({ locationName }) {
   const gameTime = calculateGameTime(gameConfig)
   const weather = getDynamicWeather(gameConfig, gameTime)
 
+  // Verifica se o personagem possui item que desbloqueia a visualização de relógio preciso
+  const hasClock = hasFeatureUnlocked(character?.inventory, 'hud_clock')
+  const periodOfDay = getTimeOfDay(gameTime)
+
+  // Checagem de vitais para alertas na tela
+  const vitals = character?.vitals || { hunger: 100, thirst: 100, blood: 100 }
+  const debuffInfo = getVitalsDebuffs(vitals)
+  const isHungerLow = (vitals.hunger ?? 100) < 30
+  const isThirstLow = (vitals.thirst ?? 100) < 30
+  const isBloodLow  = (vitals.blood ?? 100) < 30
+  const hasVitalWarning = isHungerLow || isThirstLow || isBloodLow
+
   return (
     <>
       <header className="hud">
@@ -79,12 +95,18 @@ export default function HUD({ locationName }) {
           <button
             className={`hud-weather ${showCalendar ? 'active' : ''}`}
             onClick={() => setShowCalendar(prev => !prev)}
-            title="Clique para abrir o Calendário de Sobrevivência & Eventos"
+            title={hasClock ? "Clique para abrir o Calendário de Sobrevivência & Eventos" : "Você não possui um relógio. Exibindo estimativa solar do período."}
           >
             <span className="weather-icon">{weather.icon}</span>
             <span className="temp">{weather.temperature}°C</span>
             <span className="separator">|</span>
-            <span className="time">{gameTime.timeString}</span>
+            {hasClock ? (
+              <span className="time" style={{ fontWeight: 'bold' }}>{gameTime.timeString}</span>
+            ) : (
+              <span className="time" style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                <small>{periodOfDay.icon}</small> {periodOfDay.label}
+              </span>
+            )}
             <span className="season-icon" title={gameTime.season.name}>{gameTime.season.icon}</span>
             <span className="moon-icon" title={gameTime.moonPhase.name}>{gameTime.moonPhase.icon}</span>
           </button>
@@ -108,15 +130,22 @@ export default function HUD({ locationName }) {
             Mapa
           </Link>
 
-          <a
-            href="/characters"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => {
+              if (location.pathname === '/characters') return
+              if (location.pathname.startsWith('/location')) {
+                window.open('/characters', '_blank', 'noopener,noreferrer')
+              } else {
+                navigate('/characters')
+              }
+            }}
             className={`hud-btn ${location.pathname === '/characters' ? 'active' : ''}`}
+            title={location.pathname === '/characters' ? 'Você já está na página de Sobreviventes' : 'Sobreviventes'}
           >
             <span className="hud-btn-icon">👥</span>
             Sobreviventes
-          </a>
+          </button>
 
           <button
             className={`hud-btn ${showDice ? 'active' : ''}`}
@@ -127,13 +156,14 @@ export default function HUD({ locationName }) {
             Dados
           </button>
 
+          {/* Botão de Configurações do Usuário (Clima, Opacidade, Áudio) */}
           <button
-            className={`hud-btn ${weatherFxEnabled ? 'active' : ''}`}
-            onClick={toggleWeatherFx}
-            title={weatherFxEnabled ? 'Efeitos Climáticos: Ligados (Clique para desligar)' : 'Efeitos Climáticos: Desligados (Clique para ligar)'}
+            className={`hud-btn ${showSettings ? 'active' : ''}`}
+            onClick={() => setShowSettings((prev) => !prev)}
+            title="Configurações (Clima, Opacidade e Áudio)"
             style={{ padding: '7px 10px' }}
           >
-            <span className="hud-btn-icon" style={{ fontSize: 15 }}>{weatherFxEnabled ? '✨' : '💤'}</span>
+            <span className="hud-btn-icon" style={{ fontSize: 15 }}>⚙️</span>
           </button>
 
           {role === 'admin' && (
@@ -172,12 +202,43 @@ export default function HUD({ locationName }) {
         </div>
       </header>
 
+      {/* Alerta na tela para Fome ou Sede crítica (< 30%) */}
+      {hasVitalWarning && !dismissedVitalAlert && (
+        <div className="vital-warning-banner">
+          <div className="vital-warning-content">
+            <span className="vital-warning-icon">⚠️</span>
+            <div className="vital-warning-text">
+              <strong>Atenção Sobrevivente:</strong>
+              {isBloodLow && <span className="vital-tag danger">Vida Crítica ({vitals.blood ?? 0}%)</span>}
+              {isThirstLow && <span className="vital-tag warning">Desidratando ({vitals.thirst ?? 0}%)</span>}
+              {isHungerLow && <span className="vital-tag warning">Fome Severa ({vitals.hunger ?? 0}%)</span>}
+              <span className="vital-tag debuff-alert">Debuff ativo nos Atributos</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <Link to="/character" className="vital-warning-btn">
+              Mochila / Consumir
+            </Link>
+            <button
+              type="button"
+              className="vital-warning-close"
+              onClick={() => setDismissedVitalAlert(true)}
+              title="Dispensar aviso por agora"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Popups flutuantes */}
       {showDice && <DiceRoller onClose={() => setShowDice(false)} />}
       {showCharacter && <CharacterPopup onClose={() => setShowCharacter(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showCalendar && (
         <CalendarModal
           gameTime={gameTime}
+          weather={weather}
           events={calendarEvents}
           onClose={() => setShowCalendar(false)}
         />

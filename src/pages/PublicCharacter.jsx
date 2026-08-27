@@ -14,11 +14,12 @@ const ATTRIBUTES = [
 ]
 
 const CATEGORY_LABELS = {
-  general:  { label: 'Item Geral',        color: 'var(--text-muted)' },
-  clothing: { label: 'Roupa / Vestuário', color: '#70d6ff' },
-  melee:    { label: 'Arma Branca',       color: '#ff9770' },
-  firearms: { label: 'Arma de Fogo',      color: '#ff70a6' },
-  medical:  { label: 'Suprimento Médico', color: '#5cff7a' },
+  general:   { label: 'Item Geral',        color: 'var(--text-muted)' },
+  clothing:  { label: 'Roupa / Vestuário', color: '#70d6ff' },
+  melee:     { label: 'Arma Branca',       color: '#ff9770' },
+  firearms:  { label: 'Arma de Fogo',      color: '#ff70a6' },
+  medical:   { label: 'Suprimento Médico', color: '#5cff7a' },
+  supplies:  { label: 'Mantimentos',       color: '#fbbf24' },
 }
 
 function xpForNextLevel(level) {
@@ -57,7 +58,7 @@ export default function PublicCharacter() {
   const inventory = character?.inventory || []
 
   const { filteredItems, categoryCounts } = useMemo(() => {
-    const counts = { all: inventory.length, general: 0, clothing: 0, melee: 0, firearms: 0, medical: 0 }
+    const counts = { all: inventory.length, general: 0, supplies: 0, clothing: 0, melee: 0, firearms: 0, medical: 0 }
     const categorized = inventory.map((item) => {
       const cat = getItemCategory(item)
       if (counts[cat] !== undefined) counts[cat]++
