@@ -350,9 +350,9 @@ export default function Character() {
                 <div
                   style={{
                     position: 'absolute',
-                    bottom: 0,
-                    right: 0,
-                    background: 'rgba(0,0,0,0.75)',
+                    top: -4,
+                    left: -4,
+                    background: 'rgba(0,0,0,0.85)',
                     border: '1px solid var(--glass-border)',
                     borderRadius: '50%',
                     width: 22,
@@ -362,27 +362,17 @@ export default function Character() {
                     justifyContent: 'center',
                     fontSize: 11,
                     color: '#fff',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
+                    zIndex: 2
                   }}
-                  title="Alterar foto"
+                  title="Alterar foto de perfil"
                 >
                   📷
                 </div>
               </div>
 
               <div className="character-info">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div className="character-name">{character.name}</div>
-                  <button
-                    type="button"
-                    onClick={openAvatarModal}
-                    className="btn btn-sm"
-                    style={{ padding: '2px 8px', fontSize: 11, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}
-                    title="Alterar foto de perfil"
-                  >
-                    📷 Foto
-                  </button>
-                </div>
+                <div className="character-name">{character.name}</div>
                 <div className="character-age">{character.age || '??'} anos · Sobrevivente</div>
 
                 <div className="xp-bar-container">
