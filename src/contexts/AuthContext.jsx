@@ -379,23 +379,28 @@ export function AuthProvider({ children }) {
       uniqueSearchesDone[locationSlug] = new Date().toISOString()
       const inventory = [...(charData.inventory || [])]
 
-      // Adiciona itens escolhidos
+      // Adiciona itens escolhidos (empilha se já existir o mesmo itemId)
       chosenItems.forEach((item) => {
-        inventory.push({
-          instanceId: Math.random().toString(36).substring(2) + Date.now().toString(36),
-          itemId: item.itemId,
-          name: item.name,
-          icon: item.icon,
-          rarity: item.rarity || 'rare',
-          quantity: item.quantity || 1,
-          category: item.category || 'general',
-          consumable: item.consumable ?? false,
-          consumeEffect: item.consumeEffect || null,
-          isQuestItem: item.isQuestItem ?? false,
-          unlocks: item.unlocks || [],
-          obtainedAt: new Date().toISOString(),
-          obtainedFrom: `Busca Única (${locationSlug})`,
-        })
+        const existing = inventory.find(i => i.itemId === item.itemId && !i.isQuestItem)
+        if (existing) {
+          existing.quantity = (existing.quantity || 1) + (item.quantity || 1)
+        } else {
+          inventory.push({
+            instanceId: Math.random().toString(36).substring(2) + Date.now().toString(36),
+            itemId: item.itemId,
+            name: item.name,
+            icon: item.icon,
+            rarity: item.rarity || 'rare',
+            quantity: item.quantity || 1,
+            category: item.category || 'general',
+            consumable: item.consumable ?? false,
+            consumeEffect: item.consumeEffect || null,
+            isQuestItem: item.isQuestItem ?? false,
+            unlocks: item.unlocks || [],
+            obtainedAt: new Date().toISOString(),
+            obtainedFrom: `Busca Única (${locationSlug})`,
+          })
+        }
       })
 
       transaction.update(userRef, {
@@ -448,22 +453,27 @@ export function AuthProvider({ children }) {
         }
       }
 
-      // Adiciona ao destinatário
-      recipientInventory.push({
-        instanceId: Math.random().toString(36).substring(2) + Date.now().toString(36),
-        itemId: item.itemId,
-        name: item.name,
-        icon: item.icon,
-        rarity: item.rarity || 'common',
-        quantity: quantityToTransfer,
-        category: item.category || 'general',
-        consumable: item.consumable ?? false,
-        consumeEffect: item.consumeEffect || null,
-        isQuestItem: item.isQuestItem ?? false,
-        unlocks: item.unlocks || [],
-        obtainedAt: new Date().toISOString(),
-        obtainedFrom: 'transferência',
-      })
+      // Adiciona ao destinatário (empilha se já existir o mesmo itemId)
+      const recipientExisting = recipientInventory.find(i => i.itemId === item.itemId && !i.isQuestItem)
+      if (recipientExisting) {
+        recipientExisting.quantity = (recipientExisting.quantity || 1) + quantityToTransfer
+      } else {
+        recipientInventory.push({
+          instanceId: Math.random().toString(36).substring(2) + Date.now().toString(36),
+          itemId: item.itemId,
+          name: item.name,
+          icon: item.icon,
+          rarity: item.rarity || 'common',
+          quantity: quantityToTransfer,
+          category: item.category || 'general',
+          consumable: item.consumable ?? false,
+          consumeEffect: item.consumeEffect || null,
+          isQuestItem: item.isQuestItem ?? false,
+          unlocks: item.unlocks || [],
+          obtainedAt: new Date().toISOString(),
+          obtainedFrom: 'transferência',
+        })
+      }
 
       transaction.update(senderRef, {
         'character.inventory': senderInventory,

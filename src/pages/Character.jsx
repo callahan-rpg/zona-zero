@@ -3,7 +3,7 @@ import { collection, getDocs } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
-import { getVitalsDebuffs, getMaxHp } from '../utils/itemSystem'
+import { getVitalsDebuffs, getMaxHp, DEFAULT_PRESET_ITEMS } from '../utils/itemSystem'
 
 const ATTRIBUTES = [
   { key: 'forca',        label: 'Força',        icon: '💪' },
@@ -24,16 +24,28 @@ export const INVENTORY_CATEGORIES = [
 ]
 
 export function getItemCategory(item) {
+  if (!item) return 'general'
+
+  // Se já tiver uma categoria válida definida (não sendo 'general' quando o nome/id indica outra)
   if (item.category) {
     const cat = item.category.toLowerCase().trim()
-    if (['general', 'geral', 'itens gerais'].includes(cat)) return 'general'
     if (['supplies', 'mantimentos', 'comida', 'bebida', 'alimento'].includes(cat)) return 'supplies'
     if (['clothing', 'roupas', 'roupa', 'vestimenta', 'equipamento'].includes(cat)) return 'clothing'
     if (['melee', 'armas brancas', 'branca', 'corpo a corpo'].includes(cat)) return 'melee'
     if (['firearms', 'armas de fogo', 'fogo', 'armas'].includes(cat)) return 'firearms'
     if (['medical', 'suprimentos medicos', 'medico', 'médico', 'cura'].includes(cat)) return 'medical'
-    return cat
+    if (['general', 'geral', 'itens gerais'].includes(cat)) {
+      // Se estiver como general, mas for um item com preset ou nome evidente de outra categoria (ex: bandagem cadastrada com category='general' por engano)
+      const preset = DEFAULT_PRESET_ITEMS.find(p => p.itemId === item.itemId)
+      if (preset && preset.category && preset.category !== 'general') return preset.category
+    } else {
+      return cat
+    }
   }
+
+  // Checa se coincide com algum preset padrão
+  const preset = DEFAULT_PRESET_ITEMS.find(p => p.itemId === item.itemId)
+  if (preset && preset.category) return preset.category
 
   // Inferência inteligente baseada no nome / itemId
   const text = `${item.itemId || ''} ${item.name || ''}`.toLowerCase()
@@ -66,6 +78,13 @@ export function getItemCategory(item) {
     return 'clothing'
   }
 
+  // Mantimentos (Comida e Bebida)
+  if (
+    /agua|água|comida|enlatad|cereal|cereais|cafe|café|cha|chá|mantimento|biscoito|refrigerante|suco|garrafa/i.test(text)
+  ) {
+    return 'supplies'
+  }
+
   return 'general'
 }
 
@@ -83,12 +102,19 @@ function xpForNextLevel(level) {
 }
 
 export default function Character() {
-  const { user, character, transferItem, consumeItem, discardItem } = useAuth()
+  const { user, character, updateCharacter, transferItem, consumeItem, discardItem } = useAuth()
 
   const debuffInfo = getVitalsDebuffs(character?.vitals || {})
 
   // Filtro de aba ativo
   const [activeCategory, setActiveCategory] = useState('all')
+
+  // Estado do Modal de Edição de Avatar
+  const [showAvatarModal, setShowAvatarModal] = useState(false)
+  const [avatarUrlInput, setAvatarUrlInput] = useState('')
+  const [avatarLoading, setAvatarLoading] = useState(false)
+  const [avatarError, setAvatarError] = useState('')
+  const [avatarSuccess, setAvatarSuccess] = useState('')
 
   // Estados do Modal de Transferência
   const [showTransfer, setShowTransfer] = useState(false)
@@ -266,6 +292,34 @@ export default function Character() {
     }
   }
 
+  // Handlers do Modal de Avatar
+  function openAvatarModal() {
+    setAvatarUrlInput(character?.avatarUrl || '')
+    setAvatarError('')
+    setAvatarSuccess('')
+    setShowAvatarModal(true)
+  }
+
+  async function handleAvatarSubmit(e) {
+    e.preventDefault()
+    setAvatarError('')
+    setAvatarSuccess('')
+    setAvatarLoading(true)
+
+    try {
+      const urlToSave = avatarUrlInput.trim() || null
+      await updateCharacter({ avatarUrl: urlToSave })
+      setAvatarSuccess('Foto de perfil atualizada com sucesso!')
+      setTimeout(() => {
+        setShowAvatarModal(false)
+      }, 1200)
+    } catch (err) {
+      setAvatarError(err.message || 'Erro ao atualizar foto de perfil.')
+    } finally {
+      setAvatarLoading(false)
+    }
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       <HUD />
@@ -276,21 +330,59 @@ export default function Character() {
           <div className="character-profile-panel">
             {/* Header: avatar + nome + nível */}
             <div className="character-header">
-              <div className="character-avatar-container">
+              <div
+                className="character-avatar-container"
+                onClick={openAvatarModal}
+                style={{ cursor: 'pointer', position: 'relative' }}
+                title="Clique para alterar foto de perfil"
+              >
                 {character.avatarUrl ? (
                   <img
                     className="character-avatar"
                     src={character.avatarUrl}
                     alt={character.name}
+                    onError={(e) => { e.target.onerror = null; e.target.src = ''; }}
                   />
                 ) : (
                   <div className="character-avatar-placeholder">🧟</div>
                 )}
                 <div className="character-level-badge">Nv {character.level || 1}</div>
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    right: 0,
+                    background: 'rgba(0,0,0,0.75)',
+                    border: '1px solid var(--glass-border)',
+                    borderRadius: '50%',
+                    width: 22,
+                    height: 22,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 11,
+                    color: '#fff',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
+                  }}
+                  title="Alterar foto"
+                >
+                  📷
+                </div>
               </div>
 
               <div className="character-info">
-                <div className="character-name">{character.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="character-name">{character.name}</div>
+                  <button
+                    type="button"
+                    onClick={openAvatarModal}
+                    className="btn btn-sm"
+                    style={{ padding: '2px 8px', fontSize: 11, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}
+                    title="Alterar foto de perfil"
+                  >
+                    📷 Foto
+                  </button>
+                </div>
                 <div className="character-age">{character.age || '??'} anos · Sobrevivente</div>
 
                 <div className="xp-bar-container">
@@ -705,6 +797,101 @@ export default function Character() {
                   disabled={actionLoading}
                 >
                   {actionLoading ? 'Descartando...' : 'Confirmar Descarte'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL: ALTERAR FOTO DE PERFIL / AVATAR */}
+      {showAvatarModal && (
+        <div className="modal-overlay">
+          <div className="modal-content glass" style={{ maxWidth: '440px', width: '100%', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, textTransform: 'uppercase', color: 'var(--accent)', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                📷 Foto de Perfil
+              </h3>
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => setShowAvatarModal(false)}
+                disabled={avatarLoading}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 18, cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {avatarError && <div className="alert alert-danger" style={{ marginBottom: 12 }}>{avatarError}</div>}
+            {avatarSuccess && <div className="alert alert-success" style={{ marginBottom: 12 }}>{avatarSuccess}</div>}
+
+            <form onSubmit={handleAvatarSubmit}>
+              {/* Preview do Avatar */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <div
+                  style={{
+                    width: 90,
+                    height: 90,
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    background: 'rgba(0,0,0,0.4)',
+                    border: '2px solid var(--accent)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.5)'
+                  }}
+                >
+                  {avatarUrlInput.trim() ? (
+                    <img
+                      src={avatarUrlInput.trim()}
+                      alt="Prévia do Avatar"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.target.onerror = null
+                        e.target.src = ''
+                      }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: 40 }}>🧟</span>
+                  )}
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  Pré-visualização do seu avatar
+                </span>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 14 }}>
+                <label>Link direto da Imagem (URL)</label>
+                <input
+                  type="url"
+                  placeholder="https://exemplo.com/sua-foto.jpg"
+                  value={avatarUrlInput}
+                  onChange={(e) => setAvatarUrlInput(e.target.value)}
+                  autoFocus
+                />
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginTop: 6, lineHeight: 1.4 }}>
+                  Você pode usar links diretos do <strong>Imgur</strong>, <strong>Discord</strong>, <strong>Pinterest</strong> ou qualquer site de hospedagem de imagens. Para remover sua foto, deixe o campo em branco.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ flex: 1 }}
+                  onClick={() => setShowAvatarModal(false)}
+                  disabled={avatarLoading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ flex: 2 }}
+                  disabled={avatarLoading}
+                >
+                  {avatarLoading ? 'Salvando...' : 'Salvar Foto'}
                 </button>
               </div>
             </form>

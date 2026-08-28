@@ -249,18 +249,11 @@ export function calculateEffectiveAttributes(baseAttributes = {}, vitals = {}) {
   return effective
 }
 
-/**
- * Rola loot de suprimentos garantindo que APENAS itens comuns, incomuns ou sucatas apareçam
- */
 export function rollSupplyLoot(lootConfig) {
   if (!lootConfig || !lootConfig.enabled) return []
   if (Math.random() < (lootConfig.emptyChance ?? 0.25)) return []
 
-  const table = (lootConfig.table || []).filter(item => {
-    const rarity = item.rarity || 'common'
-    return SUPPLY_RARITIES.includes(rarity)
-  })
-
+  const table = lootConfig.table || []
   if (table.length === 0) return []
 
   // Quantidade de itens para sortear (1 a maxItemsPerSearch)
@@ -283,6 +276,7 @@ export function rollSupplyLoot(lootConfig) {
 
     if (chosenIdx !== -1) {
       const chosen = available.splice(chosenIdx, 1)[0]
+      const preset = DEFAULT_PRESET_ITEMS.find(p => p.itemId === chosen.itemId)
       const minQ = chosen.min || 1
       const maxQ = chosen.max || 1
       const qty = Math.floor(Math.random() * (maxQ - minQ + 1)) + minQ
@@ -290,15 +284,16 @@ export function rollSupplyLoot(lootConfig) {
       rolled.push({
         instanceId: Math.random().toString(36).substring(2) + Date.now().toString(36),
         itemId: chosen.itemId,
-        name: chosen.name,
-        icon: chosen.icon,
-        rarity: chosen.rarity || 'common',
+        name: chosen.name || preset?.name || 'Item',
+        icon: chosen.icon || preset?.icon || '📦',
+        rarity: chosen.rarity || preset?.rarity || 'common',
         quantity: qty,
-        category: chosen.category || 'general',
-        consumable: chosen.consumable ?? false,
-        consumeEffect: chosen.consumeEffect || null,
-        isQuestItem: chosen.isQuestItem ?? false,
-        unlocks: chosen.unlocks || [],
+        category: chosen.category || preset?.category || 'general',
+        consumable: chosen.consumable !== undefined ? chosen.consumable : (preset?.consumable ?? false),
+        consumeEffect: chosen.consumeEffect || preset?.consumeEffect || null,
+        isQuestItem: chosen.isQuestItem !== undefined ? chosen.isQuestItem : (preset?.isQuestItem ?? false),
+        description: chosen.description || preset?.description || '',
+        unlocks: chosen.unlocks || preset?.unlocks || [],
         obtainedAt: new Date().toISOString(),
         obtainedFrom: 'Busca de Suprimentos'
       })
@@ -308,20 +303,28 @@ export function rollSupplyLoot(lootConfig) {
   return rolled
 }
 
-/**
- * Retorna todos os itens raros/excepcionais disponíveis para a Busca Única
- */
 export function rollUniqueLoot(locationUniqueConfig) {
   if (!locationUniqueConfig || !locationUniqueConfig.enabled) return []
   const items = locationUniqueConfig.items || []
   if (items.length === 0) return []
 
-  return items.map(item => ({
-    ...item,
-    quantity: item.quantity || 1,
-    rarity: item.rarity || 'rare',
-    selected: false
-  }))
+  return items.map(item => {
+    const preset = DEFAULT_PRESET_ITEMS.find(p => p.itemId === item.itemId)
+    return {
+      ...item,
+      name: item.name || preset?.name || 'Item Raro',
+      icon: item.icon || preset?.icon || '⭐',
+      quantity: item.quantity || 1,
+      rarity: item.rarity || preset?.rarity || 'rare',
+      category: item.category || preset?.category || 'general',
+      consumable: item.consumable !== undefined ? item.consumable : (preset?.consumable ?? false),
+      consumeEffect: item.consumeEffect || preset?.consumeEffect || null,
+      isQuestItem: item.isQuestItem !== undefined ? item.isQuestItem : (preset?.isQuestItem ?? false),
+      description: item.description || preset?.description || '',
+      unlocks: item.unlocks || preset?.unlocks || [],
+      selected: false
+    }
+  })
 }
 
 /**

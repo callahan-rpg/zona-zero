@@ -648,8 +648,57 @@ export default function Admin() {
     }
   }
 
-  // ==========================================
-  // TAB 5: COMBATE & ENCONTROS TÁTICOS
+  // Remove um item do inventário pelo instanceId
+  async function handleRemoveInventoryItem(instanceId) {
+    if (!selectedPlayer) return
+    const playerRef = doc(db, 'users', selectedPlayer.uid)
+    const currentInventory = (selectedPlayer.character?.inventory || []).filter(
+      (i) => i.instanceId !== instanceId
+    )
+    try {
+      await updateDoc(playerRef, { 'character.inventory': currentInventory })
+      setSelectedPlayer((prev) => ({
+        ...prev,
+        character: { ...prev.character, inventory: currentInventory },
+      }))
+    } catch (err) {
+      alert('Erro ao remover item: ' + err.message)
+    }
+  }
+
+  // Consolida itens duplicados (mesmo itemId) somando quantidades
+  async function handleConsolidateInventory() {
+    if (!selectedPlayer) return
+    const raw = selectedPlayer.character?.inventory || []
+    const consolidated = []
+    for (const item of raw) {
+      const existing = consolidated.find(
+        (i) => i.itemId === item.itemId && !i.isQuestItem && !item.isQuestItem
+      )
+      if (existing) {
+        existing.quantity = (existing.quantity || 1) + (item.quantity || 1)
+      } else {
+        consolidated.push({ ...item })
+      }
+    }
+    if (consolidated.length === raw.length) {
+      alert('Inventário já está consolidado — nenhum item duplicado encontrado.')
+      return
+    }
+    const playerRef = doc(db, 'users', selectedPlayer.uid)
+    try {
+      await updateDoc(playerRef, { 'character.inventory': consolidated })
+      setSelectedPlayer((prev) => ({
+        ...prev,
+        character: { ...prev.character, inventory: consolidated },
+      }))
+      alert(`Consolidação concluída! ${raw.length - consolidated.length} entrada(s) fundida(s).`)
+    } catch (err) {
+      alert('Erro ao consolidar: ' + err.message)
+    }
+  }
+
+
   // ==========================================
   const [combatLocations, setCombatLocations] = useState([])
   const [selectedCombatSlug, setSelectedCombatSlug] = useState('sala-hospital')
@@ -1739,7 +1788,7 @@ export default function Admin() {
                                               itemId: item.itemId,
                                               name: item.name,
                                               icon: item.icon || '📦',
-                                              rarity: ['junk', 'common', 'uncommon'].includes(item.rarity) ? item.rarity : 'common',
+                                              rarity: item.rarity || 'common',
                                               category: item.category || 'general',
                                               consumable: item.consumable,
                                               consumeEffect: item.consumeEffect,
@@ -1799,10 +1848,27 @@ export default function Admin() {
                           })}
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 50px 100px 70px 70px 40px', gap: 6, alignItems: 'end', marginTop: 8 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 50px 110px 70px 70px 40px', gap: 6, alignItems: 'end', marginTop: 8 }}>
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: 9 }}>ID Item</label>
-                            <input type="text" placeholder="bandagem" value={newLootItem.itemId} onChange={(e) => setNewLootItem(prev => ({ ...prev, itemId: e.target.value }))} style={{ padding: '6px' }} />
+                            <input type="text" placeholder="bandagem" value={newLootItem.itemId} onChange={(e) => {
+                              const id = e.target.value
+                              const catItem = catalogItems.find(c => c.itemId === id)
+                              setNewLootItem(prev => ({
+                                ...prev,
+                                itemId: id,
+                                ...(catItem ? {
+                                  name: catItem.name,
+                                  icon: catItem.icon,
+                                  rarity: catItem.rarity || 'common',
+                                  category: catItem.category || 'general',
+                                  consumable: catItem.consumable,
+                                  consumeEffect: catItem.consumeEffect,
+                                  description: catItem.description,
+                                  unlocks: catItem.unlocks
+                                } : {})
+                              }))
+                            }} style={{ padding: '6px' }} />
                           </div>
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: 9 }}>Nome</label>
@@ -1815,9 +1881,9 @@ export default function Admin() {
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: 9 }}>Raridade</label>
                             <select value={newLootItem.rarity} onChange={(e) => setNewLootItem(prev => ({ ...prev, rarity: e.target.value }))} style={{ padding: '6px' }}>
-                              <option value="junk">🔩 Sucata</option>
-                              <option value="common">⚪ Comum</option>
-                              <option value="uncommon">🟢 Incomum</option>
+                              {Object.values(RARITY_META).map(r => (
+                                <option key={r.id} value={r.id}>{r.icon} {r.label}</option>
+                              ))}
                             </select>
                           </div>
                           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1925,7 +1991,7 @@ export default function Admin() {
                                               itemId: item.itemId,
                                               name: item.name,
                                               icon: item.icon || '⭐',
-                                              rarity: ['rare', 'very_rare', 'exceptional'].includes(item.rarity) ? item.rarity : 'rare',
+                                              rarity: item.rarity || 'rare',
                                               quantity: 1,
                                               category: item.category || 'general',
                                               consumable: item.consumable,
@@ -1987,7 +2053,24 @@ export default function Admin() {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 50px 110px 70px 40px', gap: 6, alignItems: 'end', marginTop: 8 }}>
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: 9 }}>ID Item</label>
-                            <input type="text" placeholder="relogio_pulso" value={newUniqueItem.itemId} onChange={(e) => setNewUniqueItem(prev => ({ ...prev, itemId: e.target.value }))} style={{ padding: '6px' }} />
+                            <input type="text" placeholder="relogio_pulso" value={newUniqueItem.itemId} onChange={(e) => {
+                              const id = e.target.value
+                              const catItem = catalogItems.find(c => c.itemId === id)
+                              setNewUniqueItem(prev => ({
+                                ...prev,
+                                itemId: id,
+                                ...(catItem ? {
+                                  name: catItem.name,
+                                  icon: catItem.icon,
+                                  rarity: catItem.rarity || 'rare',
+                                  category: catItem.category || 'general',
+                                  consumable: catItem.consumable,
+                                  consumeEffect: catItem.consumeEffect,
+                                  description: catItem.description,
+                                  unlocks: catItem.unlocks
+                                } : {})
+                              }))
+                            }} style={{ padding: '6px' }} />
                           </div>
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: 9 }}>Nome</label>
@@ -2000,9 +2083,9 @@ export default function Admin() {
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: 9 }}>Raridade</label>
                             <select value={newUniqueItem.rarity} onChange={(e) => setNewUniqueItem(prev => ({ ...prev, rarity: e.target.value }))} style={{ padding: '6px' }}>
-                              <option value="rare">🔵 Raro</option>
-                              <option value="very_rare">🟣 Muito Raro</option>
-                              <option value="exceptional">🟠 Excepcional</option>
+                              {Object.values(RARITY_META).map(r => (
+                                <option key={r.id} value={r.id}>{r.icon} {r.label}</option>
+                              ))}
                             </select>
                           </div>
                           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -2099,7 +2182,16 @@ export default function Admin() {
                       style={{ padding: '10px', cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center', border: selectedPlayer?.uid === p.uid ? '1px solid var(--accent)' : '1px solid transparent' }}
                       onClick={() => setSelectedPlayer(p)}
                     >
-                      <span style={{ fontSize: 20 }}>{p.character?.avatarUrl ? '👤' : '🧟'}</span>
+                      {p.character?.avatarUrl ? (
+                        <img
+                          src={p.character.avatarUrl}
+                          alt="Avatar"
+                          style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--glass-border)', flexShrink: 0 }}
+                          onError={(e) => { e.target.onerror = null; e.target.src = ''; }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: 20 }}>👤</span>
+                      )}
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.character?.name || 'Incompleto'}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Nível {p.character?.level || 1} · {p.role}</div>
@@ -2115,6 +2207,42 @@ export default function Admin() {
                   <h3 style={{ fontSize: 15, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 16 }}>
                     Ficha de: {selectedPlayer.character.name}
                   </h3>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16, padding: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid var(--glass-border)' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Nome do Sobrevivente</label>
+                      <input
+                        type="text"
+                        value={selectedPlayer.character.name || ''}
+                        onChange={(e) => updatePlayerStats(selectedPlayer.uid, 'name', e.target.value)}
+                        placeholder="Nome do personagem"
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Link da Foto/Avatar (URL)</label>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {selectedPlayer.character.avatarUrl ? (
+                          <img
+                            src={selectedPlayer.character.avatarUrl}
+                            alt="Avatar"
+                            style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--glass-border)', flexShrink: 0 }}
+                            onError={(e) => { e.target.onerror = null; e.target.src = ''; }}
+                          />
+                        ) : (
+                          <div style={{ width: 36, height: 36, borderRadius: 6, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                            👤
+                          </div>
+                        )}
+                        <input
+                          type="url"
+                          value={selectedPlayer.character.avatarUrl || ''}
+                          onChange={(e) => updatePlayerStats(selectedPlayer.uid, 'avatarUrl', e.target.value)}
+                          placeholder="https://... foto do personagem"
+                          style={{ flex: 1 }}
+                        />
+                      </div>
+                    </div>
+                  </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
                     <div className="form-group">
@@ -2203,7 +2331,16 @@ export default function Admin() {
                   </div>
 
                   <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: 16 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Inventário do Jogador</label>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Inventário do Jogador</label>
+                      <button
+                        type="button"
+                        onClick={handleConsolidateInventory}
+                        style={{ fontSize: 11, background: 'rgba(255,200,0,0.15)', border: '1px solid rgba(255,200,0,0.3)', color: '#ffc800', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }}
+                      >
+                        ⚡ Consolidar Duplicatas
+                      </button>
+                    </div>
 
                     {/* === PICKER DO CATÁLOGO === */}
                     <div style={{ marginBottom: 14 }}>

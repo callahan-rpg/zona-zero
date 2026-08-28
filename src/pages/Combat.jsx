@@ -15,6 +15,13 @@ export default function CombatPage() {
   const [activeCombat, setActiveCombat] = useState(null)
   const [participantsData, setParticipantsData] = useState({})
   const [allPlayers, setAllPlayers] = useState([])
+  // IDs dos cards expandidos (local, não persiste)
+  const [expandedCards, setExpandedCards] = useState(new Set())
+  const toggleCard = (id) => setExpandedCards(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
 
   // Modal / Edição de Jogador (Admin)
   const [editingPlayer, setEditingPlayer] = useState(null)
@@ -468,11 +475,13 @@ export default function CombatPage() {
                       <div
                         key={uid}
                         className="glass-light combat-item-card"
+                        onClick={() => toggleCard(uid)}
                         style={{
                           padding: '12px 14px',
                           borderRadius: 10,
                           borderLeft: '4px solid #38bdf8',
-                          transition: 'all 0.2s',
+                          cursor: 'pointer',
+                          transition: 'all 0.25s',
                           background: currentHp <= 0 ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.03)'
                         }}
                       >
@@ -502,22 +511,25 @@ export default function CombatPage() {
                           )}
 
                           {char.avatarUrl ? (
-                            <img src={char.avatarUrl} alt={char.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--glass-border)' }} />
+                            <img src={char.avatarUrl} alt={char.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--glass-border)', flexShrink: 0 }} />
                           ) : (
-                            <div style={{ width: 44, height: 44, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
                               👤
                             </div>
                           )}
 
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                              <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{char.name}</strong>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{char.name}</strong>
+                                <span style={{ fontSize: 10, color: '#38bdf8', opacity: 0.7 }}>{expandedCards.has(uid) ? '▲' : '▼'}</span>
+                              </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Nv {char.level}</span>
                                 {isAdmin && (
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenEditPlayer(uid)}
+                                    onClick={(e) => { e.stopPropagation(); handleOpenEditPlayer(uid); }}
                                     className="btn btn-sm"
                                     style={{ padding: '2px 6px', fontSize: 10, background: 'rgba(56,189,248,0.1)', borderColor: 'rgba(56,189,248,0.3)', color: '#38bdf8' }}
                                     title="Editar HP, Atributos e Ação do Turno"
@@ -528,22 +540,22 @@ export default function CombatPage() {
                               </div>
                             </div>
 
-                            {/* CAMPO DE COMENTÁRIO DO TURNO (AÇÃO RECENTE) */}
+                            {/* COMENTÁRIO DO TURNO — sempre visível */}
                             {turnComment ? (
                               <div style={{ fontSize: 11, color: '#facc15', fontStyle: 'italic', marginBottom: 6, padding: '3px 6px', background: 'rgba(250, 204, 21, 0.08)', borderRadius: 4, borderLeft: '2px solid #facc15' }}>
                                 💬 "{turnComment}"
                               </div>
                             ) : isAdmin && (
                               <div
-                                onClick={() => handleOpenEditPlayer(uid)}
+                                onClick={(e) => { e.stopPropagation(); handleOpenEditPlayer(uid); }}
                                 style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: 6, cursor: 'pointer' }}
                               >
                                 + Adicionar ação/comentário do turno
                               </div>
                             )}
 
-                            {/* Barra de Vida */}
-                            <div style={{ marginBottom: 6 }}>
+                            {/* Barra de Vida — sempre visível */}
+                            <div style={{ marginBottom: 4 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, marginBottom: 2 }}>
                                 <span style={{ color: '#ef4444' }}>HP / Sangue</span>
                                 <span style={{ color: currentHp <= 20 ? '#ef4444' : '#22c55e' }}>{currentHp} / {maxHp}</span>
@@ -555,49 +567,44 @@ export default function CombatPage() {
                           </div>
                         </div>
 
-                        {/* Status Badges */}
-                        {charStatus.length > 0 && (
-                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-                            {charStatus.map(stId => {
-                              const stMeta = COMBAT_STATUS_EFFECTS.find(s => s.id === stId)
-                              if (!stMeta) return null
-                              return (
-                                <span
-                                  key={stId}
-                                  style={{
-                                    fontSize: 9,
-                                    fontWeight: 700,
-                                    padding: '2px 6px',
-                                    borderRadius: 4,
-                                    background: 'rgba(0,0,0,0.4)',
-                                    border: `1px solid ${stMeta.color}`,
-                                    color: stMeta.color,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 3
-                                  }}
-                                >
-                                  {stMeta.icon} {stMeta.label}
-                                </span>
-                              )
-                            })}
+                        {/* SEÇÃO EXPANDIDA: Atributos + Status */}
+                        {expandedCards.has(uid) && (
+                          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                            {charStatus.length > 0 && (
+                              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                                {charStatus.map(stId => {
+                                  const stMeta = COMBAT_STATUS_EFFECTS.find(s => s.id === stId)
+                                  if (!stMeta) return null
+                                  return (
+                                    <span
+                                      key={stId}
+                                      style={{
+                                        fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                                        background: 'rgba(0,0,0,0.4)', border: `1px solid ${stMeta.color}`,
+                                        color: stMeta.color, display: 'inline-flex', alignItems: 'center', gap: 3
+                                      }}
+                                    >
+                                      {stMeta.icon} {stMeta.label}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            )}
+                            <div className="combat-attributes-strip">
+                              {['forca', 'destreza', 'constituicao', 'sabedoria', 'carisma'].map(attrKey => {
+                                const meta = ATTRIBUTE_ICONS[attrKey]
+                                const val = char.attributes?.[attrKey] ?? 1
+                                return (
+                                  <div key={attrKey} className="compact-attr-tag" title={`${meta.label}: ${val}`}>
+                                    <span className="compact-attr-icon">{meta.icon}</span>
+                                    <span className="compact-attr-lbl">{meta.label}</span>
+                                    <span className="compact-attr-val">{val}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
                         )}
-
-                        {/* Atributos Simplificados */}
-                        <div className="combat-attributes-strip" style={{ marginTop: 6 }}>
-                          {['forca', 'destreza', 'constituicao', 'sabedoria', 'carisma'].map(attrKey => {
-                            const meta = ATTRIBUTE_ICONS[attrKey]
-                            const val = char.attributes?.[attrKey] ?? 1
-                            return (
-                              <div key={attrKey} className="compact-attr-tag" title={`${meta.label}: ${val}`}>
-                                <span className="compact-attr-icon">{meta.icon}</span>
-                                <span className="compact-attr-lbl">{meta.label}</span>
-                                <span className="compact-attr-val">{val}</span>
-                              </div>
-                            )
-                          })}
-                        </div>
                       </div>
                     )
                   })}
@@ -629,11 +636,13 @@ export default function CombatPage() {
                         <div
                           key={enemy.id}
                           className="glass-light combat-item-card"
+                          onClick={() => toggleCard(enemy.id)}
                           style={{
                             padding: '12px 14px',
                             borderRadius: 10,
                             borderLeft: `4px solid ${enemy.isBoss ? '#f59e0b' : '#ef4444'}`,
-                            transition: 'all 0.2s',
+                            cursor: 'pointer',
+                            transition: 'all 0.25s',
                             opacity: isDead ? 0.5 : 1,
                             background: enemy.isBoss ? 'rgba(245,158,11,0.04)' : 'rgba(255,255,255,0.03)'
                           }}
@@ -664,24 +673,27 @@ export default function CombatPage() {
                             )}
 
                             {enemy.avatarUrl ? (
-                              <img src={enemy.avatarUrl} alt={enemy.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--glass-border)' }} />
+                              <img src={enemy.avatarUrl} alt={enemy.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--glass-border)', flexShrink: 0 }} />
                             ) : (
-                              <div style={{ width: 44, height: 44, borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
+                              <div style={{ width: 44, height: 44, borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
                                 {enemy.icon || '🧟'}
                               </div>
                             )}
 
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                                <strong style={{ fontSize: 14, color: enemy.isBoss ? '#fbbf24' : 'var(--text-primary)' }}>
-                                  {enemy.name} {enemy.isBoss && <span className="boss-badge">BOSS</span>}
-                                </strong>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <strong style={{ fontSize: 14, color: enemy.isBoss ? '#fbbf24' : 'var(--text-primary)' }}>
+                                    {enemy.name} {enemy.isBoss && <span className="boss-badge">BOSS</span>}
+                                  </strong>
+                                  <span style={{ fontSize: 10, color: '#f87171', opacity: 0.7 }}>{expandedCards.has(enemy.id) ? '▲' : '▼'}</span>
+                                </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   {isDead && <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 800 }}>💀 DERROTADO</span>}
                                   {isAdmin && (
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenEditEnemy(enemy)}
+                                      onClick={(e) => { e.stopPropagation(); handleOpenEditEnemy(enemy); }}
                                       className="btn btn-sm"
                                       style={{ padding: '2px 6px', fontSize: 10, background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: '#f87171' }}
                                       title="Editar HP, Atributos e Ação do Monstro"
@@ -692,22 +704,22 @@ export default function CombatPage() {
                                 </div>
                               </div>
 
-                              {/* CAMPO DE COMENTÁRIO DO INIMIGO (AÇÃO DO TURNO) */}
+                              {/* COMENTÁRIO DO INIMIGO — sempre visível */}
                               {enemy.turnComment ? (
                                 <div style={{ fontSize: 11, color: '#fb923c', fontStyle: 'italic', marginBottom: 6, padding: '3px 6px', background: 'rgba(251, 146, 60, 0.08)', borderRadius: 4, borderLeft: '2px solid #fb923c' }}>
                                   💬 "{enemy.turnComment}"
                                 </div>
                               ) : isAdmin && (
                                 <div
-                                  onClick={() => handleOpenEditEnemy(enemy)}
+                                  onClick={(e) => { e.stopPropagation(); handleOpenEditEnemy(enemy); }}
                                   style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: 6, cursor: 'pointer' }}
                                 >
                                   + Adicionar ação/golpe do monstro
                                 </div>
                               )}
 
-                              {/* Barra de Vida do Inimigo */}
-                              <div style={{ marginBottom: 6 }}>
+                              {/* Barra de Vida — sempre visível */}
+                              <div style={{ marginBottom: 4 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, marginBottom: 2 }}>
                                   <span style={{ color: '#ef4444' }}>HP</span>
                                   <span style={{ color: isDead ? '#6b7280' : '#ef4444' }}>{currentHp} / {maxHp}</span>
@@ -719,49 +731,44 @@ export default function CombatPage() {
                             </div>
                           </div>
 
-                          {/* Status do Inimigo */}
-                          {enemy.status && enemy.status.length > 0 && (
-                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-                              {enemy.status.map(stId => {
-                                const stMeta = COMBAT_STATUS_EFFECTS.find(s => s.id === stId)
-                                if (!stMeta) return null
-                                return (
-                                  <span
-                                    key={stId}
-                                    style={{
-                                      fontSize: 9,
-                                      fontWeight: 700,
-                                      padding: '2px 6px',
-                                      borderRadius: 4,
-                                      background: 'rgba(0,0,0,0.4)',
-                                      border: `1px solid ${stMeta.color}`,
-                                      color: stMeta.color,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 3
-                                    }}
-                                  >
-                                    {stMeta.icon} {stMeta.label}
-                                  </span>
-                                )
-                              })}
-                            </div>
-                          )}
-
-                          {/* Atributos do Inimigo */}
-                          {enemy.attributes && (
-                            <div className="combat-attributes-strip" style={{ marginTop: 6 }}>
-                              {['forca', 'destreza', 'constituicao', 'sabedoria', 'carisma'].map(attrKey => {
-                                const meta = ATTRIBUTE_ICONS[attrKey]
-                                const val = enemy.attributes?.[attrKey] ?? 0
-                                return (
-                                  <div key={attrKey} className="compact-attr-tag" title={`${meta.label}: ${val}`}>
-                                    <span className="compact-attr-icon">{meta.icon}</span>
-                                    <span className="compact-attr-lbl">{meta.label}</span>
-                                    <span className="compact-attr-val">{val}</span>
-                                  </div>
-                                )
-                              })}
+                          {/* SEÇÃO EXPANDIDA: Status + Atributos */}
+                          {expandedCards.has(enemy.id) && (
+                            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                              {enemy.status && enemy.status.length > 0 && (
+                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                                  {enemy.status.map(stId => {
+                                    const stMeta = COMBAT_STATUS_EFFECTS.find(s => s.id === stId)
+                                    if (!stMeta) return null
+                                    return (
+                                      <span
+                                        key={stId}
+                                        style={{
+                                          fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                                          background: 'rgba(0,0,0,0.4)', border: `1px solid ${stMeta.color}`,
+                                          color: stMeta.color, display: 'inline-flex', alignItems: 'center', gap: 3
+                                        }}
+                                      >
+                                        {stMeta.icon} {stMeta.label}
+                                      </span>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                              {enemy.attributes && (
+                                <div className="combat-attributes-strip">
+                                  {['forca', 'destreza', 'constituicao', 'sabedoria', 'carisma'].map(attrKey => {
+                                    const meta = ATTRIBUTE_ICONS[attrKey]
+                                    const val = enemy.attributes?.[attrKey] ?? 0
+                                    return (
+                                      <div key={attrKey} className="compact-attr-tag" title={`${meta.label}: ${val}`}>
+                                        <span className="compact-attr-icon">{meta.icon}</span>
+                                        <span className="compact-attr-lbl">{meta.label}</span>
+                                        <span className="compact-attr-val">{val}</span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

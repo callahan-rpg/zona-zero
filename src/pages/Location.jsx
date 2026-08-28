@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { doc, getDoc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, runTransaction, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
@@ -151,35 +151,50 @@ export default function Location() {
 
     if (user) {
       const userRef = doc(db, 'users', user.uid)
-      const updates = {
-        [`character.lastLootByLocation.${slug}`]: new Date()
-      }
-
-      if (items.length > 0) {
-        const inventoryItems = items.map((item) => ({
-          instanceId: Math.random().toString(36).substring(2) + Date.now().toString(36),
-          itemId: item.itemId,
-          name: item.name,
-          icon: item.icon,
-          rarity: item.rarity || 'common',
-          quantity: item.quantity,
-          category: item.category || 'general',
-          consumable: item.consumable ?? false,
-          consumeEffect: item.consumeEffect || null,
-          isQuestItem: item.isQuestItem ?? false,
-          unlocks: item.unlocks || [],
-          obtainedAt: new Date().toISOString(),
-          obtainedFrom: `Suprimentos (${slug})`,
-        }))
-        updates['character.inventory'] = arrayUnion(...inventoryItems)
-      }
 
       try {
-        await updateDoc(userRef, updates)
+        await runTransaction(db, async (transaction) => {
+          const snap = await transaction.get(userRef)
+          if (!snap.exists()) throw new Error('Personagem não encontrado.')
+
+          const charData = snap.data().character || {}
+          const inventory = [...(charData.inventory || [])]
+
+          // Empilha cada item encontrado com os do mesmo itemId já existentes
+          for (const item of items) {
+            const existing = inventory.find(i => i.itemId === item.itemId && !i.isQuestItem)
+            if (existing) {
+              existing.quantity = (existing.quantity || 1) + (item.quantity || 1)
+            } else {
+              inventory.push({
+                instanceId: Math.random().toString(36).substring(2) + Date.now().toString(36),
+                itemId: item.itemId,
+                name: item.name,
+                icon: item.icon,
+                rarity: item.rarity || 'common',
+                quantity: item.quantity,
+                category: item.category || 'general',
+                consumable: item.consumable ?? false,
+                consumeEffect: item.consumeEffect || null,
+                isQuestItem: item.isQuestItem ?? false,
+                description: item.description || '',
+                unlocks: item.unlocks || [],
+                obtainedAt: new Date().toISOString(),
+                obtainedFrom: `Suprimentos (${slug})`,
+              })
+            }
+          }
+
+          transaction.update(userRef, {
+            'character.inventory': inventory,
+            [`character.lastLootByLocation.${slug}`]: new Date()
+          })
+        })
+
         await refreshCharacter()
         setSupplyCooldown(true)
       } catch (err) {
-        console.error("Erro ao salvar busca de suprimentos:", err)
+        console.error('Erro ao salvar busca de suprimentos:', err)
       }
     }
   }
