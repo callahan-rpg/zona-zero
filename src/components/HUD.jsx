@@ -131,7 +131,6 @@ export default function HUD({ locationName }) {
             className={`hud-btn ${location.pathname.startsWith('/location') ? 'active' : ''}`}
           >
             <span className="hud-btn-icon">🏚️</span>
-            Salas
           </Link>
 
           <Link
@@ -139,7 +138,6 @@ export default function HUD({ locationName }) {
             className={`hud-btn ${location.pathname === '/map' ? 'active' : ''}`}
           >
             <span className="hud-btn-icon">🗺️</span>
-            Mapa
           </Link>
 
           <button
@@ -156,7 +154,6 @@ export default function HUD({ locationName }) {
             title={location.pathname === '/characters' ? 'Você já está na página de Sobreviventes' : 'Sobreviventes'}
           >
             <span className="hud-btn-icon">👥</span>
-            Sobreviventes
           </button>
 
           <button
@@ -183,7 +180,6 @@ export default function HUD({ locationName }) {
             title="Rolar Dados"
           >
             <span className="hud-btn-icon">🎲</span>
-            Dados
           </button>
 
           {/* Botão de Configurações do Usuário (Clima, Opacidade, Áudio) */}
