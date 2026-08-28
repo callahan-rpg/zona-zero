@@ -475,16 +475,71 @@ export function AuthProvider({ children }) {
         })
       }
 
+      // Cria a notificação para o destinatário
+      const notification = {
+        id: 'notif_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
+        type: 'item_received',
+        senderUid: user.uid,
+        senderName: senderData.character?.name || 'Sobrevivente',
+        senderAvatar: senderData.character?.avatarUrl || null,
+        item: {
+          itemId: item.itemId,
+          name: item.name,
+          icon: item.icon,
+          rarity: item.rarity || 'common',
+          quantity: quantityToTransfer
+        },
+        read: false,
+        createdAt: new Date().toISOString()
+      }
+
+      const recipientNotifications = [
+        notification,
+        ...(recipientData.character?.notifications || []).slice(0, 49) // guarda até 50 notificações
+      ]
+
       transaction.update(senderRef, {
         'character.inventory': senderInventory,
       })
 
       transaction.update(recipientRef, {
         'character.inventory': recipientInventory,
+        'character.notifications': recipientNotifications
       })
     })
 
     await refreshCharacter()
+  }
+
+  // Marca todas as notificações como lidas
+  async function markNotificationsRead() {
+    if (!user || !character?.notifications) return
+    const updated = (character.notifications || []).map(n => ({ ...n, read: true }))
+    try {
+      const userRef = doc(db, 'users', user.uid)
+      await updateDoc(userRef, { 'character.notifications': updated })
+      setCharacter(prev => ({
+        ...prev,
+        notifications: updated
+      }))
+    } catch (err) {
+      console.error('Erro ao marcar notificações:', err)
+    }
+  }
+
+  // Limpa histórico de notificações
+  async function clearNotifications() {
+    if (!user) return
+    try {
+      const userRef = doc(db, 'users', user.uid)
+      await updateDoc(userRef, { 'character.notifications': [] })
+      setCharacter(prev => ({
+        ...prev,
+        notifications: []
+      }))
+    } catch (err) {
+      console.error('Erro ao limpar notificações:', err)
+    }
   }
 
   const value = {
@@ -501,6 +556,8 @@ export function AuthProvider({ children }) {
     consumeItem,
     discardItem,
     recordUniqueSearch,
+    markNotificationsRead,
+    clearNotifications,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

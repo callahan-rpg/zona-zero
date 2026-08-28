@@ -7,6 +7,7 @@ import DiceRoller from './DiceRoller.jsx'
 import CharacterPopup from './CharacterPopup.jsx'
 import CalendarModal from './CalendarModal.jsx'
 import SettingsModal from './SettingsModal.jsx'
+import NotificationBell from './NotificationBell.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { hasFeatureUnlocked, getTimeOfDay, getVitalsDebuffs } from '../utils/itemSystem'
 
@@ -205,6 +206,9 @@ export default function HUD({ locationName }) {
               Admin
             </Link>
           )}
+
+          {/* Sininho de Notificações de Itens */}
+          <NotificationBell />
 
           {character?.avatarUrl ? (
             <img
