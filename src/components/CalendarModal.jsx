@@ -1,12 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { MONTHS } from '../utils/timeSystem'
+import { getTimeOfDay } from '../utils/itemSystem'
 
-export default function CalendarModal({ gameTime, events = [], onClose }) {
+export default function CalendarModal({ gameTime, events = [], hasClock = false, onClose }) {
   const [selectedMonth, setSelectedMonth] = useState((gameTime?.month ? gameTime.month - 1 : 0))
   const [selectedYear, setSelectedYear] = useState(gameTime?.year || 2026)
   const [hoveredEvent, setHoveredEvent] = useState(null)
   const [selectedDayEvents, setSelectedDayEvents] = useState(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
+
+  const periodOfDay = getTimeOfDay(gameTime)
 
   // Draggable window state
   const [pos, setPos] = useState({ x: Math.max(20, window.innerWidth / 2 - 260), y: 80 })
@@ -143,9 +146,21 @@ export default function CalendarModal({ gameTime, events = [], onClose }) {
           <span>{gameTime?.moonPhase?.icon}</span>
           <span>{gameTime?.moonPhase?.name}</span>
         </div>
-        <div className="calendar-badge current-time-badge">
-          <span>⏰</span>
-          <span>{gameTime?.timeString || '12:00'} ({gameTime?.period === 'day' ? 'Dia' : 'Noite'})</span>
+        <div
+          className="calendar-badge current-time-badge"
+          title={hasClock ? 'Horário exato da Zona Zero' : 'Estimativa solar (Sem relógio de pulso)'}
+        >
+          {hasClock ? (
+            <>
+              <span>⏰</span>
+              <span>{gameTime?.timeString || '12:00'} ({gameTime?.period === 'day' ? 'Dia' : 'Noite'})</span>
+            </>
+          ) : (
+            <>
+              <span>{periodOfDay?.icon || '☀️'}</span>
+              <span>{periodOfDay?.label || 'Dia'} (Sem Relógio)</span>
+            </>
+          )}
         </div>
       </div>
 

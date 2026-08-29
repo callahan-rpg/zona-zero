@@ -29,30 +29,6 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState('config') // config | calendar | locations | catalog | players
 
   // ==========================================
-  // TAB CATALOG: CATÁLOGO GERAL DE ITENS
-  // ==========================================
-  const [catalogItems, setCatalogItems] = useState([])
-  const [editingCatalogItem, setEditingCatalogItem] = useState(null)
-  const [catalogSearch, setCatalogSearch] = useState('')
-  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState('all')
-  const [uploadingItemImage, setUploadingItemImage] = useState(false)
-  const [catalogForm, setCatalogForm] = useState({
-    itemId: '',
-    name: '',
-    icon: '📦',
-    imageUrl: '',
-    category: 'general',
-    rarity: 'common',
-    description: '',
-    consumable: false,
-    hungerEffect: 0,
-    thirstEffect: 0,
-    bloodEffect: 0,
-    isQuestItem: false,
-    unlocks: ''
-  })
-
-  // ==========================================
   // TAB 1: CONFIGURAÇÃO GLOBAL (TEMPO, ESTAÇÃO, CLIMA)
   // ==========================================
   const [globalConfig, setGlobalConfig] = useState(null)
@@ -319,13 +295,56 @@ export default function Admin() {
   }
 
   // ==========================================
-  // TAB 2: LOCAÇÕES (CRUD)
+  // TAB CATALOG: CATÁLOGO GERAL DE ITENS & COLEÇÕES DE LOOT PREDEFINIDAS
+  // ==========================================
+  const [catalogItems, setCatalogItems] = useState([])
+  const [editingCatalogItem, setEditingCatalogItem] = useState(null)
+  const [catalogSearch, setCatalogSearch] = useState('')
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState('all')
+  const [uploadingItemImage, setUploadingItemImage] = useState(false)
+  const [catalogForm, setCatalogForm] = useState({
+    itemId: '',
+    name: '',
+    icon: '📦',
+    imageUrl: '',
+    category: 'general',
+    rarity: 'common',
+    description: '',
+    consumable: false,
+    hungerEffect: 0,
+    thirstEffect: 0,
+    bloodEffect: 0,
+    isQuestItem: false,
+    unlocks: ''
+  })
+
+  // Coleções de Preset de Loot (ex: "Loot de Quarto de Hotel", "Cozinha de Hospital", etc.)
+  const [lootCollections, setLootCollections] = useState([])
+  const [editingCollection, setEditingCollection] = useState(null)
+  const [showCollectionModal, setShowCollectionModal] = useState(false)
+  const [collectionForm, setCollectionForm] = useState({
+    name: '',
+    description: '',
+    lootTable: [],
+    uniqueTable: []
+  })
+  const [collectionItemPickerOpen, setCollectionItemPickerOpen] = useState(false)
+  const [collectionItemSearch, setCollectionItemSearch] = useState('')
+  const [collectionItemCategory, setCollectionItemCategory] = useState('all')
+  const [newCollectionItem, setNewCollectionItem] = useState({ itemId: '', name: '', icon: '📦', rarity: 'common', chance: 0.4, min: 1, max: 2, category: 'general' })
+
+  // ==========================================
+  // TAB 2: LOCAÇÕES (CRUD COM PASTAS / COMPLEXOS)
   // ==========================================
   const [locations, setLocations] = useState([])
   const [editingLoc, setEditingLoc] = useState(null)
+  const [selectedFolder, setSelectedFolder] = useState('all') // 'all', 'sem_pasta' ou o nome da pasta
+  const [openFolders, setOpenFolders] = useState({}) // { [folderName]: boolean }
+  const [locSearch, setLocSearch] = useState('')
   const [locForm, setLocForm] = useState({
     name: '',
     slug: '',
+    folder: '', // Nome da Pasta / Complexo (ex: "Hotel do centro de Varsóvia")
     description: '',
     backgroundImage: '',
     xatIframe: '',
@@ -362,6 +381,14 @@ export default function Admin() {
   const [uniquePickerSearch, setUniquePickerSearch] = useState('')
   const [uniquePickerCategory, setUniquePickerCategory] = useState('all')
 
+  // Listener das coleções de loot do Firestore
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'loot_collections'), (snap) => {
+      setLootCollections(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    })
+    return unsub
+  }, [])
+
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'locations'), (snap) => {
       setLocations(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
@@ -374,6 +401,7 @@ export default function Admin() {
     setLocForm({
       name: loc.name || '',
       slug: loc.slug || '',
+      folder: loc.folder || '',
       description: loc.description || '',
       backgroundImage: loc.backgroundImage || '',
       xatIframe: loc.xatIframe || '',
@@ -394,6 +422,7 @@ export default function Admin() {
     setLocForm({
       name: '',
       slug: '',
+      folder: selectedFolder !== 'all' && selectedFolder !== 'sem_pasta' ? selectedFolder : '',
       description: '',
       backgroundImage: '',
       xatIframe: '',
@@ -425,6 +454,7 @@ export default function Admin() {
     const payload = {
       name: locForm.name.trim(),
       slug: cleanSlug,
+      folder: (locForm.folder || '').trim(),
       description: locForm.description.trim(),
       backgroundImage: locForm.backgroundImage.trim() || null,
       xatIframe: locForm.xatIframe.trim(),
@@ -546,6 +576,104 @@ export default function Admin() {
     setLocForm(prev => ({
       ...prev,
       uniqueTable: prev.uniqueTable.filter((_, i) => i !== idx)
+    }))
+  }
+
+  // ==========================================
+  // HANDLERS DE COLEÇÕES DE PRESET DE LOOT
+  // ==========================================
+  async function handleSaveCollection(e) {
+    e.preventDefault()
+    if (!collectionForm.name.trim()) return alert('Dê um nome para a coleção de loot')
+
+    const cleanId = editingCollection || collectionForm.name.trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9-_]/g, '')
+      .replace(/\s+/g, '-')
+
+    const payload = {
+      name: collectionForm.name.trim(),
+      description: collectionForm.description.trim(),
+      lootTable: collectionForm.lootTable || [],
+      uniqueTable: collectionForm.uniqueTable || [],
+      updatedAt: new Date().toISOString()
+    }
+
+    try {
+      await setDoc(doc(db, 'loot_collections', cleanId), payload)
+      alert('Coleção de preset de loot salva com sucesso!')
+      setShowCollectionModal(false)
+      setEditingCollection(null)
+      setCollectionForm({ name: '', description: '', lootTable: [], uniqueTable: [] })
+    } catch (err) {
+      alert('Erro ao salvar coleção: ' + err.message)
+    }
+  }
+
+  async function handleDeleteCollection(id) {
+    if (!confirm('Deseja excluir esta coleção de loot predefinida?')) return
+    try {
+      await deleteDoc(doc(db, 'loot_collections', id))
+      alert('Coleção removida!')
+    } catch (err) {
+      alert('Erro ao excluir: ' + err.message)
+    }
+  }
+
+  function handleEditCollection(col) {
+    setEditingCollection(col.id)
+    setCollectionForm({
+      name: col.name || '',
+      description: col.description || '',
+      lootTable: col.lootTable || [],
+      uniqueTable: col.uniqueTable || []
+    })
+    setShowCollectionModal(true)
+  }
+
+  function applyLootCollectionToLocation(col) {
+    if (!col) return
+    const hasExisting = locForm.lootTable.length > 0 || locForm.uniqueTable.length > 0
+    if (hasExisting && !confirm(`Deseja carregar os itens da coleção "${col.name}"? Isso substituirá a tabela atual da locação.`)) {
+      return
+    }
+
+    setLocForm(prev => ({
+      ...prev,
+      lootTable: Array.isArray(col.lootTable) ? [...col.lootTable] : [],
+      uniqueTable: Array.isArray(col.uniqueTable) ? [...col.uniqueTable] : []
+    }))
+    alert(`Coleção "${col.name}" aplicada com sucesso à locação!`)
+  }
+
+  function addCollectionLootItem() {
+    if (!newCollectionItem.itemId || !newCollectionItem.name) return alert('Preencha o ID e o Nome do Item')
+    const catItem = catalogItems.find(c => c.itemId === newCollectionItem.itemId)
+    setCollectionForm(prev => ({
+      ...prev,
+      lootTable: [...(prev.lootTable || []), {
+        itemId: newCollectionItem.itemId.trim().toLowerCase(),
+        name: newCollectionItem.name.trim(),
+        icon: newCollectionItem.icon.trim() || '📦',
+        imageUrl: newCollectionItem.imageUrl || catItem?.imageUrl || '',
+        rarity: newCollectionItem.rarity || catItem?.rarity || 'common',
+        chance: Number(newCollectionItem.chance) || 0.4,
+        min: Number(newCollectionItem.min) || 1,
+        max: Number(newCollectionItem.max) || 2,
+        category: newCollectionItem.category || catItem?.category || 'general',
+        consumable: newCollectionItem.consumable !== undefined ? newCollectionItem.consumable : (catItem?.consumable || false),
+        consumeEffect: newCollectionItem.consumeEffect || catItem?.consumeEffect || null,
+        description: newCollectionItem.description || catItem?.description || '',
+        unlocks: newCollectionItem.unlocks || catItem?.unlocks || []
+      }]
+    }))
+    setNewCollectionItem({ itemId: '', name: '', icon: '📦', imageUrl: '', rarity: 'common', chance: 0.4, min: 1, max: 2, category: 'general' })
+  }
+
+  function removeCollectionLootItem(idx) {
+    setCollectionForm(prev => ({
+      ...prev,
+      lootTable: prev.lootTable.filter((_, i) => i !== idx)
     }))
   }
 
@@ -1015,11 +1143,103 @@ export default function Admin() {
           </div>
 
 
-          {/* CONTEÚDO DA TAB CATALOG: CATÁLOGO GERAL DE ITENS */}
+          {/* CONTEÚDO DA TAB CATALOG: CATÁLOGO GERAL DE ITENS & COLEÇÕES DE PRESETS DE LOOT */}
           {activeTab === 'catalog' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
-              {/* Esquerda: Lista de Itens do Catálogo */}
-              <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* ============================================================ */}
+              {/* SEÇÃO A: COLEÇÕES DE LOOT PRÉ-SELECIONADAS (PRESETS) */}
+              {/* ============================================================ */}
+              <div className="glass-light" style={{ padding: '18px 20px', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div>
+                    <h3 style={{ fontSize: 14, textTransform: 'uppercase', color: '#c4b5fd', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>🗂️</span> Coleções de Loot Pré-Selecionadas ({lootCollections.length})
+                    </h3>
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                      Crie kits padrões de loot (ex: "Quarto de Hotel", "Cozinha Hospitalar") para injetar facilmente ao cadastrar ou editar salas.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    onClick={() => {
+                      setEditingCollection(null)
+                      setCollectionForm({ name: '', description: '', lootTable: [], uniqueTable: [] })
+                      setShowCollectionModal(true)
+                    }}
+                    style={{ fontSize: 11, background: '#8b5cf6', borderColor: '#a78bfa', color: '#fff' }}
+                  >
+                    ➕ Nova Coleção de Loot
+                  </button>
+                </div>
+
+                {lootCollections.length === 0 ? (
+                  <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 11.5, background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
+                    Nenhuma coleção criada ainda. Clique em "➕ Nova Coleção de Loot" para criar seu primeiro conjunto pré-definido.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                    {lootCollections.map(col => (
+                      <div key={col.id} className="glass" style={{ padding: 12, borderRadius: 10, border: '1px solid rgba(139, 92, 246, 0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>🏷️ {col.name}</strong>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button
+                                type="button"
+                                className="btn btn-sm"
+                                onClick={() => handleEditCollection(col)}
+                                style={{ padding: '2px 6px', fontSize: 10 }}
+                                title="Editar coleção"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                onClick={() => handleDeleteCollection(col.id)}
+                                style={{ padding: '2px 6px', fontSize: 10 }}
+                                title="Excluir coleção"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                          {col.description && (
+                            <p style={{ fontSize: 10.5, color: 'var(--text-muted)', margin: '4px 0 8px' }}>
+                              {col.description}
+                            </p>
+                          )}
+                          <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>
+                            📦 {col.lootTable?.length || 0} itens normais · ⭐ {col.uniqueTable?.length || 0} raros
+                          </div>
+
+                          {/* Mini visualização dos itens */}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                            {(col.lootTable || []).slice(0, 6).map((it, idx) => (
+                              <span key={idx} style={{ fontSize: 12, padding: '2px 5px', background: 'rgba(255,255,255,0.04)', borderRadius: 4 }} title={`${it.name} (${(it.chance * 100).toFixed(0)}%)`}>
+                                {it.icon} {it.name}
+                              </span>
+                            ))}
+                            {(col.lootTable || []).length > 6 && (
+                              <span style={{ fontSize: 10, color: 'var(--text-muted)', alignSelf: 'center' }}>
+                                +{(col.lootTable || []).length - 6}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ============================================================ */}
+              {/* SEÇÃO B: ITENS INDIVIDUAIS DO CATÁLOGO GERAL */}
+              {/* ============================================================ */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
+                {/* Esquerda: Lista de Itens do Catálogo */}
+                <div>
                 {/* Cabeçalho + botão popular */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                   <h3 style={{ fontSize: 14, textTransform: 'uppercase', color: 'var(--accent-yellow)', margin: 0 }}>
@@ -1301,6 +1521,7 @@ export default function Admin() {
                 </div>
               </form>
             </div>
+          </div>
           )}
 
           {/* CONTEÚDO DA TAB 1: CONFIG GLOBAL */}
@@ -1672,62 +1893,258 @@ export default function Admin() {
             </div>
           )}
 
-          {/* CONTEÚDO DA TAB 2: LOCAÇÕES */}
-          {activeTab === 'locations' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20 }}>
-              {/* Esquerda: lista */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* CONTEÚDO DA TAB 2: LOCAÇÕES (COM PASTAS / COMPLEXOS & COLEÇÕES) */}
+          {activeTab === 'locations' && (() => {
+            // Extrai lista única de pastas das locações cadastradas
+            const allFolders = Array.from(
+              new Set(
+                locations
+                  .map(l => (l.folder || '').trim())
+                  .filter(Boolean)
+              )
+            ).sort()
+
+            // Filtro por busca de texto
+            const q = locSearch.toLowerCase().trim()
+            const searchFiltered = locations.filter(l => {
+              if (!q) return true
+              return (
+                (l.name || '').toLowerCase().includes(q) ||
+                (l.slug || '').toLowerCase().includes(q) ||
+                (l.folder || '').toLowerCase().includes(q)
+              )
+            })
+
+            // Agrupamento
+            const grouped = {}
+            searchFiltered.forEach(loc => {
+              const f = (loc.folder || '').trim() || 'Sem Pasta'
+              if (!grouped[f]) grouped[f] = []
+              grouped[f].push(loc)
+            })
+
+            // Toggle para expandir/colapsar pasta
+            const toggleFolder = (folderName) => {
+              setOpenFolders(prev => ({
+                ...prev,
+                [folderName]: prev[folderName] === undefined ? false : !prev[folderName]
+              }))
+            }
+
+            return (
+            <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 20 }}>
+              {/* Esquerda: Lista de Pastas e Locações */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Locações ({locations.length})</h4>
-                  <button className="btn btn-sm btn-primary" onClick={resetLocForm}>+ Nova Sala</button>
+                  <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: 'var(--text-muted)', margin: 0 }}>
+                    Locações ({locations.length})
+                  </h4>
+                  <button className="btn btn-sm btn-primary" onClick={resetLocForm}>
+                    + Nova Sala
+                  </button>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '600px', overflowY: 'auto' }}>
-                  {locations.map((loc) => (
-                    <div
-                      key={loc.id}
-                      className={`glass-light ${editingLoc === loc.id ? 'selected' : ''}`}
-                      style={{ padding: '10px 12px', cursor: 'pointer', borderRadius: 8, border: editingLoc === loc.id ? '1px solid var(--accent)' : '1px solid transparent' }}
-                      onClick={() => handleLocEdit(loc)}
+                {/* Barra de Busca de Locação */}
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar sala ou pasta..."
+                  value={locSearch}
+                  onChange={e => setLocSearch(e.target.value)}
+                  style={{ width: '100%', padding: '7px 10px', fontSize: 12 }}
+                />
+
+                {/* Filtro rápido por pasta (Tabs horizontais compactas) */}
+                {allFolders.length > 0 && (
+                  <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFolder('all')}
+                      style={{
+                        padding: '3px 8px',
+                        fontSize: 10.5,
+                        borderRadius: 6,
+                        border: selectedFolder === 'all' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
+                        background: selectedFolder === 'all' ? 'rgba(38,200,143,0.15)' : 'rgba(255,255,255,0.02)',
+                        color: selectedFolder === 'all' ? 'var(--accent)' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ fontSize: 13 }}>{loc.name}</strong>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-sm" style={{ padding: '2px 6px', fontSize: 10 }} onClick={(e) => { e.stopPropagation(); handleLocEdit(loc); }}>
-                            Editar
-                          </button>
-                          <a 
-                            href={`/location/${loc.slug}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="btn btn-sm" 
-                            style={{ padding: '2px 6px', fontSize: 10, background: 'rgba(255,255,255,0.05)' }}
-                          >
-                            👁️ Ver
-                          </a>
-                          <button className="btn btn-sm btn-danger" style={{ padding: '2px 6px', fontSize: 10 }} onClick={(e) => { e.stopPropagation(); handleLocDelete(loc.id); }}>
-                            Excluir
-                          </button>
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>URL: /location/{loc.slug}</div>
+                      Todas ({locations.length})
+                    </button>
+                    {allFolders.map(f => {
+                      const count = locations.filter(l => (l.folder || '').trim() === f).length
+                      const isSel = selectedFolder === f
+                      return (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setSelectedFolder(isSel ? 'all' : f)}
+                          style={{
+                            padding: '3px 8px',
+                            fontSize: 10.5,
+                            borderRadius: 6,
+                            border: isSel ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
+                            background: isSel ? 'rgba(38,200,143,0.15)' : 'rgba(255,255,255,0.02)',
+                            color: isSel ? 'var(--accent)' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                          title={`Filtrar apenas ${f}`}
+                        >
+                          📁 {f} ({count})
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Árvore de Pastas e Locações */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '620px', overflowY: 'auto' }}>
+                  {locations.length === 0 ? (
+                    <div className="glass-light" style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+                      Nenhuma locação cadastrada.
                     </div>
-                  ))}
+                  ) : Object.keys(grouped).length === 0 ? (
+                    <div className="glass-light" style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+                      Nenhuma locação encontrada para "{locSearch}".
+                    </div>
+                  ) : (
+                    Object.entries(grouped)
+                      .filter(([folderName]) => {
+                        if (selectedFolder === 'all') return true
+                        if (selectedFolder === 'sem_pasta') return folderName === 'Sem Pasta'
+                        return folderName === selectedFolder
+                      })
+                      .map(([folderName, locList]) => {
+                        const isOpen = openFolders[folderName] !== false // Padrão aberto
+                        const isFolderReal = folderName !== 'Sem Pasta'
+
+                        return (
+                          <div key={folderName} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden', background: 'rgba(0,0,0,0.2)' }}>
+                            {/* Cabeçalho da Pasta */}
+                            <div
+                              onClick={() => toggleFolder(folderName)}
+                              style={{
+                                padding: '8px 10px',
+                                background: isFolderReal ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.01)',
+                                borderBottom: isOpen ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                userSelect: 'none'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 13, color: isFolderReal ? '#fbbf24' : 'var(--text-muted)' }}>
+                                  {isFolderReal ? (isOpen ? '📂' : '📁') : '🏷️'}
+                                </span>
+                                <strong style={{ fontSize: 12, color: isFolderReal ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                  {folderName}
+                                </strong>
+                                <span style={{ fontSize: 10, color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '1px 5px', borderRadius: 4 }}>
+                                  {locList.length}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                                {isOpen ? '▲' : '▼'}
+                              </span>
+                            </div>
+
+                            {/* Conteúdo da Pasta: Lista de Salas */}
+                            {isOpen && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px' }}>
+                                {locList.map(loc => (
+                                  <div
+                                    key={loc.id}
+                                    className={`glass-light ${editingLoc === loc.id ? 'selected' : ''}`}
+                                    style={{
+                                      padding: '7px 10px',
+                                      cursor: 'pointer',
+                                      borderRadius: 6,
+                                      border: editingLoc === loc.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.03)',
+                                      background: editingLoc === loc.id ? 'rgba(38,200,143,0.1)' : 'rgba(255,255,255,0.015)'
+                                    }}
+                                    onClick={() => handleLocEdit(loc)}
+                                  >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <strong style={{ fontSize: 12 }}>{loc.name}</strong>
+                                      <div style={{ display: 'flex', gap: 3 }}>
+                                        <button className="btn btn-sm" style={{ padding: '2px 5px', fontSize: 9 }} onClick={(e) => { e.stopPropagation(); handleLocEdit(loc); }}>
+                                          Editar
+                                        </button>
+                                        <a 
+                                          href={`/location/${loc.slug}`} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="btn btn-sm" 
+                                          style={{ padding: '2px 5px', fontSize: 9, background: 'rgba(255,255,255,0.05)' }}
+                                          onClick={e => e.stopPropagation()}
+                                        >
+                                          👁️
+                                        </a>
+                                        <button className="btn btn-sm btn-danger" style={{ padding: '2px 5px', fontSize: 9 }} onClick={(e) => { e.stopPropagation(); handleLocDelete(loc.id); }}>
+                                          🗑️
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <div style={{ fontSize: 9.5, color: 'var(--text-muted)', marginTop: 2 }}>/{loc.slug}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })
+                  )}
                 </div>
               </div>
 
               {/* Direita: formulário */}
               <form onSubmit={handleLocSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '20px', borderRadius: '12px', maxHeight: 'calc(100vh - 240px)', overflowY: 'auto' }} className="glass-light">
-                <h3 style={{ fontSize: 14, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 8 }}>
-                  {editingLoc ? `Editando: ${locForm.name}` : 'Criar Nova Locação'}
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ fontSize: 14, textTransform: 'uppercase', color: 'var(--accent)', margin: 0 }}>
+                    {editingLoc ? `Editando: ${locForm.name}` : 'Criar Nova Locação'}
+                  </h3>
+                  {editingLoc && (
+                    <button type="button" className="btn btn-sm" onClick={resetLocForm} style={{ fontSize: 10 }}>
+                      ✕ Cancelar Edição
+                    </button>
+                  )}
+                </div>
+
+                {/* PASTA / COMPLEXO DA LOCAÇÃO */}
+                <div className="form-group" style={{ background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '10px 12px', borderRadius: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label style={{ margin: 0, fontSize: 11, color: '#fbbf24', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>📁</span> Pasta / Complexo Principal
+                    </label>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                      Agrupa cômodos no menu lateral
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ex: Hotel do centro de Varsóvia, Hospital de Povorek, Base Militar..."
+                    value={locForm.folder}
+                    onChange={(e) => setLocForm(prev => ({ ...prev, folder: e.target.value }))}
+                    list="existing-folders-list"
+                    style={{ width: '100%', fontSize: 12, padding: '7px 10px' }}
+                  />
+                  <datalist id="existing-folders-list">
+                    {allFolders.map(f => (
+                      <option key={f} value={f} />
+                    ))}
+                  </datalist>
+                </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div className="form-group">
-                    <label>Nome do Local</label>
+                    <label>Nome do Local (Cômodo/Sala)</label>
                     <input
                       type="text"
-                      placeholder="Ex: Praça Central"
+                      placeholder="Ex: Quarto 203, Garagem Subterrânea, Cozinha..."
                       value={locForm.name}
                       onChange={(e) => {
                         const name = e.target.value
@@ -1746,7 +2163,7 @@ export default function Admin() {
                     <label>ID da Sala (URL)</label>
                     <input
                       type="text"
-                      placeholder="Ex: praca-central"
+                      placeholder="Ex: quarto-203"
                       value={locForm.slug}
                       onChange={(e) => setLocForm(prev => ({ ...prev, slug: e.target.value }))}
                       disabled={!!editingLoc}
@@ -1795,11 +2212,39 @@ export default function Admin() {
                   </div>
                 </div>
 
+                {/* ============================================================ */}
                 {/* 1. SEÇÃO DE BUSCA DE SUPRIMENTOS (COMUM / COOLDOWN) */}
+                {/* ============================================================ */}
                 <div style={{ padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                    <input type="checkbox" id="lootEn" checked={locForm.lootEnabled} onChange={(e) => setLocForm(prev => ({ ...prev, lootEnabled: e.target.checked }))} style={{ width: 'auto' }} />
-                    <label htmlFor="lootEn" style={{ margin: 0, cursor: 'pointer', fontWeight: 600, color: 'var(--accent)' }}>🔦 Busca de Suprimentos (Repetível / Sucata, Comum e Incomum)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <input type="checkbox" id="lootEn" checked={locForm.lootEnabled} onChange={(e) => setLocForm(prev => ({ ...prev, lootEnabled: e.target.checked }))} style={{ width: 'auto' }} />
+                      <label htmlFor="lootEn" style={{ margin: 0, cursor: 'pointer', fontWeight: 600, color: 'var(--accent)' }}>🔦 Busca de Suprimentos (Repetível / Sucata, Comum e Incomum)</label>
+                    </div>
+
+                    {/* BOTÃO DE PUXAR COLEÇÃO DE PRESET */}
+                    {lootCollections.length > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Importar Coleção:</span>
+                        <select
+                          onChange={(e) => {
+                            if (!e.target.value) return
+                            const found = lootCollections.find(c => c.id === e.target.value)
+                            if (found) applyLootCollectionToLocation(found)
+                            e.target.value = ''
+                          }}
+                          defaultValue=""
+                          style={{ padding: '4px 8px', fontSize: 11, background: 'rgba(139, 92, 246, 0.15)', borderColor: '#8b5cf6', color: '#c4b5fd', borderRadius: 6 }}
+                        >
+                          <option value="" disabled>🗂️ Selecionar preset...</option>
+                          {lootCollections.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} ({c.lootTable?.length || 0} itens)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                   {locForm.lootEnabled && (
                     <>
@@ -2266,7 +2711,8 @@ export default function Admin() {
                 </div>
               </form>
             </div>
-          )}
+            )
+          })()}
 
           {/* CONTEÚDO DA TAB 3: SOBREVIVENTES */}
           {activeTab === 'players' && (
@@ -2868,6 +3314,262 @@ export default function Admin() {
           )}
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* MODAL: CRIAR / EDITAR COLEÇÃO DE PRESET DE LOOT */}
+      {/* ============================================================ */}
+      {showCollectionModal && (
+        <div className="loot-modal-overlay" onClick={() => setShowCollectionModal(false)}>
+          <div
+            className="glass"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '90%',
+              maxWidth: '650px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '24px',
+              borderRadius: '14px',
+              animation: 'slideUp 0.3s ease',
+              border: '1px solid rgba(139, 92, 246, 0.4)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, textTransform: 'uppercase', color: '#c4b5fd', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>🗂️</span> {editingCollection ? `Editar Coleção: ${collectionForm.name}` : 'Nova Coleção de Loot Predefinida'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCollectionModal(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 18, cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCollection} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11 }}>Nome do Kit / Coleção</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Quarto de Hotel Padrão, Cozinha de Hospital, Almoxarifado..."
+                  value={collectionForm.name}
+                  onChange={(e) => setCollectionForm(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11 }}>Descrição (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Tabela com roupas, chaves e bandagens típicas de quartos."
+                  value={collectionForm.description}
+                  onChange={(e) => setCollectionForm(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+
+              {/* Tabela de Itens da Coleção */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: 8, border: '1px solid var(--glass-border)' }}>
+                <label style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--accent-yellow)', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
+                  📦 Itens que compõem esta Coleção ({collectionForm.lootTable?.length || 0})
+                </label>
+
+                {/* Seletor rápido de catálogo para a coleção */}
+                <div style={{ margin: '8px 0 12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCollectionItemPickerOpen(v => !v)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: collectionItemPickerOpen ? '#8b5cf6' : 'var(--text-secondary)',
+                      background: collectionItemPickerOpen ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${collectionItemPickerOpen ? 'rgba(139,92,246,0.4)' : 'var(--glass-border)'}`,
+                      borderRadius: 8,
+                      padding: '7px 12px',
+                      cursor: 'pointer',
+                      width: '100%',
+                      justifyContent: 'space-between',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <span>🔍 {collectionItemPickerOpen ? 'Fechar catálogo' : 'Selecionar item do catálogo para o kit'}</span>
+                    <span>{collectionItemPickerOpen ? '▲' : '▼'}</span>
+                  </button>
+
+                  {collectionItemPickerOpen && (
+                    <div style={{ marginTop: 8, padding: 12, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 10 }}>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                        <input
+                          type="text"
+                          placeholder="🔍 Buscar item..."
+                          value={collectionItemSearch}
+                          onChange={e => setCollectionItemSearch(e.target.value)}
+                          style={{ flex: 1, padding: '6px 10px', fontSize: 12 }}
+                        />
+                        <select
+                          value={collectionItemCategory}
+                          onChange={e => setCollectionItemCategory(e.target.value)}
+                          style={{ padding: '6px 8px', fontSize: 12 }}
+                        >
+                          <option value="all">📦 Todas Categorias</option>
+                          <option value="general">🎒 Gerais</option>
+                          <option value="supplies">🌾 Mantimentos</option>
+                          <option value="clothing">👕 Roupas</option>
+                          <option value="melee">🗡️ Armas Brancas</option>
+                          <option value="firearms">🔫 Armas de Fogo</option>
+                          <option value="medical">💉 Médicos</option>
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
+                        {catalogItems
+                          .filter(item => {
+                            const matchCat = collectionItemCategory === 'all' || item.category === collectionItemCategory
+                            const q = collectionItemSearch.toLowerCase().trim()
+                            const matchQ = !q || item.name.toLowerCase().includes(q) || (item.itemId || '').toLowerCase().includes(q)
+                            return matchCat && matchQ
+                          })
+                          .map(item => {
+                            const rMeta = RARITY_META[item.rarity] || RARITY_META.common
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setNewCollectionItem(prev => ({
+                                    ...prev,
+                                    itemId: item.itemId,
+                                    name: item.name,
+                                    icon: item.icon || '📦',
+                                    imageUrl: item.imageUrl || '',
+                                    rarity: item.rarity || 'common',
+                                    category: item.category || 'general',
+                                    consumable: item.consumable,
+                                    consumeEffect: item.consumeEffect,
+                                    description: item.description,
+                                    unlocks: item.unlocks
+                                  }))
+                                  setCollectionItemPickerOpen(false)
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  padding: '6px',
+                                  borderRadius: 6,
+                                  background: 'rgba(255,255,255,0.03)',
+                                  border: `1px solid ${rMeta.border || 'rgba(255,255,255,0.08)'}`,
+                                  cursor: 'pointer',
+                                  textAlign: 'center'
+                                }}
+                              >
+                                <span style={{ fontSize: 18 }}>{item.icon || '📦'}</span>
+                                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                  {item.name}
+                                </span>
+                              </button>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Lista de itens inseridos no preset */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '8px 0' }}>
+                  {(collectionForm.lootTable || []).map((item, idx) => {
+                    const rMeta = RARITY_META[item.rarity] || RARITY_META.common
+                    return (
+                      <div key={idx} className="glass-light" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 6, fontSize: 11, borderLeft: `3px solid ${rMeta.color}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 16 }}>{item.icon}</span>
+                          <strong>{item.name}</strong>
+                          <span style={{ color: rMeta.color, fontSize: 10 }}>[{rMeta.label}]</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <span>Chance: <strong>{(item.chance * 100).toFixed(0)}%</strong></span>
+                          <span>Qtd: <strong>{item.min}-{item.max}</strong></span>
+                          <button type="button" onClick={() => removeCollectionLootItem(idx)} style={{ background: 'transparent', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: 14 }}>×</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {(collectionForm.lootTable || []).length === 0 && (
+                    <div style={{ padding: '8px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+                      Adicione itens abaixo para compor o pacote de loot desta coleção.
+                    </div>
+                  )}
+                </div>
+
+                {/* Formulário para adicionar item ao preset */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 50px 110px 70px 70px 40px', gap: 6, alignItems: 'end', marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 9 }}>ID Item</label>
+                    <input type="text" placeholder="bandagem" value={newCollectionItem.itemId} onChange={(e) => {
+                      const id = e.target.value
+                      const catItem = catalogItems.find(c => c.itemId === id)
+                      setNewCollectionItem(prev => ({
+                        ...prev,
+                        itemId: id,
+                        ...(catItem ? {
+                          name: catItem.name,
+                          icon: catItem.icon,
+                          rarity: catItem.rarity || 'common',
+                          category: catItem.category || 'general'
+                        } : {})
+                      }))
+                    }} style={{ padding: '6px' }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 9 }}>Nome</label>
+                    <input type="text" placeholder="Bandagem Estéril" value={newCollectionItem.name} onChange={(e) => setNewCollectionItem(prev => ({ ...prev, name: e.target.value }))} style={{ padding: '6px' }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 9 }}>Ícone</label>
+                    <input type="text" placeholder="🩹" value={newCollectionItem.icon} onChange={(e) => setNewCollectionItem(prev => ({ ...prev, icon: e.target.value }))} style={{ padding: '6px', textAlign: 'center' }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 9 }}>Raridade</label>
+                    <select value={newCollectionItem.rarity} onChange={(e) => setNewCollectionItem(prev => ({ ...prev, rarity: e.target.value }))} style={{ padding: '6px' }}>
+                      {Object.values(RARITY_META).map(r => (
+                        <option key={r.id} value={r.id}>{r.icon} {r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 9 }}>Chance</label>
+                    <input type="number" step="0.05" min="0" max="1" value={newCollectionItem.chance} onChange={(e) => setNewCollectionItem(prev => ({ ...prev, chance: e.target.value }))} style={{ padding: '6px' }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 9 }}>Min-Max</label>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      <input type="number" min="1" value={newCollectionItem.min} onChange={(e) => setNewCollectionItem(prev => ({ ...prev, min: e.target.value }))} style={{ padding: '6px', width: '50%' }} />
+                      <input type="number" min="1" value={newCollectionItem.max} onChange={(e) => setNewCollectionItem(prev => ({ ...prev, max: e.target.value }))} style={{ padding: '6px', width: '50%' }} />
+                    </div>
+                  </div>
+                  <button type="button" className="btn btn-sm btn-primary" onClick={addCollectionLootItem} style={{ padding: '8px 0', width: '100%', background: '#8b5cf6', borderColor: '#a78bfa' }}>
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setShowCollectionModal(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 2, background: '#8b5cf6', borderColor: '#a78bfa' }}>
+                  💾 Salvar Coleção de Loot
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

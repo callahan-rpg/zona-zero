@@ -859,8 +859,8 @@ export default function Character() {
       )}
       {/* MODAL: ALTERAR FOTO DE PERFIL / AVATAR */}
       {showAvatarModal && (
-        <div className="modal-overlay">
-          <div className="modal-content glass" style={{ maxWidth: '440px', width: '100%', padding: '24px' }}>
+        <div className="loot-modal-overlay" onClick={() => !avatarLoading && setShowAvatarModal(false)}>
+          <div className="modal-content glass" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '90%', padding: '24px', animation: 'slideUp 0.3s ease' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ fontSize: 16, textTransform: 'uppercase', color: 'var(--accent)', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                 📷 Foto de Perfil

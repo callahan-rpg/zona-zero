@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import ColorPicker from './ColorPicker.jsx'
+import { applyThemeColor, resetThemeToDefault } from '../utils/themeSystem'
 
 export default function SettingsModal({ onClose }) {
   const [enabled, setEnabled] = useState(() => {
@@ -16,14 +18,23 @@ export default function SettingsModal({ onClose }) {
     return saved ? Number(saved) : 50
   })
 
+  // Tema de Interface (Cores e Tint do Glassmorphism)
+  const [themeColor, setThemeColor] = useState(() => {
+    return localStorage.getItem('zz_theme_color') || '#26C88F'
+  })
+  const [themeTint, setThemeTint] = useState(() => {
+    const saved = localStorage.getItem('zz_theme_tint')
+    return saved ? Number(saved) : 15
+  })
+
   // Posição arrastável do modal
-  const [pos, setPos] = useState({ x: Math.max(20, window.innerWidth - 380), y: 80 })
+  const [pos, setPos] = useState({ x: Math.max(20, window.innerWidth - 410), y: 80 })
   const dragging = useRef(false)
   const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
   const panelRef = useRef(null)
 
   const onMouseDown = useCallback((e) => {
-    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('label')) return
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('label') || e.target.closest('.color-picker-box')) return
     e.preventDefault()
     dragging.current = true
     dragStart.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y }
@@ -75,11 +86,27 @@ export default function SettingsModal({ onClose }) {
     window.dispatchEvent(new CustomEvent('audio_volume_change', { detail: val }))
   }
 
+  function handleThemeColorChange(newColor) {
+    setThemeColor(newColor)
+    applyThemeColor(newColor, themeTint)
+  }
+
+  function handleThemeTintChange(newTint) {
+    setThemeTint(newTint)
+    applyThemeColor(themeColor, newTint)
+  }
+
+  function handleResetTheme() {
+    setThemeColor('#26C88F')
+    setThemeTint(15)
+    resetThemeToDefault()
+  }
+
   return (
     <div
       ref={panelRef}
       className="character-float-panel"
-      style={{ left: pos.x, top: pos.y, width: 340, zIndex: 9999 }}
+      style={{ left: pos.x, top: pos.y, width: 380, maxWidth: '95vw', maxHeight: '88vh', overflowY: 'auto', zIndex: 9999 }}
     >
       {/* Header: Área de arrasto */}
       <div className="character-float-header" onMouseDown={onMouseDown} style={{ cursor: 'move' }}>
@@ -90,7 +117,23 @@ export default function SettingsModal({ onClose }) {
       </div>
 
       <div className="character-float-body" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Seção 1: Efeitos Climáticos */}
+        {/* Seção 1: Tema de Cores e Estética Glassmorphism */}
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: 8, padding: 12 }}>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>🎨 Tema da Interface (Glass)</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Altere as cores do cabeçalho, dados e cards mantendo o efeito fosco</div>
+          </div>
+
+          <ColorPicker
+            currentColor={themeColor}
+            currentTint={themeTint}
+            onChangeColor={handleThemeColorChange}
+            onChangeTint={handleThemeTintChange}
+            onReset={handleResetTheme}
+          />
+        </div>
+
+        {/* Seção 2: Efeitos Climáticos */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: 8, padding: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div>
@@ -102,7 +145,7 @@ export default function SettingsModal({ onClose }) {
               id="weatherToggle"
               checked={enabled}
               onChange={(e) => handleToggleWeather(e.target.checked)}
-              style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--accent-yellow)' }}
+              style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--accent)' }}
             />
           </div>
 
@@ -110,7 +153,7 @@ export default function SettingsModal({ onClose }) {
             <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Opacidade do Efeito</span>
-                <span style={{ fontWeight: 'bold', color: 'var(--accent-yellow)' }}>{opacity}%</span>
+                <span style={{ fontWeight: 'bold', color: 'var(--accent)' }}>{opacity}%</span>
               </div>
               <input
                 type="range"
@@ -118,13 +161,13 @@ export default function SettingsModal({ onClose }) {
                 max="100"
                 value={opacity}
                 onChange={(e) => handleOpacityChange(Number(e.target.value))}
-                style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--accent-yellow)' }}
+                style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--accent)' }}
               />
             </div>
           )}
         </div>
 
-        {/* Seção 2: Áudio & Efeitos Sonoros */}
+        {/* Seção 3: Áudio & Efeitos Sonoros */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: 8, padding: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div>
@@ -136,7 +179,7 @@ export default function SettingsModal({ onClose }) {
               id="audioToggle"
               checked={ambientAudio}
               onChange={(e) => handleAmbientAudioToggle(e.target.checked)}
-              style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--accent-yellow)' }}
+              style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--accent)' }}
             />
           </div>
 
@@ -144,7 +187,7 @@ export default function SettingsModal({ onClose }) {
             <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Volume do Som</span>
-                <span style={{ fontWeight: 'bold', color: 'var(--accent-yellow)' }}>{audioVolume}%</span>
+                <span style={{ fontWeight: 'bold', color: 'var(--accent)' }}>{audioVolume}%</span>
               </div>
               <input
                 type="range"
@@ -152,7 +195,7 @@ export default function SettingsModal({ onClose }) {
                 max="100"
                 value={audioVolume}
                 onChange={(e) => handleAudioVolumeChange(Number(e.target.value))}
-                style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--accent-yellow)' }}
+                style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--accent)' }}
               />
             </div>
           )}
@@ -165,3 +208,4 @@ export default function SettingsModal({ onClose }) {
     </div>
   )
 }
+
