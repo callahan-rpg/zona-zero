@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { RARITY_META } from '../utils/itemSystem.js'
+import GameIcon from './GameIcon.jsx'
 
 export default function NotificationBell() {
   const { character, markNotificationsRead, clearNotifications } = useAuth()
@@ -69,7 +70,7 @@ export default function NotificationBell() {
         title="Notificações de Itens"
         style={{ position: 'relative', padding: '7px 10px' }}
       >
-        <span className="hud-btn-icon" style={{ fontSize: 16 }}>🔔</span>
+        <GameIcon name="bell" size={16} className="hud-btn-icon" />
         {unreadCount > 0 && (
           <span
             style={{

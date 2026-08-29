@@ -171,6 +171,7 @@ export default function Location() {
                 itemId: item.itemId,
                 name: item.name,
                 icon: item.icon,
+                imageUrl: item.imageUrl || '',
                 rarity: item.rarity || 'common',
                 quantity: item.quantity,
                 category: item.category || 'general',

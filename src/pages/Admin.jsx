@@ -13,6 +13,8 @@ import HUD from '../components/HUD.jsx'
 import { SEASONS, MOON_PHASES, MONTHS, calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { RARITY_META, DEFAULT_PRESET_ITEMS, SUPPLY_RARITIES, UNIQUE_RARITIES, getMaxHp } from '../utils/itemSystem'
 import { COMBAT_STATUS_EFFECTS, MONSTER_TEMPLATES, ATTRIBUTE_ICONS } from '../utils/combatSystem'
+import { uploadImageFree } from '../utils/imageUpload'
+import GameIcon from '../components/GameIcon.jsx'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -33,10 +35,12 @@ export default function Admin() {
   const [editingCatalogItem, setEditingCatalogItem] = useState(null)
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogCategoryFilter, setCatalogCategoryFilter] = useState('all')
+  const [uploadingItemImage, setUploadingItemImage] = useState(false)
   const [catalogForm, setCatalogForm] = useState({
     itemId: '',
     name: '',
     icon: '📦',
+    imageUrl: '',
     category: 'general',
     rarity: 'common',
     description: '',
@@ -251,6 +255,7 @@ export default function Admin() {
       itemId: cleanId,
       name: catalogForm.name.trim(),
       icon: catalogForm.icon.trim() || '📦',
+      imageUrl: catalogForm.imageUrl.trim() || '',
       category: catalogForm.category || 'general',
       rarity: catalogForm.rarity || 'common',
       description: catalogForm.description.trim(),
@@ -268,6 +273,7 @@ export default function Admin() {
         itemId: '',
         name: '',
         icon: '📦',
+        imageUrl: '',
         category: 'general',
         rarity: 'common',
         description: '',
@@ -299,6 +305,7 @@ export default function Admin() {
       itemId: item.itemId || item.id,
       name: item.name || '',
       icon: item.icon || '📦',
+      imageUrl: item.imageUrl || '',
       category: item.category || 'general',
       rarity: item.rarity || 'common',
       description: item.description || '',
@@ -489,7 +496,8 @@ export default function Admin() {
         itemId: newLootItem.itemId.trim().toLowerCase(),
         name: newLootItem.name.trim(),
         icon: newLootItem.icon.trim(),
-        rarity: newLootItem.rarity || 'common',
+        imageUrl: newLootItem.imageUrl || catItem?.imageUrl || '',
+        rarity: newLootItem.rarity || catItem?.rarity || 'common',
         chance: Number(newLootItem.chance),
         min: Number(newLootItem.min),
         max: Number(newLootItem.max),
@@ -500,7 +508,7 @@ export default function Admin() {
         unlocks: newLootItem.unlocks || catItem?.unlocks || []
       }]
     }))
-    setNewLootItem({ itemId: '', name: '', icon: '📦', rarity: 'common', chance: 0.4, min: 1, max: 2, category: 'general' })
+    setNewLootItem({ itemId: '', name: '', icon: '📦', imageUrl: '', rarity: 'common', chance: 0.4, min: 1, max: 2, category: 'general' })
   }
 
   function removeLootItem(idx) {
@@ -521,7 +529,8 @@ export default function Admin() {
         itemId: newUniqueItem.itemId.trim().toLowerCase(),
         name: newUniqueItem.name.trim(),
         icon: newUniqueItem.icon.trim(),
-        rarity: newUniqueItem.rarity || 'rare',
+        imageUrl: newUniqueItem.imageUrl || catItem?.imageUrl || '',
+        rarity: newUniqueItem.rarity || catItem?.rarity || 'rare',
         quantity: Number(newUniqueItem.quantity) || 1,
         category: newUniqueItem.category || catItem?.category || 'general',
         consumable: newUniqueItem.consumable !== undefined ? newUniqueItem.consumable : (catItem?.consumable || false),
@@ -530,7 +539,7 @@ export default function Admin() {
         unlocks: newUniqueItem.unlocks || catItem?.unlocks || []
       }]
     }))
-    setNewUniqueItem({ itemId: '', name: '', icon: '⭐', rarity: 'rare', quantity: 1, category: 'general' })
+    setNewUniqueItem({ itemId: '', name: '', icon: '⭐', imageUrl: '', rarity: 'rare', quantity: 1, category: 'general' })
   }
 
   function removeUniqueItem(idx) {
@@ -620,6 +629,7 @@ export default function Admin() {
         itemId: newItem.itemId,
         name: newItem.name,
         icon: newItem.icon,
+        imageUrl: newItem.imageUrl || '',
         rarity: newItem.rarity || 'common',
         quantity: Number(newItem.quantity),
         category: newItem.category || 'general',
@@ -1069,7 +1079,9 @@ export default function Admin() {
                           <div key={item.id} className="glass-light" style={{ padding: 10, borderRadius: 8, borderLeft: `3px solid ${rMeta.color}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <span style={{ fontSize: 22 }}>{item.icon}</span>
+                                <div style={{ width: 34, height: 34, borderRadius: 6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                  <GameIcon src={item.imageUrl} emoji={item.icon} size={22} />
+                                </div>
                                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: rMeta.bg, color: rMeta.color, fontWeight: 'bold' }}>
                                   {rMeta.label}
                                 </span>
@@ -1123,6 +1135,92 @@ export default function Admin() {
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label style={{ fontSize: 10 }}>Nome do Item</label>
                     <input type="text" placeholder="Ex: Garrafa de Água" value={catalogForm.name} onChange={e => setCatalogForm(prev => ({ ...prev, name: e.target.value }))} required />
+                  </div>
+                </div>
+
+                {/* Upload e URL da Imagem do Item */}
+                <div style={{ padding: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--accent)', margin: 0 }}>
+                      🖼️ Imagem do Item (Upload Gratuito / URL)
+                    </label>
+                    {uploadingItemImage && (
+                      <span style={{ fontSize: 10, color: '#fbbf24' }}>Enviando imagem...</span>
+                    )}
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 6,
+                      background: 'rgba(0,0,0,0.4)',
+                      border: '1px solid var(--glass-border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      flexShrink: 0
+                    }}>
+                      {catalogForm.imageUrl ? (
+                        <img
+                          src={catalogForm.imageUrl}
+                          alt="preview"
+                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          onError={(e) => { e.target.onerror = null; e.target.src = ''; }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: 20 }}>{catalogForm.icon || '📦'}</span>
+                      )}
+                    </div>
+
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <input
+                        type="text"
+                        placeholder="Cole a URL ou use o botão de upload ->"
+                        value={catalogForm.imageUrl}
+                        onChange={e => setCatalogForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+                        style={{ fontSize: 11, padding: '5px 8px' }}
+                      />
+                      
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <label className="btn btn-sm" style={{ cursor: 'pointer', fontSize: 10, padding: '3px 8px', background: 'rgba(255,255,255,0.06)' }}>
+                          📁 Escolher Arquivo do PC
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+                              try {
+                                setUploadingItemImage(true)
+                                const url = await uploadImageFree(file)
+                                setCatalogForm(prev => ({ ...prev, imageUrl: url }))
+                              } catch (err) {
+                                alert('Erro no upload: ' + err.message)
+                              } finally {
+                                setUploadingItemImage(false)
+                              }
+                            }}
+                          />
+                        </label>
+                        {catalogForm.imageUrl && (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-danger"
+                            style={{ fontSize: 10, padding: '3px 6px' }}
+                            onClick={() => setCatalogForm(prev => ({ ...prev, imageUrl: '' }))}
+                            title="Remover imagem"
+                          >
+                            Remover
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                    Dica: Suporta arquivos do PC (PNG/JPG/WEBP), links externos ou caminhos locais como <code>/assets/items/nome.png</code>
                   </div>
                 </div>
 
@@ -1788,6 +1886,7 @@ export default function Admin() {
                                               itemId: item.itemId,
                                               name: item.name,
                                               icon: item.icon || '📦',
+                                              imageUrl: item.imageUrl || '',
                                               rarity: item.rarity || 'common',
                                               category: item.category || 'general',
                                               consumable: item.consumable,
@@ -1991,6 +2090,7 @@ export default function Admin() {
                                               itemId: item.itemId,
                                               name: item.name,
                                               icon: item.icon || '⭐',
+                                              imageUrl: item.imageUrl || '',
                                               rarity: item.rarity || 'rare',
                                               quantity: 1,
                                               category: item.category || 'general',
@@ -2409,6 +2509,7 @@ export default function Admin() {
                                         itemId: item.itemId,
                                         name: item.name,
                                         icon: item.icon || '📦',
+                                        imageUrl: item.imageUrl || '',
                                         rarity: item.rarity || 'common',
                                         quantity: 1,
                                         category: item.category || 'general',

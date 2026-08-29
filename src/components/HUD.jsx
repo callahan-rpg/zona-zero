@@ -8,6 +8,7 @@ import CharacterPopup from './CharacterPopup.jsx'
 import CalendarModal from './CalendarModal.jsx'
 import SettingsModal from './SettingsModal.jsx'
 import NotificationBell from './NotificationBell.jsx'
+import GameIcon from './GameIcon.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { hasFeatureUnlocked, getTimeOfDay, getVitalsDebuffs } from '../utils/itemSystem'
 
@@ -130,14 +131,16 @@ export default function HUD({ locationName }) {
             to={`/location/${character?.currentLocation || 'sala-hospital'}`}
             className={`hud-btn ${location.pathname.startsWith('/location') ? 'active' : ''}`}
           >
-            <span className="hud-btn-icon">🏚️</span>
+            <GameIcon name="rooms" size={16} className="hud-btn-icon" />
+            Salas
           </Link>
 
           <Link
             to="/map"
             className={`hud-btn ${location.pathname === '/map' ? 'active' : ''}`}
           >
-            <span className="hud-btn-icon">🗺️</span>
+            <GameIcon name="map" size={16} className="hud-btn-icon" />
+            Mapa
           </Link>
 
           <button
@@ -153,7 +156,8 @@ export default function HUD({ locationName }) {
             className={`hud-btn ${location.pathname === '/characters' ? 'active' : ''}`}
             title={location.pathname === '/characters' ? 'Você já está na página de Sobreviventes' : 'Sobreviventes'}
           >
-            <span className="hud-btn-icon">👥</span>
+            <GameIcon name="players" size={16} className="hud-btn-icon" />
+            Sobreviventes
           </button>
 
           <button
@@ -169,17 +173,16 @@ export default function HUD({ locationName }) {
             className={`hud-btn combat-hud-icon-btn ${location.pathname === '/combat' ? 'active' : ''} ${hasActiveCombat ? 'combat-pulsing-active' : ''}`}
             title={hasActiveCombat ? "⚔️ Mesa de Combate Tático (EM ANDAMENTO)" : "⚔️ Mesa de Combate Tático"}
           >
-            <span className="hud-btn-icon" style={{ fontSize: 18, margin: 0 }}>⚔️</span>
+            <GameIcon name="combat" size={18} className="hud-btn-icon" style={{ margin: 0 }} />
           </button>
-
-
 
           <button
             className={`hud-btn ${showDice ? 'active' : ''}`}
             onClick={() => setShowDice((prev) => !prev)}
             title="Rolar Dados"
           >
-            <span className="hud-btn-icon">🎲</span>
+            <GameIcon name="dice" size={16} className="hud-btn-icon" />
+            Dados
           </button>
 
           {/* Botão de Configurações do Usuário (Clima, Opacidade, Áudio) */}
@@ -189,7 +192,7 @@ export default function HUD({ locationName }) {
             title="Configurações (Clima, Opacidade e Áudio)"
             style={{ padding: '7px 10px' }}
           >
-            <span className="hud-btn-icon" style={{ fontSize: 15 }}>⚙️</span>
+            <GameIcon name="settings" size={16} className="hud-btn-icon" />
           </button>
 
           {role === 'admin' && (
@@ -198,7 +201,7 @@ export default function HUD({ locationName }) {
               className={`hud-btn ${location.pathname === '/admin' ? 'active' : ''}`}
               style={{ borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' }}
             >
-              <span className="hud-btn-icon">🛠️</span>
+              <GameIcon name="admin" size={16} className="hud-btn-icon" />
               Admin
             </Link>
           )}
@@ -225,7 +228,7 @@ export default function HUD({ locationName }) {
           )}
 
           <button className="hud-btn btn-danger" onClick={handleLogout}>
-            <span className="hud-btn-icon">🚪</span>
+            <GameIcon name="logout" size={16} className="hud-btn-icon" />
             Sair
           </button>
         </div>

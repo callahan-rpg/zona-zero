@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, getDocs, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
-import { getVitalsDebuffs, getMaxHp, DEFAULT_PRESET_ITEMS } from '../utils/itemSystem'
+import GameIcon from '../components/GameIcon.jsx'
+import { getVitalsDebuffs, getMaxHp, DEFAULT_PRESET_ITEMS, RARITY_META } from '../utils/itemSystem'
 
 const ATTRIBUTES = [
   { key: 'forca',        label: 'Força',        icon: '💪' },
@@ -162,7 +163,42 @@ export default function Character() {
     loadSurvivors()
   }, [showTransfer, user])
 
-  const inventory = character?.inventory || []
+  const [catalogMap, setCatalogMap] = useState({})
+
+  // Escuta o catálogo de itens global para sincronizar imagens, nomes e raridades atualizadas em tempo real
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'items_db'), (snap) => {
+      const map = {}
+      snap.docs.forEach(d => {
+        const data = d.data()
+        const key = data.itemId || d.id
+        map[key] = data
+      })
+      setCatalogMap(map)
+    })
+    return unsub
+  }, [])
+
+  const rawInventory = character?.inventory || []
+
+  // Hidrata itens do inventário com os dados mais recentes do catálogo (imagem, raridade, etc)
+  const inventory = useMemo(() => {
+    return rawInventory.map(item => {
+      const catData = catalogMap[item.itemId]
+      if (!catData) return item
+      return {
+        ...item,
+        name: catData.name || item.name,
+        icon: catData.icon || item.icon,
+        imageUrl: catData.imageUrl || item.imageUrl || '',
+        rarity: catData.rarity || item.rarity || 'common',
+        category: catData.category || item.category,
+        consumable: catData.consumable !== undefined ? catData.consumable : item.consumable,
+        consumeEffect: catData.consumeEffect || item.consumeEffect,
+        description: catData.description || item.description,
+      }
+    })
+  }, [rawInventory, catalogMap])
 
   // Agrupamento e contagem por categorias
   const { filteredItems, categoryCounts } = useMemo(() => {
@@ -531,21 +567,49 @@ export default function Character() {
               <div className="inventory-grid">
                 {filteredItems.map((item) => {
                   const catMeta = CATEGORY_LABELS[item._category] || CATEGORY_LABELS.general
+                  const rMeta = RARITY_META[item.rarity] || RARITY_META.common
                   const isConsumable = item.consumable === true || (item.consumeEffect && Object.keys(item.consumeEffect).length > 0)
                   return (
-                    <div className="inventory-item-card" key={item.instanceId}>
+                    <div
+                      className="inventory-item-card"
+                      key={item.instanceId}
+                      style={{
+                        borderLeft: `3px solid ${rMeta.color || 'var(--glass-border)'}`,
+                        position: 'relative'
+                      }}
+                    >
                       <div className="inventory-item-top">
-                        <span className="inventory-item-card-icon">{item.icon || '📦'}</span>
-                        <span
-                          className="inventory-item-category-tag"
-                          style={{ color: catMeta.color, borderColor: catMeta.color }}
-                        >
-                          {catMeta.label}
-                        </span>
+                        <div style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: 8,
+                          background: 'rgba(0,0,0,0.35)',
+                          border: `1px solid ${rMeta.border || 'rgba(255,255,255,0.08)'}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                          flexShrink: 0
+                        }}>
+                          <GameIcon src={item.imageUrl} emoji={item.icon || '📦'} size={24} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                          <span
+                            className="inventory-item-category-tag"
+                            style={{ color: catMeta.color, borderColor: catMeta.color }}
+                          >
+                            {catMeta.label}
+                          </span>
+                          {rMeta && (
+                            <span style={{ fontSize: 9, color: rMeta.color, fontWeight: 'bold', textTransform: 'uppercase' }}>
+                              {rMeta.label}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="inventory-item-main">
-                        <div className="inventory-item-card-name" title={item.name}>
+                        <div className="inventory-item-card-name" title={item.name} style={{ color: rMeta.color || 'inherit' }}>
                           {item.name}
                         </div>
                         <div className="inventory-item-card-qty">

@@ -390,6 +390,7 @@ export function AuthProvider({ children }) {
             itemId: item.itemId,
             name: item.name,
             icon: item.icon,
+            imageUrl: item.imageUrl || '',
             rarity: item.rarity || 'rare',
             quantity: item.quantity || 1,
             category: item.category || 'general',
