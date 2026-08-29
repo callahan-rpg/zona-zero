@@ -14,9 +14,9 @@ service cloud.firestore {
         request.auth.uid == uid ||
         isAdmin() ||
         (
-          // Permite que outros modifiquem APENAS o inventário (transferência de itens)
+          // Permite que outros modifiquem o inventário e notificações (transferência de itens)
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['character']) &&
-          request.resource.data.character.diff(resource.data.character).affectedKeys().hasOnly(['inventory'])
+          request.resource.data.character.diff(resource.data.character).affectedKeys().hasOnly(['inventory', 'notifications'])
         )
       );
     }
@@ -47,9 +47,22 @@ service cloud.firestore {
       allow write: if request.auth != null && isAdmin();
     }
 
+    // Eventos do Calendário: todos logados leem; só admin pode criar, atualizar ou excluir
+    match /calendar_events/{eventId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // Combate em tempo real: todos logados leem; só admin cria/atualiza/deleta
+    match /active_combats/{combatId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin();
+    }
+
     // Função auxiliar: verifica se o usuário é admin
     function isAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
+
   }
 }
