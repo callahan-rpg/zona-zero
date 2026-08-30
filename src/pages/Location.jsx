@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { doc, getDoc, updateDoc, runTransaction, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, runTransaction, onSnapshot, collection } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
 import CombatHUD from '../components/CombatHUD.jsx'
 import WeatherEffects from '../components/WeatherEffects.jsx'
+import ShopModal from '../components/ShopModal.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
 
@@ -66,10 +67,36 @@ export default function Location() {
   const [selectedUniqueIndices, setSelectedUniqueIndices] = useState([])
   const [uniqueSaving, setUniqueSaving] = useState(false)
 
+  // Estados de Loja Local
+  const [showShop, setShowShop] = useState(false)
+  const [shopInfo, setShopInfo] = useState(null)
+  const [catalogItems, setCatalogItems] = useState([])
+
   const showToast = (msg) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
   }
+
+  // Escuta dados da loja desta locação em tempo real
+  useEffect(() => {
+    if (!slug) return
+    const unsub = onSnapshot(doc(db, 'shops', slug), (snap) => {
+      if (snap.exists()) {
+        setShopInfo({ id: snap.id, ...snap.data() })
+      } else {
+        setShopInfo(null)
+      }
+    })
+    return unsub
+  }, [slug])
+
+  // Escuta catálogo geral de itens para hidratação de ícones e descrições na loja
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'items_db'), (snap) => {
+      setCatalogItems(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+    return unsub
+  }, [])
 
   // Escuta alterações no toggle de efeitos visuais disparados pelo HUD
   useEffect(() => {
@@ -342,8 +369,27 @@ export default function Location() {
               />
             </div>
 
-            {/* Painel de Ações de Busca (Suprimentos + Busca Única) */}
+            {/* Painel de Ações de Busca (Suprimentos + Busca Única + Loja / Comércio) */}
             <div className="loot-search-actions-bar">
+              {/* Botão 0: Acessar Loja / Comércio do Local */}
+              {shopInfo && shopInfo.enabled !== false && (
+                <button
+                  className="loot-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.35) 100%)',
+                    borderColor: '#f59e0b',
+                    color: '#facc15',
+                    fontWeight: 700,
+                    boxShadow: '0 0 12px rgba(245, 158, 11, 0.25)'
+                  }}
+                  onClick={() => setShowShop(true)}
+                  title={`Abrir o comércio de ${location.name}`}
+                >
+                  <span>🏪</span>
+                  {shopInfo.name || 'Acessar Loja'}
+                </button>
+              )}
+
               {/* Botão 1: Buscar Suprimentos (Repetível / Cooldown / Sucata & Comuns) */}
               {location.loot?.enabled && (
                 <button
@@ -501,6 +547,15 @@ export default function Location() {
           </div>
         </div>
       )}
+
+      {/* Modal de Loja & Comércio Local */}
+      <ShopModal
+        isOpen={showShop}
+        onClose={() => setShowShop(false)}
+        locationSlug={slug}
+        locationName={location?.name || 'Comércio Local'}
+        catalogItems={catalogItems}
+      />
     </div>
   )
 }

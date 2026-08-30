@@ -218,6 +218,7 @@ export function AuthProvider({ children }) {
         constituicao: characterData.constituicao,
       },
       inventory: [],
+      rublos: 0,
       currentLocation: 'sala-hospital',
       lastLootByLocation: {},
       uniqueSearchesDone: {},
@@ -512,6 +513,76 @@ export function AuthProvider({ children }) {
     await refreshCharacter()
   }
 
+  // Transferência de Novos Rublos de forma atômica e segura
+  async function transferMoney(recipientUid, amountToTransfer) {
+    if (!user) return
+    const amount = Number(amountToTransfer)
+
+    if (!recipientUid || recipientUid === user.uid) {
+      throw new Error('Destinatário inválido.')
+    }
+    if (isNaN(amount) || !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)) {
+      throw new Error('Informe um valor inteiro válido maior que zero.')
+    }
+
+    const senderRef = doc(db, 'users', user.uid)
+    const recipientRef = doc(db, 'users', recipientUid)
+
+    await runTransaction(db, async (transaction) => {
+      const senderSnap = await transaction.get(senderRef)
+      const recipientSnap = await transaction.get(recipientRef)
+
+      if (!senderSnap.exists() || !recipientSnap.exists()) {
+        throw new Error('Jogador remetente ou destinatário não encontrado.')
+      }
+
+      const senderData = senderSnap.data()
+      const recipientData = recipientSnap.data()
+
+      const senderRublos = Number(senderData.character?.rublos || 0)
+      const recipientRublos = Number(recipientData.character?.rublos || 0)
+
+      if (senderRublos < amount) {
+        throw new Error('Você não possui Novos Rublos suficientes para esta transferência.')
+      }
+
+      const nextSenderRublos = senderRublos - amount
+      const nextRecipientRublos = recipientRublos + amount
+
+      if (nextSenderRublos < 0) {
+        throw new Error('A transação resultaria em saldo negativo.')
+      }
+
+      // Cria a notificação para o destinatário
+      const notification = {
+        id: 'notif_rublos_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
+        type: 'money_received',
+        senderUid: user.uid,
+        senderName: senderData.character?.name || 'Sobrevivente',
+        senderAvatar: senderData.character?.avatarUrl || null,
+        amount: amount,
+        read: false,
+        createdAt: new Date().toISOString()
+      }
+
+      const recipientNotifications = [
+        notification,
+        ...(recipientData.character?.notifications || []).slice(0, 49)
+      ]
+
+      transaction.update(senderRef, {
+        'character.rublos': nextSenderRublos
+      })
+
+      transaction.update(recipientRef, {
+        'character.rublos': nextRecipientRublos,
+        'character.notifications': recipientNotifications
+      })
+    })
+
+    await refreshCharacter()
+  }
+
   // Marca todas as notificações como lidas
   async function markNotificationsRead() {
     if (!user || !character?.notifications) return
@@ -554,6 +625,7 @@ export function AuthProvider({ children }) {
     updateCharacter,
     refreshCharacter,
     transferItem,
+    transferMoney,
     consumeItem,
     discardItem,
     recordUniqueSearch,

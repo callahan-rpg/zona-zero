@@ -4,6 +4,7 @@ import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
 import GameIcon from '../components/GameIcon.jsx'
+import MoneyTransferModal from '../components/MoneyTransferModal.jsx'
 import { getVitalsDebuffs, getMaxHp, DEFAULT_PRESET_ITEMS, RARITY_META } from '../utils/itemSystem'
 
 const ATTRIBUTES = [
@@ -117,7 +118,7 @@ export default function Character() {
   const [avatarError, setAvatarError] = useState('')
   const [avatarSuccess, setAvatarSuccess] = useState('')
 
-  // Estados do Modal de Transferência
+  // Estados do Modal de Transferência de Item
   const [showTransfer, setShowTransfer] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
   const [transferQty, setTransferQty] = useState(1)
@@ -127,6 +128,16 @@ export default function Character() {
   const [transferLoading, setTransferLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  // Estado do Modal de Transferência de Novos Rublos
+  const [showMoneyTransfer, setShowMoneyTransfer] = useState(false)
+
+  // Escuta evento customizado disparado pelo Card Flutuante (CharacterPopup)
+  useEffect(() => {
+    const handleOpenMoney = () => setShowMoneyTransfer(true)
+    window.addEventListener('open_money_transfer_modal', handleOpenMoney)
+    return () => window.removeEventListener('open_money_transfer_modal', handleOpenMoney)
+  }, [])
 
   // Estados de Consumo e Descarte
   const [showConsumeModal, setShowConsumeModal] = useState(false)
@@ -520,12 +531,42 @@ export default function Character() {
 
           {/* COLUNA DIREITA: Mochila & Inventário com Abas */}
           <div className="character-inventory-panel">
-            <div className="inventory-header-row">
+            <div className="inventory-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
               <div>
                 <p className="section-title" style={{ marginBottom: 4 }}>Mochila & Inventário</p>
                 <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
                   Total de itens: <strong style={{ color: 'var(--accent)' }}>{inventory.length}</strong>
                 </span>
+              </div>
+
+              {/* Saldo de Novos Rublos no Inventário */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(234, 179, 8, 0.12)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '8px', padding: '6px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 18 }}>💰</span>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Saldo Atual</div>
+                    <strong style={{ fontSize: 14, color: '#facc15' }}>
+                      {Number(character.rublos || 0).toLocaleString('pt-BR')} Novos Rublos
+                    </strong>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMoneyTransfer(true)}
+                  className="btn btn-sm"
+                  style={{
+                    background: 'rgba(234, 179, 8, 0.25)',
+                    borderColor: '#facc15',
+                    color: '#facc15',
+                    fontSize: 11,
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    fontWeight: 600
+                  }}
+                  title="Transferir Novos Rublos para outro sobrevivente"
+                >
+                  💸 Transferir
+                </button>
               </div>
             </div>
 
@@ -952,6 +993,12 @@ export default function Character() {
           </div>
         </div>
       )}
+
+      {/* Modal de Transferência de Novos Rublos */}
+      <MoneyTransferModal
+        isOpen={showMoneyTransfer}
+        onClose={() => setShowMoneyTransfer(false)}
+      />
     </div>
   )
 }

@@ -848,6 +848,146 @@ export default function Admin() {
     }
   }
 
+  // ==========================================
+  // TAB SHOPS: GERENCIADOR DE LOJAS & ECONOMIA
+  // ==========================================
+  const [shops, setShops] = useState([])
+  const [selectedShopLocation, setSelectedShopLocation] = useState('')
+  const [shopForm, setShopForm] = useState({
+    name: '',
+    description: '',
+    enabled: true,
+    itemsForSale: [],
+    itemsAccepted: []
+  })
+  const [newSaleItem, setNewSaleItem] = useState({ itemId: '', buyPrice: 100, stock: 5 })
+  const [newAcceptedItem, setNewAcceptedItem] = useState({ itemId: '', sellPrice: 50 })
+  const [shopSalePickerOpen, setShopSalePickerOpen] = useState(false)
+  const [shopAcceptedPickerOpen, setShopAcceptedPickerOpen] = useState(false)
+
+  // Escuta lojas em tempo real
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'shops'), (snap) => {
+      setShops(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+    return unsub
+  }, [])
+
+  function handleSelectShop(locationSlug) {
+    setSelectedShopLocation(locationSlug)
+    const existing = shops.find(s => s.id === locationSlug || s.locationSlug === locationSlug)
+    if (existing) {
+      setShopForm({
+        name: existing.name || '',
+        description: existing.description || '',
+        enabled: existing.enabled !== false,
+        itemsForSale: existing.itemsForSale || [],
+        itemsAccepted: existing.itemsAccepted || []
+      })
+    } else {
+      const loc = locations.find(l => l.slug === locationSlug)
+      setShopForm({
+        name: loc ? `Comércio de ${loc.name}` : 'Loja Local',
+        description: 'Loja de suprimentos e trocas deste local.',
+        enabled: true,
+        itemsForSale: [],
+        itemsAccepted: []
+      })
+    }
+  }
+
+  async function handleSaveShop(e) {
+    e.preventDefault()
+    if (!selectedShopLocation) return alert('Selecione uma locação para vincular a loja.')
+    if (!shopForm.name.trim()) return alert('Informe o nome da loja.')
+
+    const payload = {
+      locationSlug: selectedShopLocation,
+      name: shopForm.name.trim(),
+      description: shopForm.description.trim(),
+      enabled: !!shopForm.enabled,
+      itemsForSale: (shopForm.itemsForSale || []).map(i => ({
+        itemId: i.itemId,
+        buyPrice: Math.max(1, Number(i.buyPrice) || 1),
+        stock: Math.max(0, Number(i.stock) || 0)
+      })),
+      itemsAccepted: (shopForm.itemsAccepted || []).map(i => ({
+        itemId: i.itemId,
+        sellPrice: Math.max(1, Number(i.sellPrice) || 1)
+      })),
+      updatedAt: new Date().toISOString()
+    }
+
+    try {
+      await setDoc(doc(db, 'shops', selectedShopLocation), payload)
+      alert('Loja salva com sucesso no Firestore!')
+    } catch (err) {
+      alert('Erro ao salvar loja: ' + err.message)
+    }
+  }
+
+  async function handleDeleteShop(shopId) {
+    if (!confirm('Deseja realmente excluir a loja deste local?')) return
+    try {
+      await deleteDoc(doc(db, 'shops', shopId))
+      setSelectedShopLocation('')
+      setShopForm({ name: '', description: '', enabled: true, itemsForSale: [], itemsAccepted: [] })
+      alert('Loja excluída!')
+    } catch (err) {
+      alert('Erro ao excluir loja: ' + err.message)
+    }
+  }
+
+  function addSaleItemToShop() {
+    if (!newSaleItem.itemId) return alert('Selecione um item do catálogo para vender na loja.')
+    const exists = (shopForm.itemsForSale || []).some(i => i.itemId === newSaleItem.itemId)
+    if (exists) return alert('Este item já está cadastrado na lista de venda desta loja.')
+
+    setShopForm(prev => ({
+      ...prev,
+      itemsForSale: [
+        ...prev.itemsForSale,
+        {
+          itemId: newSaleItem.itemId,
+          buyPrice: Math.max(1, Number(newSaleItem.buyPrice) || 1),
+          stock: Math.max(0, Number(newSaleItem.stock) || 0)
+        }
+      ]
+    }))
+    setNewSaleItem({ itemId: '', buyPrice: 100, stock: 5 })
+  }
+
+  function removeSaleItemFromShop(idx) {
+    setShopForm(prev => ({
+      ...prev,
+      itemsForSale: prev.itemsForSale.filter((_, i) => i !== idx)
+    }))
+  }
+
+  function addAcceptedItemToShop() {
+    if (!newAcceptedItem.itemId) return alert('Selecione um item do catálogo para a loja comprar dos sobreviventes.')
+    const exists = (shopForm.itemsAccepted || []).some(i => i.itemId === newAcceptedItem.itemId)
+    if (exists) return alert('Este item já está cadastrado na lista de compra desta loja.')
+
+    setShopForm(prev => ({
+      ...prev,
+      itemsAccepted: [
+        ...prev.itemsAccepted,
+        {
+          itemId: newAcceptedItem.itemId,
+          sellPrice: Math.max(1, Number(newAcceptedItem.sellPrice) || 1)
+        }
+      ]
+    }))
+    setNewAcceptedItem({ itemId: '', sellPrice: 50 })
+  }
+
+  function removeAcceptedItemFromShop(idx) {
+    setShopForm(prev => ({
+      ...prev,
+      itemsAccepted: prev.itemsAccepted.filter((_, i) => i !== idx)
+    }))
+  }
 
   // ==========================================
   const [combatLocations, setCombatLocations] = useState([])
@@ -1148,6 +1288,9 @@ export default function Admin() {
             </button>
             <button className={`btn btn-sm ${activeTab === 'players' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('players')}>
               👥 Sobreviventes
+            </button>
+            <button className={`btn btn-sm ${activeTab === 'shops' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('shops')} style={{ borderColor: 'rgba(234, 179, 8, 0.4)', color: activeTab === 'shops' ? '#000' : '#facc15', background: activeTab === 'shops' ? '#f59e0b' : 'transparent' }}>
+              🏪 Lojas & Economia
             </button>
             <button className={`btn btn-sm ${activeTab === 'combat' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('combat')} style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: activeTab === 'combat' ? '#fff' : '#f87171' }}>
               ⚔️ Mesa de Combate {activeCombatData?.active && '🔴'}
@@ -2960,6 +3103,16 @@ export default function Admin() {
                         onChange={(e) => updatePlayerStats(selectedPlayer.uid, 'age', Number(e.target.value))}
                       />
                     </div>
+                    <div className="form-group">
+                      <label style={{ color: '#facc15' }}>💰 Novos Rublos</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={selectedPlayer.character.rublos ?? 0}
+                        onChange={(e) => updatePlayerStats(selectedPlayer.uid, 'rublos', Math.max(0, Number(e.target.value)))}
+                        style={{ color: '#facc15', fontWeight: 'bold' }}
+                      />
+                    </div>
                   </div>
 
                   {/* Edição de Vitais (Sede, Fome, Sangue) */}
@@ -3195,6 +3348,505 @@ export default function Admin() {
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', border: '1px dashed var(--glass-border)', borderRadius: '12px' }}>
                   Selecione um sobrevivente para editar
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ========================================== */}
+          {/* CONTEÚDO DA TAB SHOPS: LOJAS & ECONOMIA */}
+          {/* ========================================== */}
+          {activeTab === 'shops' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20 }}>
+              {/* Coluna Esquerda: Lista de Lojas / Locações */}
+              <div className="glass-light" style={{ padding: 16, borderRadius: 12, height: 'fit-content' }}>
+                <h3 style={{ fontSize: 13, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>🏪 Locais com Loja</span>
+                  <span style={{ fontSize: 11, background: 'rgba(234, 179, 8, 0.2)', color: '#facc15', padding: '2px 6px', borderRadius: 4 }}>
+                    {shops.length} ativas
+                  </span>
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '550px', overflowY: 'auto' }}>
+                  {locations.map((loc) => {
+                    const shop = shops.find(s => s.id === loc.slug || s.locationSlug === loc.slug)
+                    const isSelected = selectedShopLocation === loc.slug
+                    return (
+                      <div
+                        key={loc.slug}
+                        onClick={() => handleSelectShop(loc.slug)}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          background: isSelected ? 'rgba(234, 179, 8, 0.15)' : 'rgba(255,255,255,0.03)',
+                          border: `1px solid ${isSelected ? '#f59e0b' : 'var(--glass-border)'}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div>
+                          <strong style={{ fontSize: 13, color: isSelected ? '#facc15' : 'var(--text-primary)', display: 'block' }}>
+                            {loc.name}
+                          </strong>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            {loc.slug}
+                          </span>
+                        </div>
+                        {shop ? (
+                          <span style={{ fontSize: 10, background: shop.enabled ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: shop.enabled ? '#4ade80' : '#f87171', padding: '2px 6px', borderRadius: 4 }}>
+                            {shop.enabled ? 'Ativa' : 'Pausada'}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                            + Criar
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Coluna Direita: Editor da Loja Selecionada */}
+              {selectedShopLocation ? (
+                <div className="glass-light" style={{ padding: 20, borderRadius: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--glass-border)', paddingBottom: 12 }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 16, color: '#facc15' }}>
+                        🏪 Configuração da Loja: {locations.find(l => l.slug === selectedShopLocation)?.name || selectedShopLocation}
+                      </h3>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        Slug da Sala: <strong style={{ color: 'var(--accent-blue)' }}>{selectedShopLocation}</strong>
+                      </span>
+                    </div>
+                    {shops.some(s => s.id === selectedShopLocation) && (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171', background: 'rgba(239, 68, 68, 0.1)' }}
+                        onClick={() => handleDeleteShop(selectedShopLocation)}
+                      >
+                        🗑️ Excluir Loja
+                      </button>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleSaveShop}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, marginBottom: 14 }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Nome da Loja</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Armeiro de Sobrevivência"
+                          value={shopForm.name}
+                          onChange={(e) => setShopForm(prev => ({ ...prev, name: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Status da Loja</label>
+                        <select
+                          value={shopForm.enabled ? 'true' : 'false'}
+                          onChange={(e) => setShopForm(prev => ({ ...prev, enabled: e.target.value === 'true' }))}
+                        >
+                          <option value="true">🟢 Aberta / Ativa no local</option>
+                          <option value="false">🔴 Fechada / Desativada</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 18 }}>
+                      <label>Descrição / Ambientação da Loja</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Um balcão improvisado protegido por grades reforçadas..."
+                        value={shopForm.description}
+                        onChange={(e) => setShopForm(prev => ({ ...prev, description: e.target.value }))}
+                      />
+                    </div>
+
+                    {/* SEÇÃO 1: ITENS QUE A LOJA VENDE PARA OS JOGADORES */}
+                    <div style={{ padding: 14, background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: 8, marginBottom: 18 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <label style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase' }}>
+                          🛒 Itens que a Loja Vende (Preço de Compra do Jogador & Estoque)
+                        </label>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {shopForm.itemsForSale.length} item(ns) à venda
+                        </span>
+                      </div>
+
+                      {/* Picker de catálogo para venda */}
+                      <div style={{ marginBottom: 10 }}>
+                        <button
+                          type="button"
+                          onClick={() => setShopSalePickerOpen(v => !v)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            width: '100%',
+                            padding: '6px 10px',
+                            background: shopSalePickerOpen ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.03)',
+                            border: `1px solid ${shopSalePickerOpen ? '#60a5fa' : 'var(--glass-border)'}`,
+                            borderRadius: 6,
+                            color: shopSalePickerOpen ? '#60a5fa' : 'var(--text-secondary)',
+                            fontSize: 11,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <span>🗃️ {shopSalePickerOpen ? 'Fechar Catálogo' : '🔍 Selecionar Item do Catálogo para Vender na Loja'}</span>
+                          <span>{shopSalePickerOpen ? '▲' : '▼'}</span>
+                        </button>
+
+                        {shopSalePickerOpen && (
+                          <div style={{ marginTop: 6, padding: 8, background: 'rgba(0,0,0,0.4)', borderRadius: 8, border: '1px solid rgba(96,165,250,0.3)', maxHeight: 180, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6 }}>
+                            {catalogItems.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setNewSaleItem(prev => ({ ...prev, itemId: item.itemId }))
+                                  setShopSalePickerOpen(false)
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  padding: '5px 8px',
+                                  borderRadius: 6,
+                                  background: newSaleItem.itemId === item.itemId ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.02)',
+                                  border: `1px solid ${newSaleItem.itemId === item.itemId ? '#60a5fa' : 'rgba(255,255,255,0.06)'}`,
+                                  cursor: 'pointer',
+                                  textAlign: 'left'
+                                }}
+                              >
+                                <span style={{ fontSize: 16 }}>{item.icon || '📦'}</span>
+                                <span style={{ fontSize: 11, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {item.name}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Lista de itens à venda */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                        {shopForm.itemsForSale.map((saleItem, idx) => {
+                          const catItem = catalogItems.find(c => c.itemId === saleItem.itemId)
+                          const rMeta = RARITY_META[catItem?.rarity || 'common'] || RARITY_META.common
+                          return (
+                            <div
+                              key={idx}
+                              className="glass-light"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 12px',
+                                borderRadius: 6,
+                                borderLeft: `3px solid ${rMeta.color}`
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                <span style={{ fontSize: 18 }}>{catItem?.icon || '📦'}</span>
+                                <div>
+                                  <strong style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                                    {catItem?.name || saleItem.itemId}
+                                  </strong>
+                                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 6 }}>
+                                    (ID: {saleItem.itemId})
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Preço:</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={saleItem.buyPrice}
+                                    onChange={(e) => {
+                                      const val = Math.max(1, Number(e.target.value))
+                                      setShopForm(prev => ({
+                                        ...prev,
+                                        itemsForSale: prev.itemsForSale.map((item, i) => i === idx ? { ...item, buyPrice: val } : item)
+                                      }))
+                                    }}
+                                    style={{ width: '80px', padding: '3px 6px', fontSize: 12, color: '#facc15', fontWeight: 'bold' }}
+                                  />
+                                  <span style={{ fontSize: 11, color: '#facc15' }}>Rublos</span>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Estoque:</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={saleItem.stock}
+                                    onChange={(e) => {
+                                      const val = Math.max(0, Number(e.target.value))
+                                      setShopForm(prev => ({
+                                        ...prev,
+                                        itemsForSale: prev.itemsForSale.map((item, i) => i === idx ? { ...item, stock: val } : item)
+                                      }))
+                                    }}
+                                    style={{ width: '65px', padding: '3px 6px', fontSize: 12, color: saleItem.stock === 0 ? '#ef4444' : '#4ade80', fontWeight: 'bold' }}
+                                  />
+                                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>unid.</span>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => removeSaleItemFromShop(idx)}
+                                  style={{ background: 'transparent', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: 14 }}
+                                  title="Remover item da loja"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {shopForm.itemsForSale.length === 0 && (
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>
+                            Nenhum item colocado à venda ainda.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Formulário para adicionar item à venda */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 90px 40px', gap: 8, alignItems: 'end' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 10 }}>ID do Item (Catálogo)</label>
+                          <input
+                            type="text"
+                            placeholder="faca_cozinha"
+                            value={newSaleItem.itemId}
+                            onChange={(e) => setNewSaleItem(prev => ({ ...prev, itemId: e.target.value.trim().toLowerCase() }))}
+                            style={{ padding: '6px' }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 10 }}>Preço de Venda</label>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="100"
+                            value={newSaleItem.buyPrice}
+                            onChange={(e) => setNewSaleItem(prev => ({ ...prev, buyPrice: e.target.value }))}
+                            style={{ padding: '6px' }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 10 }}>Estoque Inicial</label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="5"
+                            value={newSaleItem.stock}
+                            onChange={(e) => setNewSaleItem(prev => ({ ...prev, stock: e.target.value }))}
+                            style={{ padding: '6px' }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={addSaleItemToShop}
+                          style={{ padding: '8px 0', width: '100%' }}
+                          title="Adicionar item à venda"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* SEÇÃO 2: ITENS QUE A LOJA COMPRA DOS JOGADORES */}
+                    <div style={{ padding: 14, background: 'rgba(34, 197, 94, 0.05)', border: '1px solid rgba(34, 197, 94, 0.25)', borderRadius: 8, marginBottom: 20 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <label style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#4ade80', textTransform: 'uppercase' }}>
+                          💰 Itens que a Loja Compra dos Jogadores (Preço Pago ao Jogador)
+                        </label>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {shopForm.itemsAccepted.length} item(ns) aceito(s)
+                        </span>
+                      </div>
+
+                      {/* Picker de catálogo para compra */}
+                      <div style={{ marginBottom: 10 }}>
+                        <button
+                          type="button"
+                          onClick={() => setShopAcceptedPickerOpen(v => !v)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            width: '100%',
+                            padding: '6px 10px',
+                            background: shopAcceptedPickerOpen ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.03)',
+                            border: `1px solid ${shopAcceptedPickerOpen ? '#4ade80' : 'var(--glass-border)'}`,
+                            borderRadius: 6,
+                            color: shopAcceptedPickerOpen ? '#4ade80' : 'var(--text-secondary)',
+                            fontSize: 11,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <span>🗃️ {shopAcceptedPickerOpen ? 'Fechar Catálogo' : '🔍 Selecionar Item do Catálogo para Comprar dos Sobreviventes'}</span>
+                          <span>{shopAcceptedPickerOpen ? '▲' : '▼'}</span>
+                        </button>
+
+                        {shopAcceptedPickerOpen && (
+                          <div style={{ marginTop: 6, padding: 8, background: 'rgba(0,0,0,0.4)', borderRadius: 8, border: '1px solid rgba(74,222,128,0.3)', maxHeight: 180, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6 }}>
+                            {catalogItems.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setNewAcceptedItem(prev => ({ ...prev, itemId: item.itemId }))
+                                  setShopAcceptedPickerOpen(false)
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  padding: '5px 8px',
+                                  borderRadius: 6,
+                                  background: newAcceptedItem.itemId === item.itemId ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.02)',
+                                  border: `1px solid ${newAcceptedItem.itemId === item.itemId ? '#4ade80' : 'rgba(255,255,255,0.06)'}`,
+                                  cursor: 'pointer',
+                                  textAlign: 'left'
+                                }}
+                              >
+                                <span style={{ fontSize: 16 }}>{item.icon || '📦'}</span>
+                                <span style={{ fontSize: 11, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {item.name}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Lista de itens aceitos */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                        {shopForm.itemsAccepted.map((accItem, idx) => {
+                          const catItem = catalogItems.find(c => c.itemId === accItem.itemId)
+                          const rMeta = RARITY_META[catItem?.rarity || 'common'] || RARITY_META.common
+                          return (
+                            <div
+                              key={idx}
+                              className="glass-light"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 12px',
+                                borderRadius: 6,
+                                borderLeft: `3px solid ${rMeta.color}`
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                <span style={{ fontSize: 18 }}>{catItem?.icon || '📦'}</span>
+                                <div>
+                                  <strong style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                                    {catItem?.name || accItem.itemId}
+                                  </strong>
+                                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 6 }}>
+                                    (ID: {accItem.itemId})
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Loja paga:</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={accItem.sellPrice}
+                                    onChange={(e) => {
+                                      const val = Math.max(1, Number(e.target.value))
+                                      setShopForm(prev => ({
+                                        ...prev,
+                                        itemsAccepted: prev.itemsAccepted.map((item, i) => i === idx ? { ...item, sellPrice: val } : item)
+                                      }))
+                                    }}
+                                    style={{ width: '80px', padding: '3px 6px', fontSize: 12, color: '#4ade80', fontWeight: 'bold' }}
+                                  />
+                                  <span style={{ fontSize: 11, color: '#4ade80' }}>Rublos</span>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => removeAcceptedItemFromShop(idx)}
+                                  style={{ background: 'transparent', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: 14 }}
+                                  title="Remover item aceito"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {shopForm.itemsAccepted.length === 0 && (
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>
+                            Nenhum item configurado para compra nesta loja.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Formulário para adicionar item aceito */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px 40px', gap: 8, alignItems: 'end' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 10 }}>ID do Item (Catálogo)</label>
+                          <input
+                            type="text"
+                            placeholder="trigo"
+                            value={newAcceptedItem.itemId}
+                            onChange={(e) => setNewAcceptedItem(prev => ({ ...prev, itemId: e.target.value.trim().toLowerCase() }))}
+                            style={{ padding: '6px' }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 10 }}>Valor Pago ao Jogador</label>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="50"
+                            value={newAcceptedItem.sellPrice}
+                            onChange={(e) => setNewAcceptedItem(prev => ({ ...prev, sellPrice: e.target.value }))}
+                            style={{ padding: '6px' }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={addAcceptedItemToShop}
+                          style={{ padding: '8px 0', width: '100%', background: '#22c55e', borderColor: '#4ade80' }}
+                          title="Adicionar item aceito"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      style={{ width: '100%', padding: '12px', background: '#f59e0b', borderColor: '#fbbf24', color: '#000', fontWeight: 700 }}
+                    >
+                      💾 Salvar Configurações da Loja
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', border: '1px dashed var(--glass-border)', borderRadius: 12, padding: 40 }}>
+                  Selecione uma locação ao lado para configurar sua loja e estoque.
                 </div>
               )}
             </div>

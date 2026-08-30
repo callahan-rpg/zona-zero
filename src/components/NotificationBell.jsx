@@ -172,33 +172,61 @@ export default function NotificationBell() {
                       )}
                       <div style={{ minWidth: 0, flex: 1, fontSize: 12 }}>
                         <strong style={{ color: '#fff' }}>{n.senderName}</strong>
-                        <span style={{ color: 'var(--text-muted)' }}> te enviou um item:</span>
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          {n.type === 'money_received' ? ' te transferiu dinheiro:' : ' te enviou um item:'}
+                        </span>
                       </div>
                     </div>
 
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: 'rgba(0,0,0,0.3)',
-                        padding: '6px 10px',
-                        borderRadius: 6,
-                        border: '1px solid rgba(255,255,255,0.04)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                        <span style={{ fontSize: 18 }}>{n.item?.icon || '📦'}</span>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 'bold', color: rarity.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {n.item?.name}
-                          </div>
-                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                            Qtd: {n.item?.quantity || 1} · {rarity.label}
+                    {n.type === 'money_received' ? (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: 'rgba(234, 179, 8, 0.1)',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          border: '1px solid rgba(234, 179, 8, 0.25)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 18 }}>💰</span>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 'bold', color: '#facc15' }}>
+                              +{Number(n.amount || 0).toLocaleString('pt-BR')} Novos Rublos
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                              Transferência direta de fundos
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: 'rgba(0,0,0,0.3)',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          border: '1px solid rgba(255,255,255,0.04)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                          <span style={{ fontSize: 18 }}>{n.item?.icon || '📦'}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 'bold', color: rarity.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {n.item?.name}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                              Qtd: {n.item?.quantity || 1} · {rarity.label}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'right', fontStyle: 'italic' }}>
                       🕒 {formatTime(n.createdAt)}
@@ -234,9 +262,9 @@ export default function NotificationBell() {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 16 }}>🎁</span>
-              <strong style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--accent)', letterSpacing: 0.5 }}>
-                Item Recebido!
+              <span style={{ fontSize: 16 }}>{toast.type === 'money_received' ? '💰' : '🎁'}</span>
+              <strong style={{ fontSize: 12, textTransform: 'uppercase', color: toast.type === 'money_received' ? '#facc15' : 'var(--accent)', letterSpacing: 0.5 }}>
+                {toast.type === 'money_received' ? 'Rublos Recebidos!' : 'Item Recebido!'}
               </strong>
             </div>
             <button
@@ -263,10 +291,17 @@ export default function NotificationBell() {
             )}
             <div style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.3 }}>
               <div><strong style={{ color: '#fff' }}>{toast.senderName}</strong> te enviou:</div>
-              <div style={{ color: 'var(--accent)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                <span>{toast.item?.icon}</span>
-                <span>{toast.item?.quantity}x {toast.item?.name}</span>
-              </div>
+              {toast.type === 'money_received' ? (
+                <div style={{ color: '#facc15', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <span>💰</span>
+                  <span>+{Number(toast.amount || 0).toLocaleString('pt-BR')} Novos Rublos</span>
+                </div>
+              ) : (
+                <div style={{ color: 'var(--accent)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <span>{toast.item?.icon}</span>
+                  <span>{toast.item?.quantity}x {toast.item?.name}</span>
+                </div>
+              )}
             </div>
           </div>
 

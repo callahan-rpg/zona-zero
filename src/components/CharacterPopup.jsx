@@ -116,6 +116,45 @@ export default function CharacterPopup({ onClose }) {
                 <div className="character-float-xp-fill" style={{ width: `${xpProgress}%` }} />
               </div>
             </div>
+
+            {/* Saldo de Novos Rublos */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginTop: '8px',
+                padding: '5px 8px',
+                background: 'rgba(234, 179, 8, 0.12)',
+                border: '1px solid rgba(234, 179, 8, 0.3)',
+                borderRadius: '6px',
+                fontSize: '12px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold', color: '#facc15' }}>
+                <span>💰</span>
+                <span>{Number(character.rublos || 0).toLocaleString('pt-BR')} Novos Rublos</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('open_money_transfer_modal'))
+                }}
+                style={{
+                  background: 'rgba(234, 179, 8, 0.2)',
+                  border: '1px solid rgba(234, 179, 8, 0.4)',
+                  color: '#facc15',
+                  borderRadius: '4px',
+                  padding: '2px 6px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+                title="Transferir Novos Rublos para outro sobrevivente"
+              >
+                Transferir
+              </button>
+            </div>
           </div>
         </div>
 

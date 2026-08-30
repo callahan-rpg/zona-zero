@@ -8,6 +8,7 @@ import CharacterPopup from './CharacterPopup.jsx'
 import CalendarModal from './CalendarModal.jsx'
 import SettingsModal from './SettingsModal.jsx'
 import NotificationBell from './NotificationBell.jsx'
+import MoneyTransferModal from './MoneyTransferModal.jsx'
 import GameIcon from './GameIcon.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { hasFeatureUnlocked, getTimeOfDay, getVitalsDebuffs } from '../utils/itemSystem'
@@ -23,12 +24,20 @@ export default function HUD({ locationName }) {
   const [showCharacter, setShowCharacter] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showMoneyTransfer, setShowMoneyTransfer] = useState(false)
   const [showWeatherPopover, setShowWeatherPopover] = useState(false)
   const [tickCounter, setTickCounter] = useState(0)
   const [dismissedVitalAlert, setDismissedVitalAlert] = useState(false)
   const [weatherFxEnabled, setWeatherFxEnabled] = useState(() => {
     return localStorage.getItem('zz_weather_fx') !== 'false'
   })
+
+  // Escuta evento customizado para abertura do modal de transferência
+  useEffect(() => {
+    const handleOpenMoney = () => setShowMoneyTransfer(true)
+    window.addEventListener('open_money_transfer_modal', handleOpenMoney)
+    return () => window.removeEventListener('open_money_transfer_modal', handleOpenMoney)
+  }, [])
 
   // Escuta combates ativos no Firestore para exibir o botão com badge pulsante
   useEffect(() => {
@@ -132,6 +141,7 @@ export default function HUD({ locationName }) {
             className={`hud-btn ${location.pathname.startsWith('/location') ? 'active' : ''}`}
           >
             <GameIcon name="rooms" size={16} className="hud-btn-icon" />
+            Salas
           </Link>
 
           <Link
@@ -139,6 +149,7 @@ export default function HUD({ locationName }) {
             className={`hud-btn ${location.pathname === '/map' ? 'active' : ''}`}
           >
             <GameIcon name="map" size={16} className="hud-btn-icon" />
+            Mapa
           </Link>
 
           <button
@@ -155,6 +166,7 @@ export default function HUD({ locationName }) {
             title={location.pathname === '/characters' ? 'Você já está na página de Sobreviventes' : 'Sobreviventes'}
           >
             <GameIcon name="players" size={16} className="hud-btn-icon" />
+            Sobreviventes
           </button>
 
           <button
@@ -179,6 +191,7 @@ export default function HUD({ locationName }) {
             title="Rolar Dados"
           >
             <GameIcon name="dice" size={16} className="hud-btn-icon" />
+            Dados
           </button>
 
           {/* Botão de Configurações do Usuário (Clima, Opacidade, Áudio) */}
@@ -263,6 +276,7 @@ export default function HUD({ locationName }) {
       {showDice && <DiceRoller onClose={() => setShowDice(false)} />}
       {showCharacter && <CharacterPopup onClose={() => setShowCharacter(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showMoneyTransfer && <MoneyTransferModal isOpen={showMoneyTransfer} onClose={() => setShowMoneyTransfer(false)} />}
       {showCalendar && (
         <CalendarModal
           gameTime={gameTime}
