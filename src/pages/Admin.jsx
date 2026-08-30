@@ -14,6 +14,7 @@ import { SEASONS, MOON_PHASES, MONTHS, calculateGameTime, getDynamicWeather } fr
 import { RARITY_META, DEFAULT_PRESET_ITEMS, SUPPLY_RARITIES, UNIQUE_RARITIES, getMaxHp } from '../utils/itemSystem'
 import { COMBAT_STATUS_EFFECTS, MONSTER_TEMPLATES, ATTRIBUTE_ICONS } from '../utils/combatSystem'
 import { uploadImageFree } from '../utils/imageUpload'
+import { DEFAULT_WEATHER_SOUNDS, extractYouTubeId } from '../utils/audioSystem'
 import GameIcon from '../components/GameIcon.jsx'
 
 const WEATHER_OPTIONS = [
@@ -29,7 +30,7 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState('config') // config | calendar | locations | catalog | players
 
   // ==========================================
-  // TAB 1: CONFIGURAÇÃO GLOBAL (TEMPO, ESTAÇÃO, CLIMA)
+  // TAB 1: CONFIGURAÇÃO GLOBAL (TEMPO, ESTAÇÃO, CLIMA & SONS)
   // ==========================================
   const [globalConfig, setGlobalConfig] = useState(null)
   const [tempTitle, setTempTitle] = useState('')
@@ -41,6 +42,7 @@ export default function Admin() {
     icon: '☀️',
     region: 'Leste Europeu'
   })
+  const [tempWeatherSounds, setTempWeatherSounds] = useState(DEFAULT_WEATHER_SOUNDS)
   const [tempTime, setTempTime] = useState({
     mode: 'dynamic', // dynamic | manual
     value: '12:00',
@@ -71,6 +73,7 @@ export default function Admin() {
           icon: '☀️',
           region: 'Leste Europeu'
         })
+        setTempWeatherSounds(data.weatherSounds || DEFAULT_WEATHER_SOUNDS)
         setTempTime(data.time || {
           mode: 'dynamic',
           value: '12:00',
@@ -97,6 +100,7 @@ export default function Admin() {
       await setDoc(doc(db, 'game_config', 'global'), {
         title: tempTitle,
         weather: tempWeather,
+        weatherSounds: tempWeatherSounds,
         time: tempTime,
         maintenance: tempMaintenance,
         global_message: globalMsg,
@@ -347,6 +351,8 @@ export default function Admin() {
     folder: '', // Nome da Pasta / Complexo (ex: "Hotel do centro de Varsóvia")
     description: '',
     backgroundImage: '',
+    locationSound: '', // Link do YouTube de som específico do lugar
+    disableWeatherSound: false, // Se verdadeiro, silencia o som do clima nesta sala
     xatIframe: '',
     isIndoor: false,
     lootEnabled: true,
@@ -404,6 +410,8 @@ export default function Admin() {
       folder: loc.folder || '',
       description: loc.description || '',
       backgroundImage: loc.backgroundImage || '',
+      locationSound: loc.locationSound || '',
+      disableWeatherSound: !!loc.disableWeatherSound,
       xatIframe: loc.xatIframe || '',
       isIndoor: !!loc.isIndoor,
       lootEnabled: loc.loot?.enabled !== false,
@@ -425,6 +433,8 @@ export default function Admin() {
       folder: selectedFolder !== 'all' && selectedFolder !== 'sem_pasta' ? selectedFolder : '',
       description: '',
       backgroundImage: '',
+      locationSound: '',
+      disableWeatherSound: false,
       xatIframe: '',
       isIndoor: false,
       lootEnabled: true,
@@ -457,6 +467,8 @@ export default function Admin() {
       folder: (locForm.folder || '').trim(),
       description: locForm.description.trim(),
       backgroundImage: locForm.backgroundImage.trim() || null,
+      locationSound: (locForm.locationSound || '').trim() || null,
+      disableWeatherSound: !!locForm.disableWeatherSound,
       xatIframe: locForm.xatIframe.trim(),
       isIndoor: !!locForm.isIndoor,
       loot: {
@@ -1742,6 +1754,99 @@ export default function Admin() {
                 )}
               </div>
 
+              {/* SEÇÃO 4: ÁUDIO & SONS DE CLIMA DO YOUTUBE (EXTERNO E INTERNO) */}
+              <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '10px' }}>
+                <div style={{ marginBottom: 14 }}>
+                  <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: '#60a5fa', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>🔊</span> Sons de Ambiente dos Efeitos Climáticos (YouTube)
+                  </h4>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                    Configure os links de vídeos do YouTube que tocarão quando cada clima estiver ativo. Você pode diferenciar o áudio escutado ao ar livre (<strong>Ambiente Externo</strong>) daquele ouvido de dentro de uma casa/quarto (<strong>Ambiente Interno / Coberto</strong>).
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {[
+                    { id: 'rainy', label: '🌧️ Chuva (Chovendo)' },
+                    { id: 'storm', label: '⛈️ Tempestade & Relâmpagos' },
+                    { id: 'snowy', label: '❄️ Nevasca & Frio Extremo' },
+                    { id: 'foggy', label: '🌫️ Neblina & Vento Misterioso' },
+                    { id: 'sunny', label: '☀️ Ensolarado / Vento Suave (Opcional)' },
+                    { id: 'cloudy', label: '☁️ Nublado (Opcional)' }
+                  ].map(w => {
+                    const currentSound = tempWeatherSounds[w.id] || { outdoor: '', indoor: '' }
+                    const outId = extractYouTubeId(currentSound.outdoor)
+                    const inId = extractYouTubeId(currentSound.indoor)
+
+                    return (
+                      <div key={w.id} style={{ padding: '12px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8 }}>
+                        <div style={{ fontWeight: 600, fontSize: 12.5, color: 'var(--text-primary)', marginBottom: 8 }}>
+                          {w.label}
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          {/* Som Externo */}
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 10.5, color: 'var(--text-secondary)' }}>
+                              🌲 Ao Ar Livre (Ambiente Externo)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="https://www.youtube.com/watch?v=..."
+                              value={currentSound.outdoor || ''}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setTempWeatherSounds(prev => ({
+                                  ...prev,
+                                  [w.id]: {
+                                    ...(prev[w.id] || {}),
+                                    outdoor: val
+                                  }
+                                }))
+                              }}
+                              style={{ fontSize: 11, padding: '6px 8px' }}
+                            />
+                            {outId && (
+                              <span style={{ fontSize: 9.5, color: '#4ade80', marginTop: 2, display: 'block' }}>
+                                ✓ ID: {outId}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Som Interno */}
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 10.5, color: 'var(--text-secondary)' }}>
+                              🏠 De Dentro da Casa (Ambiente Interno)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="https://www.youtube.com/watch?v=..."
+                              value={currentSound.indoor || ''}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setTempWeatherSounds(prev => ({
+                                  ...prev,
+                                  [w.id]: {
+                                    ...(prev[w.id] || {}),
+                                    indoor: val
+                                  }
+                                }))
+                              }}
+                              style={{ fontSize: 11, padding: '6px 8px' }}
+                            />
+                            {inId && (
+                              <span style={{ fontSize: 9.5, color: '#4ade80', marginTop: 2, display: 'block' }}>
+                                ✓ ID: {inId}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
               <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
                 <input
                   type="checkbox"
@@ -2189,12 +2294,36 @@ export default function Admin() {
                   <input type="url" placeholder="https://exemplo.com/imagem.jpg" value={locForm.backgroundImage} onChange={(e) => setLocForm(prev => ({ ...prev, backgroundImage: e.target.value }))} />
                 </div>
 
+                {/* SOM ESPECÍFICO DESTE LUGAR (YOUTUBE) */}
+                <div className="form-group" style={{ background: 'rgba(96, 165, 250, 0.05)', border: '1px solid rgba(96, 165, 250, 0.2)', padding: '10px 12px', borderRadius: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label style={{ margin: 0, fontSize: 11, color: '#93c5fd', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>📻</span> Som Específico Deste Lugar (YouTube - Opcional)
+                    </label>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                      Toca junto com o clima ambiente
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ex: https://www.youtube.com/watch?v=... (som de mercado, pessoas conversando, máquinas)"
+                    value={locForm.locationSound || ''}
+                    onChange={(e) => setLocForm(prev => ({ ...prev, locationSound: e.target.value }))}
+                    style={{ width: '100%', fontSize: 11, padding: '7px 10px' }}
+                  />
+                  {locForm.locationSound && extractYouTubeId(locForm.locationSound) && (
+                    <span style={{ fontSize: 10, color: '#4ade80', marginTop: 4, display: 'block' }}>
+                      ✓ ID do vídeo: {extractYouTubeId(locForm.locationSound)}
+                    </span>
+                  )}
+                </div>
+
                 <div className="form-group">
                   <label>Iframe do Chat xat.com</label>
                   <input type="text" placeholder="https://xat.com/embed/chat.php#id=..." value={locForm.xatIframe} onChange={(e) => setLocForm(prev => ({ ...prev, xatIframe: e.target.value }))} required />
                 </div>
 
-                <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '6px' }}>
+                <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <input
                       type="checkbox"
@@ -2206,7 +2335,23 @@ export default function Admin() {
                     <label htmlFor="isIndoor" style={{ margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontWeight: 600 }}>🏠 Ambiente Fechado (Interior / Sala Coberta)</span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        Se marcado, efeitos climáticos externos (como chuva, neve e tempestade) não caem dentro deste local.
+                        Se marcado, efeitos climáticos visuais externos não caem dentro deste local.
+                      </span>
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
+                    <input
+                      type="checkbox"
+                      id="disableWeatherSound"
+                      checked={locForm.disableWeatherSound}
+                      onChange={(e) => setLocForm(prev => ({ ...prev, disableWeatherSound: e.target.checked }))}
+                      style={{ width: 'auto', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="disableWeatherSound" style={{ margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: 600, color: '#f87171' }}>🔇 Silenciar / Desativar Som do Clima Deste Lugar</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        Se marcado, nenhum som de chuva, tempestade ou vento tocará nesta sala (ideal para bunkers subterrâneos, cofres ou salas que devem tocar apenas o som próprio).
                       </span>
                     </label>
                   </div>
