@@ -136,19 +136,16 @@ export default function HUD({ locationName }) {
 
         {/* Direita: botões de navegação */}
         <div className="hud-right">
-          <Link
-            to={`/location/${character?.currentLocation || 'sala-hospital'}`}
-            className={`hud-btn ${location.pathname.startsWith('/location') ? 'active' : ''}`}
-          >
-            <GameIcon name="rooms" size={16} className="hud-btn-icon" />
-          </Link>
-
-          <Link
-            to="/map"
-            className={`hud-btn ${location.pathname === '/map' ? 'active' : ''}`}
+          <button
+            type="button"
+            onClick={() => {
+              window.open('/map', '_blank', 'noopener,noreferrer')
+            }}
+            className={`hud-btn ${location.pathname.startsWith('/map') ? 'active' : ''}`}
+            title="Mapa (Abrir em Nova Guia)"
           >
             <GameIcon name="map" size={16} className="hud-btn-icon" />
-          </Link>
+          </button>
 
           <button
             type="button"

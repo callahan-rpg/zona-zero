@@ -16,6 +16,7 @@ import { COMBAT_STATUS_EFFECTS, MONSTER_TEMPLATES, ATTRIBUTE_ICONS } from '../ut
 import { uploadImageFree } from '../utils/imageUpload'
 import { DEFAULT_WEATHER_SOUNDS, extractYouTubeId } from '../utils/audioSystem'
 import GameIcon from '../components/GameIcon.jsx'
+import AdminMapEditor from '../components/AdminMapEditor.jsx'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -1294,6 +1295,9 @@ export default function Admin() {
             </button>
             <button className={`btn btn-sm ${activeTab === 'combat' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('combat')} style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: activeTab === 'combat' ? '#fff' : '#f87171' }}>
               ⚔️ Mesa de Combate {activeCombatData?.active && '🔴'}
+            </button>
+            <button className={`btn btn-sm ${activeTab === 'map_editor' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('map_editor')} style={{ borderColor: 'rgba(56, 189, 248, 0.4)', color: activeTab === 'map_editor' ? '#fff' : '#38bdf8', background: activeTab === 'map_editor' ? '#0284c7' : 'transparent' }}>
+              📍 Editor de Mapa
             </button>
           </div>
 
@@ -4108,6 +4112,11 @@ export default function Admin() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* CONTEÚDO DA TAB MAP_EDITOR: EDITOR VISUAL DE MAPA E PINS */}
+          {activeTab === 'map_editor' && (
+            <AdminMapEditor availableLocations={locations} />
           )}
         </div>
       </div>

@@ -123,6 +123,8 @@ export default function App() {
         <Route path="/combat" element={<ProtectedRoute><Combat /></ProtectedRoute>} />
         <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
         <Route path="/map" element={<ProtectedRoute><Map /></ProtectedRoute>} />
+        <Route path="/map/:region" element={<ProtectedRoute><Map /></ProtectedRoute>} />
+        <Route path="/map/:region/:city" element={<ProtectedRoute><Map /></ProtectedRoute>} />
         <Route path="/characters/:uid" element={<ProtectedRoute><PublicCharacter /></ProtectedRoute>} />
 
         {/* Redirecionamentos */}
