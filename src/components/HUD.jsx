@@ -108,9 +108,21 @@ export default function HUD({ locationName }) {
       <header className="hud">
         {/* Esquerda: logo + localização + clima dinâmico e interativo */}
         <div className="hud-left">
-          <Link to="/" className="hud-logo hud-logo-link" title="Ir para a Home do RPG">
-            ZONA ZERO
-          </Link>
+          {location.pathname.startsWith('/location/') ? (
+            <a
+              href="/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hud-logo hud-logo-link"
+              title="Ir para a Home do RPG (nova aba)"
+            >
+              ZONA ZERO
+            </a>
+          ) : (
+            <Link to="/" className="hud-logo hud-logo-link" title="Ir para a Home do RPG">
+              ZONA ZERO
+            </Link>
+          )}
           {locationName && (
             <span className="hud-location-name">{locationName}</span>
           )}
