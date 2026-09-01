@@ -60,6 +60,50 @@ export default function Admin() {
   const [tempMaintenance, setTempMaintenance] = useState(false)
   const [globalMsg, setGlobalMsg] = useState('')
 
+  // ==========================================
+  // TAB HOME: PAINEL DE CUSTOMIZAÇÃO DA HOME
+  // ==========================================
+  const [homeConfig, setHomeConfig] = useState({
+    titleText: 'ZO\nNA\nZE\nRO',
+    subtitleText: 'PROTOCOL DE SOBREVIVÊNCIA & IMERSÃO PÓS-APOCALÍPTICA',
+    fontFamily: "'Oswald', sans-serif",
+    slides: [
+      {
+        id: 'slide_1',
+        number: '01',
+        badge: '01 / AMBIENTAÇÃO',
+        title: 'VAREZHIA EM RUÍNAS',
+        tagline: 'Território sob Quarentena Militar',
+        description: 'Uma nação devastada de 43.000 km². Cidades fantasmas, laboratórios sob escombros e uma infecção em constante mutação.',
+        imageUrl: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1920&q=80',
+        actionType: 'lore'
+      }
+    ],
+    loreText: '',
+    rulesText: ''
+  })
+  const [uploadingSlideImgIndex, setUploadingSlideImgIndex] = useState(null)
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'home_config', 'global'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data()
+        setHomeConfig(prev => ({ ...prev, ...data }))
+      }
+    })
+    return unsub
+  }, [])
+
+  async function saveHomeConfig(e) {
+    if (e) e.preventDefault()
+    try {
+      await setDoc(doc(db, 'home_config', 'global'), homeConfig, { merge: true })
+      alert('Configuração da Home salva com sucesso!')
+    } catch (err) {
+      alert('Erro ao salvar configuração da Home: ' + err.message)
+    }
+  }
+
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'game_config', 'global'), (snap) => {
       if (snap.exists()) {
@@ -1278,6 +1322,9 @@ export default function Admin() {
             <button className={`btn btn-sm ${activeTab === 'config' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('config')}>
               🌍 Tempo & Clima Global
             </button>
+            <button className={`btn btn-sm ${activeTab === 'home' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('home')} style={{ borderColor: 'rgba(168, 85, 247, 0.4)', color: activeTab === 'home' ? '#fff' : '#c084fc', background: activeTab === 'home' ? '#9333ea' : 'transparent' }}>
+              🏠 Customizar Home
+            </button>
             <button className={`btn btn-sm ${activeTab === 'catalog' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('catalog')}>
               🗃️ Catálogo de Itens ({catalogItems.length})
             </button>
@@ -1301,6 +1348,297 @@ export default function Admin() {
             </button>
           </div>
 
+
+          {/* CONTEÚDO DA TAB HOME: CUSTOMIZAÇÃO DA HOME & SLIDES */}
+          {activeTab === 'home' && (
+            <form onSubmit={saveHomeConfig} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: 16, textTransform: 'uppercase', color: '#c084fc', margin: 0 }}>
+                  🏠 Personalização Visual & Conteúdo da Home
+                </h3>
+                <button type="submit" className="btn btn-primary">
+                  💾 Salvar Alterações da Home
+                </button>
+              </div>
+
+              {/* Seção 1: Identidade Visual e Tipografia */}
+              <div className="glass-light" style={{ padding: 20, borderRadius: 12 }}>
+                <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 14 }}>
+                  🎨 Identidade e Tipografia do Titular
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="form-group">
+                    <label>Fonte do Título Grande</label>
+                    <select
+                      value={homeConfig.fontFamily || "'Oswald', sans-serif"}
+                      onChange={e => setHomeConfig(prev => ({ ...prev, fontFamily: e.target.value }))}
+                    >
+                      <option value="'Oswald', sans-serif">Oswald (Industrial / Impacto)</option>
+                      <option value="'Inter', sans-serif">Inter (Moderno / Minimalista)</option>
+                      <option value="'Share Tech Mono', monospace">Share Tech Mono (Militar / Hacker)</option>
+                      <option value="'Playfair Display', serif">Playfair Display (Editorial / Luxo)</option>
+                      <option value="'Cinzel', serif">Cinzel (Clássico / Épico)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Subtítulo do Hero</label>
+                    <input
+                      type="text"
+                      value={homeConfig.subtitleText || ''}
+                      onChange={e => setHomeConfig(prev => ({ ...prev, subtitleText: e.target.value }))}
+                      placeholder="Ex: PROTOCOLO DE SOBREVIVÊNCIA..."
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginTop: 12 }}>
+                  <label>Texto do Título Principal (Use quebras de linha para formatar em colunas/linhas)</label>
+                  <textarea
+                    rows={4}
+                    value={homeConfig.titleText || ''}
+                    onChange={e => setHomeConfig(prev => ({ ...prev, titleText: e.target.value }))}
+                    placeholder="ZO&#10;NA&#10;ZE&#10;RO"
+                    style={{
+                      width: '100%',
+                      padding: 10,
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: 8,
+                      color: '#fff',
+                      fontFamily: homeConfig.fontFamily || 'monospace',
+                      fontSize: 16
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Seção 2: Gerenciador de Slides / Carrossel Flutuante */}
+              <div className="glass-light" style={{ padding: 20, borderRadius: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: 'var(--accent)', margin: 0 }}>
+                    🖼️ Carrossel & Slides de Destaque ({homeConfig.slides?.length || 0})
+                  </h4>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    onClick={() => {
+                      const newSlide = {
+                        id: 'slide_' + Date.now(),
+                        number: `0${(homeConfig.slides?.length || 0) + 1}`,
+                        badge: `0${(homeConfig.slides?.length || 0) + 1} / NOVO DESTAQUE`,
+                        title: 'NOVO SLIDE',
+                        tagline: 'Subtítulo descritivo',
+                        description: 'Descrição detalhada sobre o setor ou mecânica.',
+                        imageUrl: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1920&q=80',
+                        actionType: 'lore'
+                      }
+                      setHomeConfig(prev => ({ ...prev, slides: [...(prev.slides || []), newSlide] }))
+                    }}
+                  >
+                    ➕ Adicionar Slide
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {(homeConfig.slides || []).map((slide, index) => (
+                    <div
+                      key={slide.id || index}
+                      style={{
+                        padding: 16,
+                        background: 'rgba(0,0,0,0.4)',
+                        border: '1px solid var(--glass-border)',
+                        borderRadius: 10,
+                        display: 'grid',
+                        gridTemplateColumns: '120px 1fr 40px',
+                        gap: 16,
+                        alignItems: 'center'
+                      }}
+                    >
+                      {/* Thumbnail & Upload */}
+                      <div style={{ position: 'relative' }}>
+                        <img
+                          src={slide.imageUrl}
+                          alt={slide.title}
+                          style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}
+                        />
+                        <label
+                          style={{
+                            marginTop: 4,
+                            fontSize: 10,
+                            display: 'block',
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            color: '#38bdf8',
+                            background: 'rgba(56,189,248,0.1)',
+                            padding: '3px 0',
+                            borderRadius: 4
+                          }}
+                        >
+                          {uploadingSlideImgIndex === index ? 'Enviando...' : '📷 Trocar Foto'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={async (e) => {
+                              const file = e.target.files[0]
+                              if (!file) return
+                              try {
+                                setUploadingSlideImgIndex(index)
+                                const url = await uploadImageFree(file)
+                                const updated = [...homeConfig.slides]
+                                updated[index].imageUrl = url
+                                setHomeConfig(prev => ({ ...prev, slides: updated }))
+                              } catch (err) {
+                                alert('Erro upload: ' + err.message)
+                              } finally {
+                                setUploadingSlideImgIndex(null)
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Campos do Slide */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div>
+                          <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>Título do Slide</label>
+                          <input
+                            type="text"
+                            value={slide.title || ''}
+                            style={{ padding: '6px 10px', fontSize: 12 }}
+                            onChange={e => {
+                              const updated = [...homeConfig.slides]
+                              updated[index].title = e.target.value
+                              setHomeConfig(prev => ({ ...prev, slides: updated }))
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>Badge / Etiqueta Topo</label>
+                          <input
+                            type="text"
+                            value={slide.badge || ''}
+                            style={{ padding: '6px 10px', fontSize: 12 }}
+                            onChange={e => {
+                              const updated = [...homeConfig.slides]
+                              updated[index].badge = e.target.value
+                              setHomeConfig(prev => ({ ...prev, slides: updated }))
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>Subtítulo / Tagline</label>
+                          <input
+                            type="text"
+                            value={slide.tagline || ''}
+                            style={{ padding: '6px 10px', fontSize: 12 }}
+                            onChange={e => {
+                              const updated = [...homeConfig.slides]
+                              updated[index].tagline = e.target.value
+                              setHomeConfig(prev => ({ ...prev, slides: updated }))
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>Ação do Botão</label>
+                          <select
+                            value={slide.actionType || 'lore'}
+                            style={{ padding: '6px 10px', fontSize: 12 }}
+                            onChange={e => {
+                              const updated = [...homeConfig.slides]
+                              updated[index].actionType = e.target.value
+                              setHomeConfig(prev => ({ ...prev, slides: updated }))
+                            }}
+                          >
+                            <option value="lore">📜 Abrir História (Lore)</option>
+                            <option value="rules">⚖️ Abrir Regras</option>
+                            <option value="login">🔑 Ir para Login / Entrar</option>
+                          </select>
+                        </div>
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>Descrição do Card</label>
+                          <input
+                            type="text"
+                            value={slide.description || ''}
+                            style={{ padding: '6px 10px', fontSize: 12 }}
+                            onChange={e => {
+                              const updated = [...homeConfig.slides]
+                              updated[index].description = e.target.value
+                              setHomeConfig(prev => ({ ...prev, slides: updated }))
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Botão Deletar */}
+                      <div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger"
+                          title="Remover Slide"
+                          onClick={() => {
+                            if (homeConfig.slides.length <= 1) return alert('Mantenha pelo menos 1 slide.')
+                            const updated = homeConfig.slides.filter((_, i) => i !== index)
+                            setHomeConfig(prev => ({ ...prev, slides: updated }))
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Seção 3: Textos dos Modais (História e Regras) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="glass-light" style={{ padding: 20, borderRadius: 12 }}>
+                  <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>
+                    📜 História do Jogo (Lore Completa)
+                  </h4>
+                  <textarea
+                    rows={8}
+                    value={homeConfig.loreText || ''}
+                    onChange={e => setHomeConfig(prev => ({ ...prev, loreText: e.target.value }))}
+                    placeholder="Escreva a lore do jogo..."
+                    style={{
+                      width: '100%',
+                      padding: 10,
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: 8,
+                      color: '#fff',
+                      fontSize: 13,
+                      lineHeight: 1.5
+                    }}
+                  />
+                </div>
+
+                <div className="glass-light" style={{ padding: 20, borderRadius: 12 }}>
+                  <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>
+                    ⚖️ Regras do RPG
+                  </h4>
+                  <textarea
+                    rows={8}
+                    value={homeConfig.rulesText || ''}
+                    onChange={e => setHomeConfig(prev => ({ ...prev, rulesText: e.target.value }))}
+                    placeholder="Escreva as diretrizes e regras..."
+                    style={{
+                      width: '100%',
+                      padding: 10,
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: 8,
+                      color: '#fff',
+                      fontSize: 13,
+                      lineHeight: 1.5
+                    }}
+                  />
+                </div>
+              </div>
+            </form>
+          )}
 
           {/* CONTEÚDO DA TAB CATALOG: CATÁLOGO GERAL DE ITENS & COLEÇÕES DE PRESETS DE LOOT */}
           {activeTab === 'catalog' && (

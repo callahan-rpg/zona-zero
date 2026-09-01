@@ -40,12 +40,27 @@ import {
   Unlock,
   Sparkles,
   Award,
-  AlertTriangle
+  AlertTriangle,
+  Home,
+  BookOpen,
+  Scroll,
+  Scale,
+  User,
+  LogIn,
+  ChevronLeft
 } from 'lucide-react'
 
 // Mapeamento dos nomes mais usados no RPG para ícones vetoriais do Lucide
 const ICON_MAP = {
   // Navegação e HUD
+  home: Home,
+  book: BookOpen,
+  scroll: Scroll,
+  lore: BookOpen,
+  rules: Scale,
+  user: User,
+  login: LogIn,
+  arrowLeft: ChevronLeft,
   rooms: MapPin,
   location: MapPin,
   map: Map,

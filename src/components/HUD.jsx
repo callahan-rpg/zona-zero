@@ -108,7 +108,9 @@ export default function HUD({ locationName }) {
       <header className="hud">
         {/* Esquerda: logo + localização + clima dinâmico e interativo */}
         <div className="hud-left">
-          <span className="hud-logo">ZONA ZERO</span>
+          <Link to="/" className="hud-logo hud-logo-link" title="Ir para a Home do RPG">
+            ZONA ZERO
+          </Link>
           {locationName && (
             <span className="hud-location-name">{locationName}</span>
           )}

@@ -5,6 +5,7 @@ import { db } from './firebase/config'
 import { useAuth } from './contexts/AuthContext.jsx'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
+import Home from './pages/Home.jsx'
 import Location from './pages/Location.jsx'
 import Character from './pages/Character.jsx'
 import Characters from './pages/Characters.jsx'
@@ -48,13 +49,20 @@ function GlobalAmbientSound() {
   const [locationSoundUrl, setLocationSoundUrl] = useState('')
   const [disableWeatherSound, setDisableWeatherSound] = useState(false)
 
-  // 1. Escuta configuração climática global em tempo real
+  // 1. Escuta configuração climática global em tempo real apenas se logado
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'game_config', 'global'), (snap) => {
-      if (snap.exists()) setGameConfig(snap.data())
-    })
+    if (!user) return
+    const unsub = onSnapshot(
+      doc(db, 'game_config', 'global'),
+      (snap) => {
+        if (snap.exists()) setGameConfig(snap.data())
+      },
+      (err) => {
+        console.warn('Aviso som ambiente game_config:', err)
+      }
+    )
     return unsub
-  }, [])
+  }, [user])
 
   // 2. Extrai o slug do local da rota atual e busca se é Indoor, se tem som específico da sala e se o clima é silenciado
   useEffect(() => {
@@ -113,6 +121,7 @@ export default function App() {
 
       <Routes>
         {/* Rotas públicas */}
+        <Route path="/" element={<Home />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
@@ -128,8 +137,7 @@ export default function App() {
         <Route path="/characters/:uid" element={<ProtectedRoute><PublicCharacter /></ProtectedRoute>} />
 
         {/* Redirecionamentos */}
-        <Route path="/" element={<Navigate to="/location/sala-hospital" replace />} />
-        <Route path="*" element={<Navigate to="/location/sala-hospital" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )
