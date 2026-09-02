@@ -1,14 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { getVitalsDebuffs, getMaxHp } from '../utils/itemSystem'
-
-const ATTRIBUTES = [
-  { key: 'forca',        label: 'Força',        icon: '💪' },
-  { key: 'destreza',     label: 'Destreza',     icon: '🏃' },
-  { key: 'sabedoria',    label: 'Sabedoria',    icon: '🧠' },
-  { key: 'carisma',      label: 'Carisma',      icon: '🗣️' },
-  { key: 'constituicao', label: 'Constituição', icon: '🛡️' },
-]
+import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
+import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
 
 function xpForNextLevel(level) {
   return (level || 1) * 100
@@ -105,7 +99,24 @@ export default function CharacterPopup({ onClose }) {
 
           <div className="character-float-info">
             <h4 className="character-float-name">{character.name}</h4>
-            <span className="character-float-age">{character.age || '??'} anos · Sobrevivente</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', margin: '2px 0 4px' }}>
+              <span className="character-float-age">{character.age || '??'} anos</span>
+              {(() => {
+                const profId = character.profession?.id || (typeof character.profession === 'string' ? character.profession : null)
+                const specId = character.specialty?.id || (typeof character.specialty === 'string' ? character.specialty : null)
+                const profData = getProfessionData(profId) || character.profession
+                const specData = getSpecialtyData(profId, specId) || character.specialty
+
+                if (profData?.name || specData?.name) {
+                  return (
+                    <span style={{ fontSize: 10.5, color: 'var(--accent-yellow)', background: 'rgba(234, 179, 8, 0.15)', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                      {profData?.icon || '🪖'} {profData?.name || 'Profissão'} {specData?.name ? `· ${specData.icon || '⭐'} ${specData.name}` : ''}
+                    </span>
+                  )
+                }
+                return <span className="character-float-age">· Sobrevivente</span>
+              })()}
+            </div>
 
             <div className="character-float-xp-box">
               <div className="character-float-xp-label">
@@ -217,38 +228,117 @@ export default function CharacterPopup({ onClose }) {
         {/* Atributos */}
         <div className="character-float-attr-section">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <div className="character-float-section-title" style={{ margin: 0 }}>Atributos Principais</div>
+            <div className="character-float-section-title" style={{ margin: 0 }}>Atributos Principais (8)</div>
             {debuffInfo.hasDebuff && (
               <span style={{ fontSize: 9, color: '#f87171', fontWeight: 'bold', background: 'rgba(239, 68, 68, 0.15)', padding: '1px 5px', borderRadius: 4 }}>
                 ⚠️ Debuff
               </span>
             )}
           </div>
-          <div className="character-float-attributes-grid">
-            {ATTRIBUTES.map(({ key, label, icon }) => {
-              const baseVal = character.attributes?.[key] ?? 1
-              const penalty = debuffInfo.penalties[key] || 0
-              const effectiveVal = Math.max(1, baseVal + penalty)
-              const isDebuffed = penalty < 0
+          {(() => {
+            const profId = character.profession?.id || (typeof character.profession === 'string' ? character.profession : null)
+            const specId = character.specialty?.id || (typeof character.specialty === 'string' ? character.specialty : null)
+            const baseAttrs = character.baseAttributes || character.attributes || {}
+            const traitModifiers = calculateTraitModifiers(character.traits || [])
+            const detailedAttrs = getDetailedAttributes(baseAttrs, profId, specId, debuffInfo.penalties, traitModifiers)
 
-              return (
-                <div key={key} className={`character-float-attr-card ${isDebuffed ? 'attr-debuffed' : ''}`} title={isDebuffed ? `${label}: ${baseVal} (${penalty} por Fome/Sede)` : `${label}: ${baseVal}`}>
-                  <span className="character-float-attr-icon">{icon}</span>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                    <span className="character-float-attr-val" style={{ color: isDebuffed ? '#f87171' : 'inherit' }}>
-                      {effectiveVal}
+            return (
+              <div className="character-float-attributes-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                {detailedAttrs.map((attr) => {
+                  const isDebuffed = attr.isDebuffed
+                  const hasBonus = attr.totalBonus > 0
+                  const tooltip = `${attr.label}: ${attr.total} (Base: ${attr.base}${attr.profBonus ? ` | Prof: +${attr.profBonus}` : ''}${attr.specBonus ? ` | Spec: +${attr.specBonus}` : ''}${attr.traitBonus ? ` | Traço: ${attr.traitBonus > 0 ? `+${attr.traitBonus}` : attr.traitBonus}` : ''}${attr.penalty ? ` | Debuff: ${attr.penalty}` : ''})`
+
+                  return (
+                    <div
+                      key={attr.key}
+                      className={`character-float-attr-card ${isDebuffed ? 'attr-debuffed' : ''}`}
+                      title={tooltip}
+                      style={{
+                        border: hasBonus && !isDebuffed ? '1px solid rgba(74,222,128,0.3)' : undefined
+                      }}
+                    >
+                      <span className="character-float-attr-icon">{attr.icon}</span>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                        <span
+                          className="character-float-attr-val"
+                          style={{
+                            color: isDebuffed ? '#f87171' : hasBonus ? '#4ade80' : 'inherit'
+                          }}
+                        >
+                          {attr.total}
+                        </span>
+                        {hasBonus && !isDebuffed && (
+                          <span style={{ fontSize: 8, color: '#4ade80', fontWeight: 'bold' }}>
+                            (+{attr.totalBonus})
+                          </span>
+                        )}
+                        {isDebuffed && (
+                          <span style={{ fontSize: 8, color: '#ef4444', fontWeight: 'bold' }}>
+                            ({attr.penalty})
+                          </span>
+                        )}
+                      </div>
+                      <span className="character-float-attr-lbl" style={{ fontSize: 9.5 }}>{attr.label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+
+          {/* Traços e Vantagens/Desvantagens do Personagem */}
+          {((character.traits && character.traits.length > 0) || (character.perks && character.perks.length > 0)) && (
+            <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize: 9.5, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, marginBottom: 4 }}>
+                Traços & Vantagens
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {(character.traits || []).map(tId => {
+                  const t = TRAITS[tId]
+                  if (!t) return null
+                  const isPos = t.type === 'positive'
+                  return (
+                    <span
+                      key={tId}
+                      title={`${t.name}: ${t.summary} (${t.description})`}
+                      style={{
+                        fontSize: 9,
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        background: isPos ? 'rgba(74,222,128,0.15)' : 'rgba(239,68,68,0.15)',
+                        color: isPos ? '#4ade80' : '#f87171',
+                        border: `1px solid ${isPos ? 'rgba(74,222,128,0.3)' : 'rgba(239,68,68,0.3)'}`
+                      }}
+                    >
+                      {t.icon} {t.name} ({t.summary})
                     </span>
-                    {isDebuffed && (
-                      <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 'bold' }}>
-                        ({penalty})
-                      </span>
-                    )}
-                  </div>
-                  <span className="character-float-attr-lbl">{label}</span>
-                </div>
-              )
-            })}
-          </div>
+                  )
+                })}
+                {(character.perks || []).map(pId => {
+                  const p = PERKS[pId]
+                  if (!p) return null
+                  const isPos = p.type === 'positive'
+                  return (
+                    <span
+                      key={pId}
+                      title={`${p.name}: ${p.summary} (${p.description})`}
+                      style={{
+                        fontSize: 9,
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        background: isPos ? 'rgba(56,189,248,0.15)' : 'rgba(245,158,11,0.15)',
+                        color: isPos ? '#38bdf8' : '#fbbf24',
+                        border: `1px solid ${isPos ? 'rgba(56,189,248,0.3)' : 'rgba(245,158,11,0.3)'}`
+                      }}
+                    >
+                      {p.icon} {p.name}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Botão de Ação: Expandir Inventário */}

@@ -6,14 +6,8 @@ import HUD from '../components/HUD.jsx'
 import GameIcon from '../components/GameIcon.jsx'
 import { RARITY_META } from '../utils/itemSystem'
 import { getItemCategory, INVENTORY_CATEGORIES } from './Character.jsx'
-
-const ATTRIBUTES = [
-  { key: 'forca',        label: 'Força',        icon: '💪' },
-  { key: 'destreza',     label: 'Destreza',     icon: '🏃' },
-  { key: 'sabedoria',    label: 'Sabedoria',     icon: '🧠' },
-  { key: 'carisma',      label: 'Carisma',       icon: '🗣️' },
-  { key: 'constituicao', label: 'Constituição',  icon: '🛡️' },
-]
+import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
+import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
 
 const CATEGORY_LABELS = {
   general:   { label: 'Item Geral',        color: 'var(--text-muted)' },
@@ -172,7 +166,9 @@ export default function PublicCharacter() {
 
               <div className="character-info">
                 <div className="character-name">{character.name}</div>
-                <div className="character-age">{character.age || '??'} anos · Sobrevivente</div>
+                <div className="character-age">
+                  {character.age || '??'} anos · {character.profession?.name || 'Sobrevivente'}
+                </div>
 
                 <div className="xp-bar-container">
                   <div className="xp-bar-label">
@@ -186,18 +182,154 @@ export default function PublicCharacter() {
               </div>
             </div>
 
+            {/* Banner / Card de Profissão & Especialização */}
+            {(() => {
+              const profId = character.profession?.id || (typeof character.profession === 'string' ? character.profession : null)
+              const specId = character.specialty?.id || (typeof character.specialty === 'string' ? character.specialty : null)
+              const profData = getProfessionData(profId) || character.profession
+              const specData = getSpecialtyData(profId, specId) || character.specialty
+
+              if (!profData && !specData) return null
+
+              return (
+                <div style={{ marginBottom: 18, background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 8, border: '1px solid var(--glass-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 18 }}>{profData?.icon || '🪖'}</span>
+                      <strong style={{ fontSize: 13, color: 'var(--accent)' }}>{profData?.name || 'Profissão'}</strong>
+                      {specData?.name && (
+                        <>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>▸</span>
+                          <span style={{ fontSize: 18 }}>{specData?.icon || '⭐'}</span>
+                          <strong style={{ fontSize: 13, color: '#f59e0b' }}>{specData?.name}</strong>
+                        </>
+                      )}
+                    </div>
+                    {(profData?.bonusSummary || specData?.bonusSummary) && (
+                      <span style={{ fontSize: 10, color: '#4ade80', background: 'rgba(74,222,128,0.12)', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
+                        {[profData?.bonusSummary, specData?.bonusSummary].filter(Boolean).join(' | ')}
+                      </span>
+                    )}
+                  </div>
+
+                  {specData?.proficiency && (
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                      <strong style={{ color: 'var(--accent-yellow)' }}>Proficiência:</strong> {specData.proficiency}
+                    </div>
+                  )}
+
+                  {Array.isArray(specData?.abilities) && specData.abilities.length > 0 && (
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6, marginTop: 4 }}>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 2 }}>Capacidades Especiais:</span>
+                      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 10.5, color: 'var(--text-secondary)', lineHeight: 1.35 }}>
+                        {specData.abilities.map((ab, i) => (
+                          <li key={i}>{ab}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* Atributos */}
             <div className="character-attributes">
-              <p className="section-title">Atributos de Sobrevivência</p>
-              <div className="attributes-grid">
-                {ATTRIBUTES.map(({ key, label, icon }) => (
-                  <div className="attr-card" key={key}>
-                    <span className="attr-icon">{icon}</span>
-                    <span className="attr-value">{character.attributes?.[key] ?? 1}</span>
-                    <span className="attr-name">{label}</span>
+              <p className="section-title">Atributos de Sobrevivência (8)</p>
+              {(() => {
+                const profId = character.profession?.id || (typeof character.profession === 'string' ? character.profession : null)
+                const specId = character.specialty?.id || (typeof character.specialty === 'string' ? character.specialty : null)
+                const baseAttrs = character.baseAttributes || character.attributes || {}
+                const traitModifiers = calculateTraitModifiers(character.traits || [])
+                const detailedAttrs = getDetailedAttributes(baseAttrs, profId, specId, {}, traitModifiers)
+
+                return (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                      {detailedAttrs.map((attr) => {
+                        const hasBonus = attr.totalBonus > 0
+                        const isDebuffed = attr.isDebuffed
+                        const tooltipText = `Atributo: ${attr.label}\nTotal: ${attr.total}\nBase: ${attr.base}${attr.profBonus ? `\nProfissão: +${attr.profBonus}` : ''}${attr.specBonus ? `\nEspecialidade: +${attr.specBonus}` : ''}${attr.traitBonus ? `\nTraço: ${attr.traitBonus > 0 ? `+${attr.traitBonus}` : attr.traitBonus}` : ''}`
+
+                        return (
+                          <div
+                            className={`character-float-attr-card ${isDebuffed ? 'attr-debuffed' : ''}`}
+                            key={attr.key}
+                            title={tooltipText}
+                            style={{ border: hasBonus && !isDebuffed ? '1px solid rgba(74,222,128,0.3)' : undefined }}
+                          >
+                            <span className="character-float-attr-icon">{attr.icon}</span>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                              <span className="character-float-attr-val" style={{ color: isDebuffed ? '#f87171' : hasBonus ? '#4ade80' : 'inherit' }}>
+                                {attr.total}
+                              </span>
+                              {hasBonus && !isDebuffed && (
+                                <span style={{ fontSize: 8, color: '#4ade80', fontWeight: 'bold' }}>(+{attr.totalBonus})</span>
+                              )}
+                              {isDebuffed && (
+                                <span style={{ fontSize: 8, color: '#ef4444', fontWeight: 'bold' }}>({attr.penalty})</span>
+                              )}
+                            </div>
+                            <span className="character-float-attr-lbl" style={{ fontSize: 9.5 }}>{attr.label}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Traços e Vantagens */}
+                    {((character.traits && character.traits.length > 0) || (character.perks && character.perks.length > 0)) && (
+                      <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                        <span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: 4 }}>
+                          Traços & Vantagens / Desvantagens:
+                        </span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {(character.traits || []).map(tId => {
+                            const t = TRAITS[tId]
+                            if (!t) return null
+                            const isPos = t.type === 'positive'
+                            return (
+                              <span
+                                key={tId}
+                                title={`${t.name}: ${t.summary}`}
+                                style={{
+                                  fontSize: 9.5,
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  background: isPos ? 'rgba(74,222,128,0.15)' : 'rgba(239,68,68,0.15)',
+                                  color: isPos ? '#4ade80' : '#f87171',
+                                  border: `1px solid ${isPos ? 'rgba(74,222,128,0.3)' : 'rgba(239,68,68,0.3)'}`
+                                }}
+                              >
+                                {t.icon} {t.name} ({t.summary})
+                              </span>
+                            )
+                          })}
+                          {(character.perks || []).map(pId => {
+                            const p = PERKS[pId]
+                            if (!p) return null
+                            const isPos = p.type === 'positive'
+                            return (
+                              <span
+                                key={pId}
+                                title={`${p.name}: ${p.summary}`}
+                                style={{
+                                  fontSize: 9.5,
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  background: isPos ? 'rgba(56,189,248,0.15)' : 'rgba(245,158,11,0.15)',
+                                  color: isPos ? '#38bdf8' : '#fbbf24',
+                                  border: `1px solid ${isPos ? 'rgba(56,189,248,0.3)' : 'rgba(245,158,11,0.3)'}`
+                                }}
+                              >
+                                {p.icon} {p.name}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                )
+              })()}
             </div>
           </div>
 

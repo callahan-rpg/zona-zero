@@ -73,17 +73,21 @@ export const MONSTER_TEMPLATES = [
 ]
 
 export const ATTRIBUTE_ICONS = {
-  forca: { label: 'FOR', icon: '💪', color: '#f87171' },
-  destreza: { label: 'DES', icon: '🏃', color: '#fbbf24' },
-  sabedoria: { label: 'SAB', icon: '🧠', color: '#60a5fa' },
-  carisma: { label: 'CAR', icon: '🗣️', color: '#c084fc' },
-  constituicao: { label: 'CON', icon: '🛡️', color: '#34d399' }
+  forca: { label: 'FOR', icon: '💪', color: '#ef4444' },
+  destreza: { label: 'DES', icon: '🎯', color: '#f59e0b' },
+  agilidade: { label: 'AGI', icon: '⚡', color: '#eab308' },
+  sabedoria: { label: 'SAB', icon: '🧠', color: '#3b82f6' },
+  percepcao: { label: 'PER', icon: '👁️', color: '#06b6d4' },
+  inteligencia: { label: 'INT', icon: '🔬', color: '#a855f7' },
+  carisma: { label: 'CAR', icon: '🗣️', color: '#ec4899' },
+  constituicao: { label: 'CON', icon: '🛡️', color: '#10b981' }
 }
 
 /**
- * Retorna o HP máximo com a regra: 50 + (CON * 10)
+ * Retorna o HP máximo com a regra: 100 + (CON * 5)
+ * Exemplo: 4 de constituição = 120 HP
  */
 export function calculateMaxHp(constituicao = 0) {
   const con = Number(constituicao) || 0
-  return 50 + (con * 10)
+  return 100 + (con * 5)
 }

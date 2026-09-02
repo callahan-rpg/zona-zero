@@ -15,6 +15,8 @@ import { RARITY_META, DEFAULT_PRESET_ITEMS, SUPPLY_RARITIES, UNIQUE_RARITIES, ge
 import { COMBAT_STATUS_EFFECTS, MONSTER_TEMPLATES, ATTRIBUTE_ICONS } from '../utils/combatSystem'
 import { uploadImageFree } from '../utils/imageUpload'
 import { DEFAULT_WEATHER_SOUNDS, extractYouTubeId } from '../utils/audioSystem'
+import { PROFESSIONS, ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getStarterItems, calculateProfessionBonuses } from '../utils/professionSystem'
+import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
 import GameIcon from '../components/GameIcon.jsx'
 import AdminMapEditor from '../components/AdminMapEditor.jsx'
 
@@ -459,6 +461,7 @@ export default function Admin() {
       disableWeatherSound: !!loc.disableWeatherSound,
       xatIframe: loc.xatIframe || '',
       isIndoor: !!loc.isIndoor,
+      isSpawnPoint: !!loc.isSpawnPoint,
       lootEnabled: loc.loot?.enabled !== false,
       cooldownMinutes: loc.loot?.cooldownMinutes || 30,
       emptyChance: loc.loot?.emptyChance || 0.25,
@@ -482,6 +485,7 @@ export default function Admin() {
       disableWeatherSound: false,
       xatIframe: '',
       isIndoor: false,
+      isSpawnPoint: false,
       lootEnabled: true,
       cooldownMinutes: 30,
       emptyChance: 0.25,
@@ -516,6 +520,7 @@ export default function Admin() {
       disableWeatherSound: !!locForm.disableWeatherSound,
       xatIframe: locForm.xatIframe.trim(),
       isIndoor: !!locForm.isIndoor,
+      isSpawnPoint: !!locForm.isSpawnPoint,
       loot: {
         enabled: locForm.lootEnabled,
         cooldownMinutes: Number(locForm.cooldownMinutes),
@@ -893,6 +898,45 @@ export default function Admin() {
     }
   }
 
+  // Exclui a ficha e todos os dados do jogador do banco de dados
+  async function handleDeletePlayer(player) {
+    if (!player) return
+    const charName = player.character?.name || player.email || 'este jogador'
+    const confirmMsg = `⚠️ ATENÇÃO: Deseja realmente EXCLUIR DEFINITIVAMENTE a ficha de "${charName}"?\n\nEsta ação apagará todos os dados, atributos, itens e progresso do personagem no banco de dados. Esta ação é irreversível!`
+    
+    if (!confirm(confirmMsg)) return
+
+    try {
+      // 1. Se o jogador tiver reivindicado uma ficha pré-pronta, libera ela de volta
+      const preMadeId = player.character?.preMadeSheetId
+      if (preMadeId) {
+        try {
+          await updateDoc(doc(db, 'pre_made_sheets', preMadeId), {
+            available: true,
+            claimedBy: null,
+            claimedByName: null,
+            claimedAt: null,
+          })
+        } catch (e) {
+          console.warn('Aviso ao liberar ficha pré-pronta:', e)
+        }
+      }
+
+      // 2. Apaga o documento do usuário no Firestore
+      await deleteDoc(doc(db, 'users', player.uid))
+
+      // 3. Limpa seleção caso o jogador excluído seja o atual
+      if (selectedPlayer?.uid === player.uid) {
+        setSelectedPlayer(null)
+      }
+
+      alert(`A ficha de "${charName}" foi excluída com sucesso do banco de dados!`)
+    } catch (err) {
+      console.error('Erro ao excluir jogador:', err)
+      alert('Erro ao excluir ficha do jogador: ' + err.message)
+    }
+  }
+
   // ==========================================
   // TAB SHOPS: GERENCIADOR DE LOJAS & ECONOMIA
   // ==========================================
@@ -917,6 +961,241 @@ export default function Admin() {
     })
     return unsub
   }, [])
+
+  // ==========================================
+  // TAB PREMADE: FICHAS PRÉ-PRONTAS
+  // ==========================================
+  const [preMadeSheets, setPreMadeSheets] = useState([])
+  const [editingSheetId, setEditingSheetId] = useState(null)
+  const [sheetForm, setSheetForm] = useState({
+    title: '',
+    defaultName: '',
+    age: 30,
+    avatarUrl: '',
+    backstory: '',
+    professionId: 'militar',
+    specialtyId: 'policial',
+    startingLocation: 'sala-hospital',
+    baseAttributes: {
+      forca: 3,
+      destreza: 2,
+      agilidade: 2,
+      sabedoria: 2,
+      percepcao: 2,
+      inteligencia: 2,
+      carisma: 1,
+      constituicao: 1,
+    },
+    available: true,
+  })
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'pre_made_sheets'), (snap) => {
+      setPreMadeSheets(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+    return unsub
+  }, [])
+
+  // ==========================================
+  // TAB STARTER_ITEMS: EQUIPAMENTOS INICIAIS POR PROFISSÃO
+  // ==========================================
+  const [customStarterConfig, setCustomStarterConfig] = useState({})
+  const [starterProfId, setStarterProfId] = useState('militar')
+  const [starterSpecId, setStarterSpecId] = useState('policial')
+  const [newStarterItem, setNewStarterItem] = useState({ itemId: '', name: '', icon: '📦', quantity: 1, rarity: 'common' })
+  const [starterCatalogSearch, setStarterCatalogSearch] = useState('')
+  const [starterCatalogCategory, setStarterCatalogCategory] = useState('all')
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'game_config', 'starter_items'), (snap) => {
+      if (snap.exists()) {
+        setCustomStarterConfig(snap.data().config || {})
+      }
+    })
+    return unsub
+  }, [])
+
+  const currentStarterKey = `${starterProfId}_${starterSpecId}`
+  const currentSpecStarterItems = customStarterConfig[currentStarterKey] !== undefined
+    ? customStarterConfig[currentStarterKey]
+    : (PROFESSIONS[starterProfId]?.specialties?.[starterSpecId]?.starterItems || [])
+
+  async function handleAddStarterItem() {
+    if (!newStarterItem.itemId || !newStarterItem.name) return alert('Selecione ou informe um item para adicionar')
+    const updatedList = [
+      ...currentSpecStarterItems,
+      {
+        itemId: newStarterItem.itemId,
+        name: newStarterItem.name,
+        icon: newStarterItem.icon || '📦',
+        quantity: Number(newStarterItem.quantity) || 1,
+        rarity: newStarterItem.rarity || 'common',
+        category: newStarterItem.category || 'general',
+      }
+    ]
+    const updatedConfig = { ...customStarterConfig, [currentStarterKey]: updatedList }
+    try {
+      await setDoc(doc(db, 'game_config', 'starter_items'), { config: updatedConfig }, { merge: true })
+      setCustomStarterConfig(updatedConfig)
+      setNewStarterItem({ itemId: '', name: '', icon: '📦', quantity: 1, rarity: 'common' })
+      alert('Item adicionado aos equipamentos iniciais da especialidade!')
+    } catch (err) {
+      alert('Erro ao salvar: ' + err.message)
+    }
+  }
+
+  async function handleRemoveStarterItem(idx) {
+    const updatedList = currentSpecStarterItems.filter((_, i) => i !== idx)
+    const updatedConfig = { ...customStarterConfig, [currentStarterKey]: updatedList }
+    try {
+      await setDoc(doc(db, 'game_config', 'starter_items'), { config: updatedConfig }, { merge: true })
+      setCustomStarterConfig(updatedConfig)
+    } catch (err) {
+      alert('Erro ao remover: ' + err.message)
+    }
+  }
+
+  async function handleUpdateStarterItemQty(idx, qty) {
+    const val = Math.max(1, Number(qty) || 1)
+    const updatedList = currentSpecStarterItems.map((item, i) => i === idx ? { ...item, quantity: val } : item)
+    const updatedConfig = { ...customStarterConfig, [currentStarterKey]: updatedList }
+    try {
+      await setDoc(doc(db, 'game_config', 'starter_items'), { config: updatedConfig }, { merge: true })
+      setCustomStarterConfig(updatedConfig)
+    } catch (err) {
+      alert('Erro ao atualizar: ' + err.message)
+    }
+  }
+
+  async function handleResetStarterItemsToDefault() {
+    if (!confirm('Deseja restaurar os itens iniciais padrão para esta especialização?')) return
+    const updatedConfig = { ...customStarterConfig }
+    delete updatedConfig[currentStarterKey]
+    try {
+      await setDoc(doc(db, 'game_config', 'starter_items'), { config: updatedConfig })
+      setCustomStarterConfig(updatedConfig)
+      alert('Equipamentos iniciais restaurados para o padrão original!')
+    } catch (err) {
+      alert('Erro ao restaurar: ' + err.message)
+    }
+  }
+
+  function resetSheetForm() {
+    setEditingSheetId(null)
+    setSheetForm({
+      title: '',
+      defaultName: '',
+      age: 30,
+      avatarUrl: '',
+      backstory: '',
+      professionId: 'militar',
+      specialtyId: 'policial',
+      startingLocation: 'sala-hospital',
+      baseAttributes: {
+        forca: 3,
+        destreza: 2,
+        agilidade: 2,
+        sabedoria: 2,
+        percepcao: 2,
+        inteligencia: 2,
+        carisma: 1,
+        constituicao: 1,
+      },
+      available: true,
+    })
+  }
+
+  async function handleSaveSheet(e) {
+    e.preventDefault()
+    if (!sheetForm.title.trim()) return alert('Informe um título/arquétipo para a ficha')
+    if (!sheetForm.defaultName.trim()) return alert('Informe o nome padrão do personagem')
+
+    const prof = PROFESSIONS[sheetForm.professionId] || PROFESSIONS.militar
+    const spec = prof.specialties?.[sheetForm.specialtyId] || Object.values(prof.specialties || {})[0]
+    
+    // Pega os itens iniciais (customizados do config ou padrão)
+    const customKey = `${sheetForm.professionId}_${sheetForm.specialtyId}`
+    const starters = customStarterConfig[customKey] || spec?.starterItems || []
+
+    const profPayload = {
+      id: prof.id,
+      name: prof.name,
+      icon: prof.icon,
+      bonusSummary: prof.bonusSummary,
+    }
+    const specPayload = spec ? {
+      id: spec.id,
+      name: spec.name,
+      icon: spec.icon,
+      bonusSummary: spec.bonusSummary,
+      proficiency: spec.proficiency,
+      abilities: spec.abilities || [],
+    } : null
+
+    // Calcula atributos totais (Base + Bônus)
+    const bonuses = calculateProfessionBonuses(prof.id, spec?.id)
+    const finalAttributes = {}
+    ATTRIBUTE_LIST.forEach(({ key }) => {
+      finalAttributes[key] = (Number(sheetForm.baseAttributes?.[key]) || 0) + (Number(bonuses[key]) || 0)
+    })
+
+    const payload = {
+      title: sheetForm.title.trim(),
+      defaultName: sheetForm.defaultName.trim(),
+      age: Number(sheetForm.age) || 30,
+      avatarUrl: sheetForm.avatarUrl.trim() || null,
+      backstory: sheetForm.backstory.trim() || '',
+      profession: profPayload,
+      specialty: specPayload,
+      startingLocation: sheetForm.startingLocation || 'sala-hospital',
+      baseAttributes: sheetForm.baseAttributes,
+      attributes: finalAttributes,
+      inventory: starters,
+      available: sheetForm.available !== undefined ? sheetForm.available : true,
+      updatedAt: new Date().toISOString()
+    }
+
+    try {
+      if (editingSheetId) {
+        await updateDoc(doc(db, 'pre_made_sheets', editingSheetId), payload)
+        alert('Ficha pré-pronta atualizada com sucesso!')
+      } else {
+        await addDoc(collection(db, 'pre_made_sheets'), {
+          ...payload,
+          createdAt: new Date().toISOString()
+        })
+        alert('Ficha pré-pronta criada com sucesso!')
+      }
+      resetSheetForm()
+    } catch (err) {
+      alert('Erro ao salvar ficha pré-pronta: ' + err.message)
+    }
+  }
+
+  async function handleDeleteSheet(sheetId) {
+    if (!confirm('Deseja realmente excluir esta ficha pré-pronta?')) return
+    try {
+      await deleteDoc(doc(db, 'pre_made_sheets', sheetId))
+      alert('Ficha excluída com sucesso!')
+      if (editingSheetId === sheetId) resetSheetForm()
+    } catch (err) {
+      alert('Erro ao excluir: ' + err.message)
+    }
+  }
+
+  async function handleResetSheetClaim(sheetId) {
+    if (!confirm('Deseja liberar esta ficha para que outro jogador possa escolhê-la?')) return
+    try {
+      await updateDoc(doc(db, 'pre_made_sheets', sheetId), {
+        available: true,
+        claimedBy: null,
+        claimedByName: null
+      })
+      alert('Ficha liberada com sucesso!')
+    } catch (err) {
+      alert('Erro ao liberar ficha: ' + err.message)
+    }
+  }
 
   function handleSelectShop(locationSlug) {
     setSelectedShopLocation(locationSlug)
@@ -1342,6 +1621,12 @@ export default function Admin() {
             </button>
             <button className={`btn btn-sm ${activeTab === 'combat' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('combat')} style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: activeTab === 'combat' ? '#fff' : '#f87171' }}>
               ⚔️ Mesa de Combate {activeCombatData?.active && '🔴'}
+            </button>
+            <button className={`btn btn-sm ${activeTab === 'premade' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('premade')} style={{ borderColor: 'rgba(52, 211, 153, 0.4)', color: activeTab === 'premade' ? '#000' : '#34d399', background: activeTab === 'premade' ? '#10b981' : 'transparent' }}>
+              📋 Fichas Pré-Prontas ({preMadeSheets.length})
+            </button>
+            <button className={`btn btn-sm ${activeTab === 'starter_items' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('starter_items')} style={{ borderColor: 'rgba(249, 115, 22, 0.4)', color: activeTab === 'starter_items' ? '#fff' : '#fb923c', background: activeTab === 'starter_items' ? '#ea580c' : 'transparent' }}>
+              🎒 Equipamentos Iniciais
             </button>
             <button className={`btn btn-sm ${activeTab === 'map_editor' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('map_editor')} style={{ borderColor: 'rgba(56, 189, 248, 0.4)', color: activeTab === 'map_editor' ? '#fff' : '#38bdf8', background: activeTab === 'map_editor' ? '#0284c7' : 'transparent' }}>
               📍 Editor de Mapa
@@ -2659,7 +2944,14 @@ export default function Admin() {
                                     onClick={() => handleLocEdit(loc)}
                                   >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <strong style={{ fontSize: 12 }}>{loc.name}</strong>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <strong style={{ fontSize: 12 }}>{loc.name}</strong>
+                                        {loc.isSpawnPoint && (
+                                          <span style={{ fontSize: 9, background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
+                                            📍 Spawn
+                                          </span>
+                                        )}
+                                      </div>
                                       <div style={{ display: 'flex', gap: 3 }}>
                                         <button className="btn btn-sm" style={{ padding: '2px 5px', fontSize: 9 }} onClick={(e) => { e.stopPropagation(); handleLocEdit(loc); }}>
                                           Editar
@@ -2837,6 +3129,22 @@ export default function Admin() {
                       <span style={{ fontWeight: 600, color: '#f87171' }}>🔇 Silenciar / Desativar Som do Clima Deste Lugar</span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         Se marcado, nenhum som de chuva, tempestade ou vento tocará nesta sala (ideal para bunkers subterrâneos, cofres ou salas que devem tocar apenas o som próprio).
+                      </span>
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
+                    <input
+                      type="checkbox"
+                      id="isSpawnPoint"
+                      checked={locForm.isSpawnPoint || false}
+                      onChange={(e) => setLocForm(prev => ({ ...prev, isSpawnPoint: e.target.checked }))}
+                      style={{ width: 'auto', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="isSpawnPoint" style={{ margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: 600, color: '#38bdf8' }}>📍 Ponto de Nascimento (Spawn de Novos Sobreviventes)</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        Se marcado, esta locação ficará disponível para os jogadores escolherem como ponto de início/nascimento no formulário de registro.
                       </span>
                     </label>
                   </div>
@@ -3372,6 +3680,19 @@ export default function Admin() {
                         <div style={{ fontSize: 13, fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.character?.name || 'Incompleto'}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Nível {p.character?.level || 1} · {p.role}</div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeletePlayer(p)
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 14, cursor: 'pointer', padding: '4px', opacity: 0.6, transition: 'opacity 0.15s' }}
+                        title="Excluir Ficha do Jogador"
+                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                        onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+                      >
+                        🗑️
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -3380,9 +3701,30 @@ export default function Admin() {
               {/* Direita: edição */}
               {selectedPlayer ? (
                 <div className="glass-light" style={{ padding: '20px', borderRadius: '12px' }}>
-                  <h3 style={{ fontSize: 15, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 16 }}>
-                    Ficha de: {selectedPlayer.character.name}
-                  </h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+                    <h3 style={{ fontSize: 15, textTransform: 'uppercase', color: 'var(--accent)', margin: 0 }}>
+                      Ficha de: {selectedPlayer.character?.name || 'Sem Nome'}
+                    </h3>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => handleDeletePlayer(selectedPlayer)}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        color: '#ef4444',
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        padding: '6px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                      title="Exclui definitivamente esta ficha e todo o progresso do jogador do banco de dados"
+                    >
+                      <span>🗑️</span> Excluir Ficha do Sistema
+                    </button>
+                  </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16, padding: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid var(--glass-border)' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
@@ -3418,6 +3760,29 @@ export default function Admin() {
                         />
                       </div>
                     </div>
+                  </div>
+
+                  {/* História do Sobrevivente */}
+                  <div style={{ marginBottom: 16, padding: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid var(--glass-border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <label style={{ fontSize: 11, color: 'var(--accent-yellow)', textTransform: 'uppercase', fontWeight: 700, margin: 0 }}>
+                        📜 História / Origem do Sobrevivente
+                      </label>
+                      {selectedPlayer.character.preMadeSheetId && (
+                        <span style={{ fontSize: 10, color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '2px 6px', borderRadius: 4 }}>
+                          📋 Ficha Pré-Pronta
+                        </span>
+                      )}
+                    </div>
+                    {selectedPlayer.character.backstory ? (
+                      <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.5, maxHeight: '140px', overflowY: 'auto' }}>
+                        {selectedPlayer.character.backstory}
+                      </p>
+                    ) : (
+                      <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, fontStyle: 'italic' }}>
+                        Nenhuma história cadastrada para este sobrevivente.
+                      </p>
+                    )}
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
@@ -3483,33 +3848,403 @@ export default function Admin() {
                           onChange={(e) => updatePlayerVitals(selectedPlayer.uid, 'hunger', e.target.value)}
                         />
                       </div>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label style={{ fontSize: 10 }}>🩸 Sangue/HP ({selectedPlayer.character.vitals?.blood ?? 100}%)</label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={selectedPlayer.character.vitals?.blood ?? 100}
-                          onChange={(e) => updatePlayerVitals(selectedPlayer.uid, 'blood', e.target.value)}
-                        />
-                      </div>
+                      {(() => {
+                        const pMaxHp = getMaxHp(selectedPlayer.character)
+                        const pBlood = selectedPlayer.character.vitals?.blood ?? pMaxHp
+                        return (
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 10 }}>🩸 Sangue/Vida ({pBlood} / {pMaxHp} HP)</label>
+                            <input
+                              type="range"
+                              min="0"
+                              max={pMaxHp}
+                              value={pBlood}
+                              onChange={(e) => updatePlayerVitals(selectedPlayer.uid, 'blood', e.target.value)}
+                            />
+                          </div>
+                        )
+                      })()}
                     </div>
                   </div>
 
+                  {/* Gerenciamento de Profissão & Especialização */}
+                  {(() => {
+                    const char = selectedPlayer.character || {}
+                    const currentProfId = char.profession?.id || (typeof char.profession === 'string' ? char.profession : 'militar')
+                    const currentSpecId = char.specialty?.id || (typeof char.specialty === 'string' ? char.specialty : '')
+                    const profData = getProfessionData(currentProfId) || PROFESSIONS.militar
+                    const specData = getSpecialtyData(currentProfId, currentSpecId)
+
+                    const handleProfChange = async (newProfId) => {
+                      const newProf = PROFESSIONS[newProfId]
+                      if (!newProf) return
+                      const firstSpecId = Object.keys(newProf.specialties || {})[0] || ''
+                      const firstSpec = newProf.specialties?.[firstSpecId]
+
+                      const profPayload = {
+                        id: newProf.id,
+                        name: newProf.name,
+                        icon: newProf.icon,
+                        bonusSummary: newProf.bonusSummary,
+                      }
+                      const specPayload = firstSpec ? {
+                        id: firstSpec.id,
+                        name: firstSpec.name,
+                        icon: firstSpec.icon,
+                        bonusSummary: firstSpec.bonusSummary,
+                        proficiency: firstSpec.proficiency,
+                        abilities: firstSpec.abilities || [],
+                      } : null
+
+                      try {
+                        const docRef = doc(db, 'users', selectedPlayer.uid)
+                        await updateDoc(docRef, {
+                          'character.profession': profPayload,
+                          'character.specialty': specPayload,
+                        })
+                        setSelectedPlayer(prev => ({
+                          ...prev,
+                          character: {
+                            ...prev.character,
+                            profession: profPayload,
+                            specialty: specPayload,
+                          }
+                        }))
+                      } catch (err) {
+                        alert('Erro ao atualizar profissão: ' + err.message)
+                      }
+                    }
+
+                    const handleSpecChange = async (newSpecId) => {
+                      const spec = profData?.specialties?.[newSpecId]
+                      if (!spec) return
+
+                      const specPayload = {
+                        id: spec.id,
+                        name: spec.name,
+                        icon: spec.icon,
+                        bonusSummary: spec.bonusSummary,
+                        proficiency: spec.proficiency,
+                        abilities: spec.abilities || [],
+                      }
+
+                      try {
+                        const docRef = doc(db, 'users', selectedPlayer.uid)
+                        await updateDoc(docRef, {
+                          'character.specialty': specPayload,
+                        })
+                        setSelectedPlayer(prev => ({
+                          ...prev,
+                          character: {
+                            ...prev.character,
+                            specialty: specPayload,
+                          }
+                        }))
+                      } catch (err) {
+                        alert('Erro ao atualizar especialização: ' + err.message)
+                      }
+                    }
+
+                    const handleGiveStarterKit = async () => {
+                      const starters = getStarterItems(currentProfId, currentSpecId)
+                      if (starters.length === 0) return alert('Nenhum item inicial encontrado para esta combinação.')
+                      if (!confirm(`Deseja entregar os ${starters.length} itens iniciais da especialidade "${specData?.name || currentSpecId}" para o jogador?`)) return
+
+                      const currentInv = [...(selectedPlayer.character?.inventory || [])]
+                      starters.forEach(stItem => {
+                        const existingIdx = currentInv.findIndex(i => i.itemId === stItem.itemId)
+                        if (existingIdx !== -1) {
+                          currentInv[existingIdx].quantity += (stItem.quantity || 1)
+                        } else {
+                          currentInv.push(stItem)
+                        }
+                      })
+
+                      try {
+                        const docRef = doc(db, 'users', selectedPlayer.uid)
+                        await updateDoc(docRef, {
+                          'character.inventory': currentInv,
+                        })
+                        setSelectedPlayer(prev => ({
+                          ...prev,
+                          character: { ...prev.character, inventory: currentInv }
+                        }))
+                        alert('Itens iniciais adicionados com sucesso ao inventário!')
+                      } catch (err) {
+                        alert('Erro ao adicionar itens iniciais: ' + err.message)
+                      }
+                    }
+
+                    const handleRecalcAttrs = async () => {
+                      const base = selectedPlayer.character.baseAttributes || selectedPlayer.character.attributes || {}
+                      const bonuses = calculateProfessionBonuses(currentProfId, currentSpecId)
+                      const newAttrs = {}
+
+                      ATTRIBUTE_LIST.forEach(({ key }) => {
+                        const baseVal = Number(base[key] || 1)
+                        const bonusVal = Number(bonuses[key] || 0)
+                        newAttrs[key] = baseVal + bonusVal
+                      })
+
+                      try {
+                        const docRef = doc(db, 'users', selectedPlayer.uid)
+                        await updateDoc(docRef, {
+                          'character.attributes': newAttrs,
+                        })
+                        setSelectedPlayer(prev => ({
+                          ...prev,
+                          character: { ...prev.character, attributes: newAttrs }
+                        }))
+                        alert('Atributos recalculados com os bônus da profissão!')
+                      } catch (err) {
+                        alert('Erro ao recalcular atributos: ' + err.message)
+                      }
+                    }
+
+                    return (
+                      <div style={{ padding: 14, background: 'rgba(38,200,143,0.04)', borderRadius: 8, border: '1px solid rgba(38,200,143,0.2)', marginBottom: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                          <label style={{ fontSize: 11, color: 'var(--accent)', textTransform: 'uppercase', fontWeight: 700, margin: 0 }}>
+                            🪖 Profissão & Especialização
+                          </label>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button
+                              type="button"
+                              onClick={handleGiveStarterKit}
+                              style={{ fontSize: 10.5, background: 'rgba(234,179,8,0.2)', border: '1px solid rgba(234,179,8,0.4)', color: '#facc15', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}
+                              title="Adiciona os itens iniciais desta especialidade no inventário do jogador"
+                            >
+                              🎒 Dar Itens Iniciais
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleRecalcAttrs}
+                              style={{ fontSize: 10.5, background: 'rgba(38,200,143,0.2)', border: '1px solid rgba(38,200,143,0.4)', color: 'var(--accent)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}
+                              title="Recalcula Atributos Totais aplicando os bônus da Profissão + Especialidade sobre a Base"
+                            >
+                              🔄 Recalcular Atributos
+                            </button>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 10 }}>Profissão (Bônus Geral)</label>
+                            <select
+                              value={currentProfId}
+                              onChange={(e) => handleProfChange(e.target.value)}
+                            >
+                              {Object.values(PROFESSIONS).map((prof) => (
+                                <option key={prof.id} value={prof.id}>
+                                  {prof.icon} {prof.name} ({prof.bonusSummary})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 10 }}>Especialização</label>
+                            <select
+                              value={currentSpecId}
+                              onChange={(e) => handleSpecChange(e.target.value)}
+                            >
+                              {profData?.specialties && Object.values(profData.specialties).map((spec) => (
+                                <option key={spec.id} value={spec.id}>
+                                  {spec.icon} {spec.name} ({spec.bonusSummary})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {specData && (
+                          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-secondary)' }}>
+                            <strong style={{ color: 'var(--accent-yellow)' }}>Proficiência:</strong> {specData.proficiency}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Gerenciamento de Traços de Atributos e Vantagens/Desvantagens */}
+                  {(() => {
+                    const playerTraits = selectedPlayer.character?.traits || []
+                    const playerPerks = selectedPlayer.character?.perks || []
+
+                    const handleTogglePlayerTrait = async (traitId) => {
+                      const newTraits = playerTraits.includes(traitId)
+                        ? playerTraits.filter(t => t !== traitId)
+                        : [...playerTraits, traitId]
+
+                      try {
+                        const docRef = doc(db, 'users', selectedPlayer.uid)
+                        await updateDoc(docRef, {
+                          'character.traits': newTraits
+                        })
+                        setSelectedPlayer(prev => ({
+                          ...prev,
+                          character: {
+                            ...prev.character,
+                            traits: newTraits
+                          }
+                        }))
+                      } catch (err) {
+                        alert('Erro ao atualizar traços: ' + err.message)
+                      }
+                    }
+
+                    const handleTogglePlayerPerk = async (perkId) => {
+                      const newPerks = playerPerks.includes(perkId)
+                        ? playerPerks.filter(p => p !== perkId)
+                        : [...playerPerks, perkId]
+
+                      try {
+                        const docRef = doc(db, 'users', selectedPlayer.uid)
+                        await updateDoc(docRef, {
+                          'character.perks': newPerks
+                        })
+                        setSelectedPlayer(prev => ({
+                          ...prev,
+                          character: {
+                            ...prev.character,
+                            perks: newPerks
+                          }
+                        }))
+                      } catch (err) {
+                        alert('Erro ao atualizar vantagens: ' + err.message)
+                      }
+                    }
+
+                    return (
+                      <div style={{ padding: 14, background: 'rgba(56,189,248,0.04)', borderRadius: 8, border: '1px solid rgba(56,189,248,0.2)', marginBottom: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                          <label style={{ fontSize: 11, color: '#38bdf8', textTransform: 'uppercase', fontWeight: 700, margin: 0 }}>
+                            🧠 Traços & ⚡ Vantagens / Desvantagens do Jogador
+                          </label>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Clique nos cards para ativar/desativar</span>
+                        </div>
+
+                        {/* Subseção: Traços de Atributos (+3 / -3) */}
+                        <div style={{ marginBottom: 12 }}>
+                          <span style={{ fontSize: 10, color: 'var(--accent-yellow)', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                            Traços de Atributos:
+                          </span>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 6 }}>
+                            {Object.values(TRAITS).map(trait => {
+                              const isActive = playerTraits.includes(trait.id)
+                              const isPos = trait.type === 'positive'
+                              return (
+                                <div
+                                  key={trait.id}
+                                  onClick={() => handleTogglePlayerTrait(trait.id)}
+                                  style={{
+                                    padding: '6px 8px',
+                                    borderRadius: 6,
+                                    cursor: 'pointer',
+                                    background: isActive
+                                      ? (isPos ? 'rgba(74, 222, 128, 0.2)' : 'rgba(239, 68, 68, 0.2)')
+                                      : 'rgba(0,0,0,0.3)',
+                                    border: isActive
+                                      ? (isPos ? '1px solid #22c55e' : '1px solid #ef4444')
+                                      : '1px solid rgba(255,255,255,0.08)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: 6,
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title={`${trait.name}: ${trait.description}`}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                                    <span>{trait.icon}</span>
+                                    <strong style={{ fontSize: 11, color: isActive ? '#fff' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {trait.name}
+                                    </strong>
+                                  </div>
+                                  <span style={{ fontSize: 9.5, fontWeight: 700, color: isPos ? '#4ade80' : '#f87171', flexShrink: 0 }}>
+                                    {trait.summary}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Subseção: Vantagens & Desvantagens (Mecânicas) */}
+                        <div>
+                          <span style={{ fontSize: 10, color: '#38bdf8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                            Vantagens & Desvantagens Mecânicas:
+                          </span>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 6 }}>
+                            {Object.values(PERKS).map(perk => {
+                              const isActive = playerPerks.includes(perk.id)
+                              const isPos = perk.type === 'positive'
+                              return (
+                                <div
+                                  key={perk.id}
+                                  onClick={() => handleTogglePlayerPerk(perk.id)}
+                                  style={{
+                                    padding: '6px 8px',
+                                    borderRadius: 6,
+                                    cursor: 'pointer',
+                                    background: isActive
+                                      ? (isPos ? 'rgba(56, 189, 248, 0.2)' : 'rgba(245, 158, 11, 0.2)')
+                                      : 'rgba(0,0,0,0.3)',
+                                    border: isActive
+                                      ? (isPos ? '1px solid #38bdf8' : '1px solid #f59e0b')
+                                      : '1px solid rgba(255,255,255,0.08)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: 6,
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title={`${perk.name}: ${perk.description}`}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                                    <span>{perk.icon}</span>
+                                    <strong style={{ fontSize: 11, color: isActive ? '#fff' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {perk.name}
+                                    </strong>
+                                  </div>
+                                  <span style={{ fontSize: 9, fontWeight: 600, color: isPos ? '#38bdf8' : '#fbbf24', flexShrink: 0 }}>
+                                    {perk.summary}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Editor dos 8 Atributos */}
                   <div style={{ marginBottom: 20 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Editar Atributos</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
-                      {['forca', 'destreza', 'sabedoria', 'carisma', 'constituicao'].map((attr) => (
-                        <div key={attr} className="form-group" style={{ marginBottom: 0, textAlign: 'center' }}>
-                          <label style={{ fontSize: 10, textTransform: 'capitalize' }}>{attr}</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', margin: 0 }}>
+                        Editar Atributos de Sobrevivência (8)
+                      </label>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Valores totais efetivos salvos no personagem</span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                      {ATTRIBUTE_LIST.map(({ key, label, icon, color }) => (
+                        <div key={key} className="form-group" style={{ marginBottom: 0, textAlign: 'center', background: 'rgba(255,255,255,0.02)', padding: '8px 4px', borderRadius: 6, border: '1px solid var(--glass-border)' }}>
+                          <label style={{ fontSize: 10, textTransform: 'capitalize', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, color }}>
+                            <span>{icon}</span>
+                            <span>{label}</span>
+                          </label>
                           <input
                             type="number"
-                            value={selectedPlayer.character.attributes?.[attr] ?? 1}
+                            min="1"
+                            max="99"
+                            value={selectedPlayer.character.attributes?.[key] ?? 1}
                             onChange={(e) => {
-                              const newAttrs = { ...selectedPlayer.character.attributes, [attr]: Number(e.target.value) }
+                              const newAttrs = { ...selectedPlayer.character.attributes, [key]: Number(e.target.value) }
                               updatePlayerStats(selectedPlayer.uid, 'attributes', newAttrs)
                             }}
-                            style={{ textAlign: 'center' }}
+                            style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 13, marginTop: 4 }}
                           />
                         </div>
                       ))}
@@ -4455,6 +5190,615 @@ export default function Admin() {
           {/* CONTEÚDO DA TAB MAP_EDITOR: EDITOR VISUAL DE MAPA E PINS */}
           {activeTab === 'map_editor' && (
             <AdminMapEditor availableLocations={locations} />
+          )}
+
+          {/* ========================================== */}
+          {/* CONTEÚDO DA TAB PREMADE: FICHAS PRÉ-PRONTAS */}
+          {/* ========================================== */}
+          {activeTab === 'premade' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 20 }}>
+              {/* Esquerda: Formulário de Criação/Edição de Ficha */}
+              <div className="glass-light" style={{ padding: 18, borderRadius: 12, height: 'fit-content' }}>
+                <h3 style={{ fontSize: 14, textTransform: 'uppercase', color: '#34d399', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{editingSheetId ? '✏️ Editar Ficha Pré-Pronta' : '➕ Nova Ficha Pré-Pronta'}</span>
+                  {editingSheetId && (
+                    <button
+                      type="button"
+                      onClick={resetSheetForm}
+                      style={{ fontSize: 10, background: 'none', border: '1px solid var(--glass-border)', color: 'var(--text-muted)', borderRadius: 4, padding: '2px 6px', cursor: 'pointer' }}
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </h3>
+
+                <form onSubmit={handleSaveSheet} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11 }}>Título / Arquétipo da Ficha</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Sargento Marcus Silva, Dra. Helena Vaz..."
+                      value={sheetForm.title}
+                      onChange={e => setSheetForm(prev => ({ ...prev, title: e.target.value }))}
+                      required
+                      style={{ padding: '7px 10px', fontSize: 12 }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 8 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 11 }}>Nome Sugerido</label>
+                      <input
+                        type="text"
+                        placeholder="Marcus Silva"
+                        value={sheetForm.defaultName}
+                        onChange={e => setSheetForm(prev => ({ ...prev, defaultName: e.target.value }))}
+                        required
+                        style={{ padding: '7px 10px', fontSize: 12 }}
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 11 }}>Idade</label>
+                      <input
+                        type="number"
+                        min="1" max="120"
+                        value={sheetForm.age}
+                        onChange={e => setSheetForm(prev => ({ ...prev, age: e.target.value }))}
+                        required
+                        style={{ padding: '7px 10px', fontSize: 12 }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11 }}>URL da Foto/Avatar (Opcional)</label>
+                    <input
+                      type="url"
+                      placeholder="https://..."
+                      value={sheetForm.avatarUrl}
+                      onChange={e => setSheetForm(prev => ({ ...prev, avatarUrl: e.target.value }))}
+                      style={{ padding: '7px 10px', fontSize: 12 }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 11 }}>Profissão</label>
+                      <select
+                        value={sheetForm.professionId}
+                        onChange={e => {
+                          const pId = e.target.value
+                          const pObj = PROFESSIONS[pId]
+                          const firstSpec = pObj?.specialties ? Object.keys(pObj.specialties)[0] : ''
+                          setSheetForm(prev => ({ ...prev, professionId: pId, specialtyId: firstSpec }))
+                        }}
+                        style={{ padding: '7px 10px', fontSize: 12 }}
+                      >
+                        {Object.values(PROFESSIONS).map(p => (
+                          <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 11 }}>Especialização</label>
+                      <select
+                        value={sheetForm.specialtyId}
+                        onChange={e => setSheetForm(prev => ({ ...prev, specialtyId: e.target.value }))}
+                        style={{ padding: '7px 10px', fontSize: 12 }}
+                      >
+                        {PROFESSIONS[sheetForm.professionId]?.specialties &&
+                          Object.values(PROFESSIONS[sheetForm.professionId].specialties).map(s => (
+                            <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Local de Spawn / Nascimento da Ficha */}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: '#38bdf8', fontWeight: 700 }}>📍 Local Inicial de Spawn / Nascimento</label>
+                    <select
+                      value={sheetForm.startingLocation || 'sala-hospital'}
+                      onChange={e => setSheetForm(prev => ({ ...prev, startingLocation: e.target.value }))}
+                      style={{ padding: '7px 10px', fontSize: 12 }}
+                    >
+                      {locations.map(loc => (
+                        <option key={loc.slug || loc.id} value={loc.slug || loc.id}>
+                          {loc.name} ({loc.slug || loc.id})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Distribuição de 15 pontos base na ficha */}
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--accent-yellow)', textTransform: 'uppercase', display: 'block', marginBottom: 6, fontWeight: 700 }}>
+                      Distribuição Base de Atributos (8 Atributos)
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                      {ATTRIBUTE_LIST.map(({ key, label, icon }) => (
+                        <div key={key} style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 4px', borderRadius: 6, border: '1px solid var(--glass-border)', textAlign: 'center' }}>
+                          <span style={{ fontSize: 11 }}>{icon} {label.substring(0, 3)}</span>
+                          <input
+                            type="number"
+                            min="0" max="10"
+                            value={sheetForm.baseAttributes?.[key] ?? 0}
+                            onChange={e => {
+                              const val = Number(e.target.value)
+                              setSheetForm(prev => ({
+                                ...prev,
+                                baseAttributes: { ...prev.baseAttributes, [key]: val }
+                              }))
+                            }}
+                            style={{ width: '100%', textAlign: 'center', fontSize: 12, padding: '3px 0', marginTop: 2, fontWeight: 700 }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11 }}>História do Personagem (Lore da Campanha)</label>
+                    <textarea
+                      rows={5}
+                      placeholder="Escreva a biografia, acontecimentos no dia do surto e motivações deste personagem..."
+                      value={sheetForm.backstory}
+                      onChange={e => setSheetForm(prev => ({ ...prev, backstory: e.target.value }))}
+                      required
+                      style={{ padding: '8px', fontSize: 12, lineHeight: 1.4 }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    style={{ width: '100%', padding: '10px', background: '#10b981', borderColor: '#34d399', color: '#000', fontWeight: 700 }}
+                  >
+                    💾 {editingSheetId ? 'Salvar Alterações da Ficha' : 'Criar Ficha Pré-Pronta'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Direita: Lista de Fichas Pré-Prontas Cadastradas */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <h3 style={{ fontSize: 15, textTransform: 'uppercase', color: '#34d399', margin: 0 }}>
+                    📋 Fichas Criadas para Jogadores ({preMadeSheets.length})
+                  </h3>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    {preMadeSheets.filter(s => s.available !== false && !s.claimedBy).length} disponíveis para escolha
+                  </span>
+                </div>
+
+                {preMadeSheets.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: 'center', border: '1px dashed var(--glass-border)', borderRadius: 10, color: 'var(--text-muted)', fontSize: 13 }}>
+                    Nenhuma ficha pré-pronta cadastrada. Crie uma no formulário ao lado para que novos jogadores possam escolhê-la no registro.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {preMadeSheets.map(sheet => {
+                      const isClaimed = !!sheet.claimedBy || sheet.available === false
+                      const profObj = sheet.profession || {}
+                      const specObj = sheet.specialty || {}
+
+                      return (
+                        <div
+                          key={sheet.id}
+                          className="glass-light"
+                          style={{
+                            padding: 16,
+                            borderRadius: 12,
+                            border: `1px solid ${isClaimed ? 'rgba(239, 68, 68, 0.3)' : 'rgba(52, 211, 153, 0.3)'}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 10
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <div style={{ width: 44, height: 44, borderRadius: 8, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, overflow: 'hidden', border: '1px solid var(--glass-border)', flexShrink: 0 }}>
+                                {sheet.avatarUrl ? (
+                                  <img src={sheet.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.onerror = null; e.target.src = ''; }} />
+                                ) : (
+                                  <span>{profObj.icon || '👤'}</span>
+                                )}
+                              </div>
+                              <div>
+                                <h4 style={{ margin: 0, fontSize: 15, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  {sheet.title}
+                                  <span style={{ fontSize: 11, color: isClaimed ? '#f87171' : '#4ade80', background: isClaimed ? 'rgba(239,68,68,0.15)' : 'rgba(74,222,128,0.15)', padding: '2px 8px', borderRadius: 4 }}>
+                                    {isClaimed ? `🔒 Reivindicada por: ${sheet.claimedByName || 'Jogador'}` : '🟢 Disponível para Escolha'}
+                                  </span>
+                                </h4>
+                                <div style={{ fontSize: 11.5, color: 'var(--accent)', marginTop: 2 }}>
+                                  {profObj.icon} {profObj.name} · {specObj.name} · {sheet.age || '??'} anos
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              {isClaimed && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleResetSheetClaim(sheet.id)}
+                                  style={{ fontSize: 10.5, background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.4)', color: '#38bdf8', borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontWeight: 600 }}
+                                  title="Libera a ficha para ser escolhida novamente"
+                                >
+                                  🔄 Liberar Ficha
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingSheetId(sheet.id)
+                                  setSheetForm({
+                                    title: sheet.title || '',
+                                    defaultName: sheet.defaultName || '',
+                                    age: sheet.age || 30,
+                                    avatarUrl: sheet.avatarUrl || '',
+                                    backstory: sheet.backstory || '',
+                                    professionId: sheet.profession?.id || 'militar',
+                                    specialtyId: sheet.specialty?.id || 'policial',
+                                    startingLocation: sheet.startingLocation || 'sala-hospital',
+                                    baseAttributes: sheet.baseAttributes || { forca: 3, destreza: 2, agilidade: 2, sabedoria: 2, percepcao: 2, inteligencia: 2, carisma: 1, constituicao: 1 },
+                                    available: sheet.available !== false,
+                                  })
+                                }}
+                                style={{ fontSize: 10.5, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)', borderRadius: 4, padding: '4px 8px', cursor: 'pointer' }}
+                              >
+                                ✏️ Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSheet(sheet.id)}
+                                style={{ fontSize: 10.5, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: 4, padding: '4px 8px', cursor: 'pointer' }}
+                              >
+                                🗑️ Excluir
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Bônus de Atributos & Spawn */}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: 6, fontSize: 11 }}>
+                            <span style={{ color: '#38bdf8' }}>
+                              📍 <strong>Nasce em:</strong> {locations.find(l => l.slug === (sheet.startingLocation || 'sala-hospital'))?.name || sheet.startingLocation || 'Hospital Central'}
+                            </span>
+                            <span style={{ color: 'var(--accent-yellow)' }}>
+                              ✨ <strong>Bônus:</strong> {profObj.bonusSummary || 'Nenhum'} {specObj.bonusSummary ? `+ ${specObj.bonusSummary}` : ''}
+                            </span>
+                          </div>
+
+                          {/* Equipamentos Iniciais da Ficha */}
+                          {sheet.inventory && sheet.inventory.length > 0 && (
+                            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '8px 10px', borderRadius: 6 }}>
+                              <span style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: 4 }}>
+                                🎒 Equipamentos Iniciais ({sheet.inventory.length}):
+                              </span>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {sheet.inventory.map((item, idx) => (
+                                  <span key={idx} style={{ fontSize: 10.5, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', padding: '2px 6px', borderRadius: 4, color: '#fff' }}>
+                                    {item.icon || '📦'} {item.name} {item.quantity > 1 ? `x${item.quantity}` : ''}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* História resumida */}
+                          <div style={{ background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 8, fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                            <strong style={{ color: 'var(--accent-yellow)', display: 'block', marginBottom: 3 }}>História da Ficha:</strong>
+                            <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                              {sheet.backstory}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================== */}
+          {/* CONTEÚDO DA TAB STARTER_ITEMS: EQUIPAMENTOS INICIAIS */}
+          {/* ========================================== */}
+          {activeTab === 'starter_items' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  <h3 style={{ fontSize: 16, textTransform: 'uppercase', color: '#fb923c', margin: 0 }}>
+                    🎒 Gerenciador de Equipamentos Iniciais por Profissão
+                  </h3>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                    Configure quais itens os sobreviventes recebem no inventário ao escolher cada profissão e especialização.
+                  </p>
+                </div>
+                {customStarterConfig[currentStarterKey] && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={handleResetStarterItemsToDefault}
+                    style={{ fontSize: 11, background: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.3)', color: '#ef4444' }}
+                  >
+                    🔄 Restaurar Itens Padrão do Sistema
+                  </button>
+                )}
+              </div>
+
+              {/* Seletor de Profissão e Especialização */}
+              <div className="glass-light" style={{ padding: 16, borderRadius: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: 12, color: 'var(--accent-yellow)' }}>1. Selecione a Profissão</label>
+                  <select
+                    value={starterProfId}
+                    onChange={e => {
+                      const pId = e.target.value
+                      const pObj = PROFESSIONS[pId]
+                      const firstSpec = pObj?.specialties ? Object.keys(pObj.specialties)[0] : ''
+                      setStarterProfId(pId)
+                      setStarterSpecId(firstSpec)
+                    }}
+                    style={{ padding: '8px 10px', fontSize: 13 }}
+                  >
+                    {Object.values(PROFESSIONS).map(p => (
+                      <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: 12, color: 'var(--accent-yellow)' }}>2. Selecione a Especialização</label>
+                  <select
+                    value={starterSpecId}
+                    onChange={e => setStarterSpecId(e.target.value)}
+                    style={{ padding: '8px 10px', fontSize: 13 }}
+                  >
+                    {PROFESSIONS[starterProfId]?.specialties &&
+                      Object.values(PROFESSIONS[starterProfId].specialties).map(s => (
+                        <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Lista dos Itens Iniciais Configurados */}
+              <div className="glass-light" style={{ padding: 16, borderRadius: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h4 style={{ margin: 0, fontSize: 13, textTransform: 'uppercase', color: '#fff' }}>
+                    Itens Iniciais de: <strong style={{ color: '#fb923c' }}>{PROFESSIONS[starterProfId]?.name} · {PROFESSIONS[starterProfId]?.specialties?.[starterSpecId]?.name}</strong>
+                    {customStarterConfig[currentStarterKey] ? (
+                      <span style={{ marginLeft: 8, fontSize: 10, background: 'rgba(249,115,22,0.2)', color: '#fb923c', padding: '2px 6px', borderRadius: 4 }}>Customizado</span>
+                    ) : (
+                      <span style={{ marginLeft: 8, fontSize: 10, background: 'rgba(255,255,255,0.1)', color: 'var(--text-muted)', padding: '2px 6px', borderRadius: 4 }}>Padrão do Sistema</span>
+                    )}
+                  </h4>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    Total de itens: {currentSpecStarterItems.length}
+                  </span>
+                </div>
+
+                {currentSpecStarterItems.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 12 }}>
+                    Nenhum item inicial configurado para esta especialidade.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8, marginBottom: 16 }}>
+                    {currentSpecStarterItems.map((item, idx) => {
+                      const rMeta = RARITY_META[item.rarity] || RARITY_META.common
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            borderRadius: 8,
+                            background: 'rgba(0,0,0,0.3)',
+                            border: `1px solid ${rMeta.border || 'var(--glass-border)'}`,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            <span style={{ fontSize: 20 }}>{item.icon || '📦'}</span>
+                            <div style={{ minWidth: 0 }}>
+                              <strong style={{ fontSize: 12, color: '#fff', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {item.name}
+                              </strong>
+                              <span style={{ fontSize: 10, color: rMeta.color }}>{rMeta.label} · ID: {item.itemId}</span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <input
+                              type="number"
+                              min="1" max="99"
+                              value={item.quantity || 1}
+                              onChange={e => handleUpdateStarterItemQty(idx, e.target.value)}
+                              style={{ width: 48, padding: '3px 4px', fontSize: 11, textAlign: 'center', fontWeight: 700 }}
+                              title="Quantidade"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveStarterItem(idx)}
+                              style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 16, cursor: 'pointer', padding: 0 }}
+                              title="Remover item"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Formulário para Adicionar Item aos Iniciais */}
+                <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <h5 style={{ margin: 0, fontSize: 12, textTransform: 'uppercase', color: 'var(--accent-yellow)' }}>
+                      ➕ Selecionar Item do Catálogo
+                    </h5>
+                    {newStarterItem.itemId && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px', background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 6 }}>
+                        <span>{newStarterItem.icon}</span>
+                        <strong style={{ fontSize: 11, color: '#fb923c' }}>{newStarterItem.name}</strong>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>· ID: {newStarterItem.itemId}</span>
+                        <label style={{ fontSize: 10, color: 'var(--text-secondary)', margin: 0 }}>Qtd:</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={newStarterItem.quantity}
+                          onChange={e => setNewStarterItem(prev => ({ ...prev, quantity: e.target.value }))}
+                          style={{ width: 48, padding: '2px 4px', fontSize: 11, textAlign: 'center', fontWeight: 700 }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={handleAddStarterItem}
+                          style={{ padding: '4px 10px', fontSize: 11, background: '#ea580c', borderColor: '#fb923c' }}
+                        >
+                          + Adicionar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Busca + filtro de categoria */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                    <input
+                      type="text"
+                      placeholder="🔍 Buscar no catálogo por nome ou ID..."
+                      value={starterCatalogSearch}
+                      onChange={e => setStarterCatalogSearch(e.target.value)}
+                      style={{ flex: 1, padding: '7px 10px', fontSize: 11 }}
+                    />
+                    <select
+                      value={starterCatalogCategory}
+                      onChange={e => setStarterCatalogCategory(e.target.value)}
+                      style={{ padding: '7px 8px', fontSize: 11, minWidth: 150 }}
+                    >
+                      <option value="all">📦 Todas as Categorias</option>
+                      <option value="general">🎒 Gerais</option>
+                      <option value="supplies">🌾 Mantimentos</option>
+                      <option value="clothing">👕 Roupas</option>
+                      <option value="melee">🗡️ Armas Brancas</option>
+                      <option value="firearms">🔫 Armas de Fogo</option>
+                      <option value="medical">💉 Médicos</option>
+                    </select>
+                  </div>
+
+                  {/* Grade de itens agrupados por categoria */}
+                  {(() => {
+                    const q = starterCatalogSearch.toLowerCase().trim()
+                    const filtered = catalogItems.filter(item => {
+                      const matchCat = starterCatalogCategory === 'all' || item.category === starterCatalogCategory
+                      const matchQ = !q || item.name.toLowerCase().includes(q) || (item.itemId || '').toLowerCase().includes(q)
+                      return matchCat && matchQ
+                    })
+
+                    const CATEGORY_META = {
+                      general:   { label: '🎒 Gerais', order: 0 },
+                      supplies:  { label: '🌾 Mantimentos', order: 1 },
+                      medical:   { label: '💉 Médicos', order: 2 },
+                      clothing:  { label: '👕 Roupas', order: 3 },
+                      melee:     { label: '🗡️ Armas Brancas', order: 4 },
+                      firearms:  { label: '🔫 Armas de Fogo', order: 5 },
+                    }
+
+                    if (catalogItems.length === 0) return (
+                      <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 12 }}>
+                        Catálogo vazio. Vá para a aba Catálogo e popule os itens padrão primeiro.
+                      </div>
+                    )
+
+                    if (filtered.length === 0) return (
+                      <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 12 }}>
+                        Nenhum item encontrado para "{starterCatalogSearch}".
+                      </div>
+                    )
+
+                    // Agrupar por categoria
+                    const groups = {}
+                    filtered.forEach(item => {
+                      const cat = item.category || 'general'
+                      if (!groups[cat]) groups[cat] = []
+                      groups[cat].push(item)
+                    })
+
+                    const sortedCategories = Object.keys(groups).sort((a, b) =>
+                      (CATEGORY_META[a]?.order ?? 99) - (CATEGORY_META[b]?.order ?? 99)
+                    )
+
+                    const alreadyAdded = new Set(currentSpecStarterItems.map(i => i.itemId))
+
+                    return (
+                      <div style={{ maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14, paddingRight: 4 }}>
+                        {sortedCategories.map(cat => (
+                          <div key={cat}>
+                            <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--accent-yellow)', textTransform: 'uppercase', marginBottom: 6, paddingBottom: 4, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                              {CATEGORY_META[cat]?.label || cat}
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 5 }}>
+                              {groups[cat].map(catItem => {
+                                const isSelected = newStarterItem.itemId === (catItem.itemId || catItem.id)
+                                const isAdded = alreadyAdded.has(catItem.itemId || catItem.id)
+                                const rMeta = RARITY_META[catItem.rarity] || RARITY_META.common
+                                return (
+                                  <div
+                                    key={catItem.id}
+                                    onClick={() => setNewStarterItem({
+                                      itemId: catItem.itemId || catItem.id,
+                                      name: catItem.name,
+                                      icon: catItem.icon || '📦',
+                                      quantity: 1,
+                                      rarity: catItem.rarity || 'common',
+                                      category: catItem.category || 'general'
+                                    })}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 7,
+                                      padding: '6px 8px',
+                                      borderRadius: 6,
+                                      cursor: 'pointer',
+                                      background: isSelected
+                                        ? 'rgba(249,115,22,0.2)'
+                                        : isAdded
+                                        ? 'rgba(74,222,128,0.07)'
+                                        : 'rgba(255,255,255,0.02)',
+                                      border: isSelected
+                                        ? '1px solid #fb923c'
+                                        : isAdded
+                                        ? '1px solid rgba(74,222,128,0.35)'
+                                        : `1px solid ${rMeta.border || 'var(--glass-border)'}`,
+                                      transition: 'all 0.12s ease',
+                                      opacity: isAdded && !isSelected ? 0.65 : 1,
+                                    }}
+                                    title={catItem.description || catItem.name}
+                                  >
+                                    <span style={{ fontSize: 18, flexShrink: 0 }}>{catItem.icon || '📦'}</span>
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                      <strong style={{ fontSize: 11, color: isSelected ? '#fb923c' : '#fff', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {catItem.name}
+                                      </strong>
+                                      <span style={{ fontSize: 9.5, color: rMeta.color }}>
+                                        {rMeta.label}{isAdded ? ' · ✓ já adicionado' : ''}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

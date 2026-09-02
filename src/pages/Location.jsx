@@ -172,7 +172,7 @@ export default function Location() {
     setSupplySearchState('searching')
     await new Promise((r) => setTimeout(r, 2000))
 
-    const items = rollSupplyLoot(location.loot)
+    const items = rollSupplyLoot(location.loot, character?.perks || [])
     setSupplyLootResult(items)
     setSupplySearchState('result')
 

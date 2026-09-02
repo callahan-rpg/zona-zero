@@ -591,7 +591,7 @@ export default function CombatPage() {
                               </div>
                             )}
                             <div className="combat-attributes-strip">
-                              {['forca', 'destreza', 'constituicao', 'sabedoria', 'carisma'].map(attrKey => {
+                              {Object.keys(ATTRIBUTE_ICONS).map(attrKey => {
                                 const meta = ATTRIBUTE_ICONS[attrKey]
                                 const val = char.attributes?.[attrKey] ?? 1
                                 return (
@@ -756,7 +756,7 @@ export default function CombatPage() {
                               )}
                               {enemy.attributes && (
                                 <div className="combat-attributes-strip">
-                                  {['forca', 'destreza', 'constituicao', 'sabedoria', 'carisma'].map(attrKey => {
+                                  {Object.keys(ATTRIBUTE_ICONS).map(attrKey => {
                                     const meta = ATTRIBUTE_ICONS[attrKey]
                                     const val = enemy.attributes?.[attrKey] ?? 0
                                     return (
@@ -860,9 +860,9 @@ export default function CombatPage() {
               <div className="combat-form-field">
                 <label>Atributos de Sobrevivência</label>
                 <div className="combat-attrs-grid">
-                  {['forca', 'destreza', 'constituicao', 'sabedoria', 'carisma'].map(attr => (
+                  {Object.keys(ATTRIBUTE_ICONS).map(attr => (
                     <div key={attr} className="combat-attr-box">
-                      <span className="attr-tag-label">{attr.substring(0, 3)}</span>
+                      <span className="attr-tag-label">{ATTRIBUTE_ICONS[attr]?.label || attr.substring(0, 3)}</span>
                       <input
                         type="number"
                         value={playerAttrForm[attr] ?? 1}
@@ -981,12 +981,12 @@ export default function CombatPage() {
               <div className="combat-form-field">
                 <label>Atributos do Monstro</label>
                 <div className="combat-attrs-grid">
-                  {['forca', 'destreza', 'constituicao', 'sabedoria', 'carisma'].map(attr => (
+                  {Object.keys(ATTRIBUTE_ICONS).map(attr => (
                     <div key={attr} className="combat-attr-box">
-                      <span className="attr-tag-label">{attr.substring(0, 3)}</span>
+                      <span className="attr-tag-label">{ATTRIBUTE_ICONS[attr]?.label || attr.substring(0, 3)}</span>
                       <input
                         type="number"
-                        value={enemyForm[attr]}
+                        value={enemyForm[attr] ?? 0}
                         onChange={e => setEnemyForm(prev => ({ ...prev, [attr]: Number(e.target.value) }))}
                         className="combat-dark-input attr-number-input"
                       />
@@ -1130,12 +1130,12 @@ export default function CombatPage() {
               <div className="combat-form-field">
                 <label>Atributos</label>
                 <div className="combat-attrs-grid">
-                  {['forca', 'destreza', 'constituicao', 'sabedoria', 'carisma'].map(attr => (
+                  {Object.keys(ATTRIBUTE_ICONS).map(attr => (
                     <div key={attr} className="combat-attr-box">
-                      <span className="attr-tag-label">{attr.substring(0, 3)}</span>
+                      <span className="attr-tag-label">{ATTRIBUTE_ICONS[attr]?.label || attr.substring(0, 3)}</span>
                       <input
                         type="number"
-                        value={enemyForm[attr]}
+                        value={enemyForm[attr] ?? 0}
                         onChange={e => setEnemyForm(prev => ({ ...prev, [attr]: Number(e.target.value) }))}
                         className="combat-dark-input attr-number-input"
                       />

@@ -11,7 +11,7 @@ import NotificationBell from './NotificationBell.jsx'
 import MoneyTransferModal from './MoneyTransferModal.jsx'
 import GameIcon from './GameIcon.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
-import { hasFeatureUnlocked, getTimeOfDay, getVitalsDebuffs } from '../utils/itemSystem'
+import { hasFeatureUnlocked, getTimeOfDay, getVitalsDebuffs, getMaxHp } from '../utils/itemSystem'
 
 export default function HUD({ locationName }) {
   const { character, role, logout } = useAuth()
@@ -100,7 +100,10 @@ export default function HUD({ locationName }) {
   const debuffInfo = getVitalsDebuffs(vitals)
   const isHungerLow = (vitals.hunger ?? 100) < 30
   const isThirstLow = (vitals.thirst ?? 100) < 30
-  const isBloodLow  = (vitals.blood ?? 100) < 30
+  const charMaxHp = getMaxHp(character)
+  const currentBlood = vitals.blood ?? charMaxHp
+  const bloodPct = charMaxHp > 0 ? Math.round((currentBlood / charMaxHp) * 100) : 100
+  const isBloodLow = bloodPct < 30
   const hasVitalWarning = isHungerLow || isThirstLow || isBloodLow
 
   return (
@@ -257,7 +260,7 @@ export default function HUD({ locationName }) {
             <span className="vital-warning-icon">⚠️</span>
             <div className="vital-warning-text">
               <strong>Atenção Sobrevivente:</strong>
-              {isBloodLow && <span className="vital-tag danger">Vida Crítica ({vitals.blood ?? 0}%)</span>}
+              {isBloodLow && <span className="vital-tag danger">Vida Crítica ({currentBlood}/{charMaxHp} - {bloodPct}%)</span>}
               {isThirstLow && <span className="vital-tag warning">Desidratando ({vitals.thirst ?? 0}%)</span>}
               {isHungerLow && <span className="vital-tag warning">Fome Severa ({vitals.hunger ?? 0}%)</span>}
               <span className="vital-tag debuff-alert">Debuff ativo nos Atributos</span>

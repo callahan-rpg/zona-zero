@@ -178,10 +178,16 @@ export default function Home() {
             </button>
 
             {!user ? (
-              <Link to="/login" className="home-nav-btn" title="Registro e Login">
-                <GameIcon name="login" size={16} />
-                <span className="home-nav-label">Registro / Login</span>
-              </Link>
+              <>
+                <Link to="/register" className="home-nav-btn" title="Criar novo personagem">
+                  <GameIcon name="create" size={16} />
+                  <span className="home-nav-label">Registro</span>
+                </Link>
+                <Link to="/login" className="home-nav-btn" title="Entrar com sua conta">
+                  <GameIcon name="login" size={16} />
+                  <span className="home-nav-label">Login</span>
+                </Link>
+              </>
             ) : (
               <Link to="/map" className="home-nav-btn" title="Ver Mapa do RPG">
                 <GameIcon name="map" size={16} />
@@ -193,9 +199,9 @@ export default function Home() {
           {/* Botão de Ação à Direita — só aparece para visitantes */}
           {!user && (
             <div className="home-nav-right">
-              <Link to="/login" className="home-action-btn">
+              <Link to="/login" className="home-action-btn" title="Acessar Bunker">
                 <GameIcon name="login" size={15} />
-                ENTRAR
+                LOGIN
               </Link>
             </div>
           )}

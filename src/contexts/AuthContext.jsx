@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
 } from 'firebase/auth'
 import {
   doc,
@@ -16,6 +17,7 @@ import {
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
+import { getMaxHp } from '../utils/itemSystem'
 
 const AuthContext = createContext(null)
 
@@ -161,16 +163,29 @@ export function AuthProvider({ children }) {
       const curT = Number(currentVitals.thirst ?? 100)
       const curB = Number(currentVitals.blood  ?? 100)
 
+      // Efeitos de Vantagens e Desvantagens (Perks)
+      const perks = Array.isArray(currentChar.perks) ? currentChar.perks : []
+      let thirstMultiplier = 1
+      let hungerMultiplier = 1
+      let bloodMultiplier = 1
+
+      if (perks.includes('sedento')) thirstMultiplier *= 1.5
+      if (perks.includes('hidratado')) thirstMultiplier *= 0.5
+      if (perks.includes('faminto')) hungerMultiplier *= 1.5
+      if (perks.includes('estomago_pequeno')) hungerMultiplier *= 0.5
+      if (perks.includes('pele_fragil')) bloodMultiplier *= 1.5
+      if (perks.includes('pele_grossa')) bloodMultiplier *= 0.5
+
       // Sede: 0.2% por min | Fome: 0.1% por min
-      const thirstLoss = minutesPassed * 0.2
-      const hungerLoss = minutesPassed * 0.1
+      const thirstLoss = minutesPassed * 0.2 * thirstMultiplier
+      const hungerLoss = minutesPassed * 0.1 * hungerMultiplier
 
       const newThirst = Math.max(0, parseFloat((curT - thirstLoss).toFixed(2)))
       const newHunger = Math.max(0, parseFloat((curH - hungerLoss).toFixed(2)))
       let newBlood = curB
 
       if (newHunger === 0 || newThirst === 0) {
-        const bloodLoss = minutesPassed * 0.5
+        const bloodLoss = minutesPassed * 0.5 * bloodMultiplier
         newBlood = Math.max(0, parseFloat((curB - bloodLoss).toFixed(2)))
       }
 
@@ -204,28 +219,40 @@ export function AuthProvider({ children }) {
     const credential = await createUserWithEmailAndPassword(auth, email, password)
     const uid = credential.user.uid
 
+    const baseAttrs = {
+      forca: Number(characterData.forca ?? 1),
+      destreza: Number(characterData.destreza ?? 1),
+      agilidade: Number(characterData.agilidade ?? 1),
+      sabedoria: Number(characterData.sabedoria ?? 1),
+      percepcao: Number(characterData.percepcao ?? 1),
+      inteligencia: Number(characterData.inteligencia ?? 1),
+      carisma: Number(characterData.carisma ?? 1),
+      constituicao: Number(characterData.constituicao ?? 1),
+    }
+
     const newCharacter = {
       name: characterData.name,
       age: characterData.age,
       level: 1,
       xp: 0,
       avatarUrl: characterData.avatarUrl || null,
-      attributes: {
-        forca: characterData.forca,
-        destreza: characterData.destreza,
-        sabedoria: characterData.sabedoria,
-        carisma: characterData.carisma,
-        constituicao: characterData.constituicao,
-      },
-      inventory: [],
-      rublos: 0,
-      currentLocation: 'sala-hospital',
+      profession: characterData.profession || null,
+      specialty: characterData.specialty || null,
+      traits: Array.isArray(characterData.traits) ? characterData.traits : [],
+      perks: Array.isArray(characterData.perks) ? characterData.perks : [],
+      backstory: characterData.backstory || '',
+      preMadeSheetId: characterData.preMadeSheetId || null,
+      baseAttributes: baseAttrs,
+      attributes: characterData.attributes || baseAttrs,
+      inventory: Array.isArray(characterData.inventory) ? characterData.inventory : [],
+      rublos: Number(characterData.rublos ?? 200), // Novos personagens começam com 200 Rublos
+      currentLocation: characterData.currentLocation || 'sala-hospital',
       lastLootByLocation: {},
       uniqueSearchesDone: {},
       vitals: {
         hunger: 100,
         thirst: 100,
-        blood: 100,
+        blood: getMaxHp({ attributes: characterData.attributes || baseAttrs }),
       },
       createdAt: serverTimestamp(),
     }
@@ -235,6 +262,19 @@ export function AuthProvider({ children }) {
       role: 'player',
       character: newCharacter,
     })
+
+    if (characterData.preMadeSheetId) {
+      try {
+        await updateDoc(doc(db, 'pre_made_sheets', characterData.preMadeSheetId), {
+          available: false,
+          claimedBy: uid,
+          claimedByName: characterData.name,
+          claimedAt: serverTimestamp()
+        })
+      } catch (sheetErr) {
+        console.warn('Aviso ao atualizar status da ficha pré-pronta:', sheetErr)
+      }
+    }
 
     setCharacter(newCharacter)
     return credential
@@ -248,6 +288,11 @@ export function AuthProvider({ children }) {
   // Logout
   async function logout() {
     return signOut(auth)
+  }
+
+  // Recuperação de Senha
+  async function resetPassword(email) {
+    return sendPasswordResetEmail(auth, email)
   }
 
   // Atualiza personagem
@@ -304,10 +349,11 @@ export function AuthProvider({ children }) {
         const tAdd = (consumeEffect.thirst || 0) * quantityToConsume
         const bAdd = (consumeEffect.blood  || 0) * quantityToConsume
 
+        const charMaxHp = getMaxHp(charData)
         updatedVitals = {
           hunger: Math.max(0, Math.min(100, (updatedVitals.hunger ?? 100) + hAdd)),
           thirst: Math.max(0, Math.min(100, (updatedVitals.thirst ?? 100) + tAdd)),
-          blood:  Math.max(0, Math.min(100, (updatedVitals.blood  ?? 100) + bAdd)),
+          blood:  Math.max(0, Math.min(charMaxHp, (updatedVitals.blood  ?? charMaxHp) + bAdd)),
         }
       }
 
@@ -622,6 +668,7 @@ export function AuthProvider({ children }) {
     register,
     login,
     logout,
+    resetPassword,
     updateCharacter,
     refreshCharacter,
     transferItem,

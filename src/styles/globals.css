@@ -1781,8 +1781,14 @@ body {
 
 .attributes-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .attributes-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .attr-card {
@@ -1790,20 +1796,12 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 14px 10px;
+  padding: 12px 8px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-md);
   text-align: center;
   transition: var(--transition);
-}
-
-.attr-card:last-child {
-  grid-column: span 2;
-  flex-direction: row;
-  justify-content: center;
-  gap: 16px;
-  padding: 14px 20px;
 }
 
 .attr-card:hover {
@@ -2009,7 +2007,7 @@ body {
 
 .character-float-attributes-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 

@@ -78,6 +78,28 @@ export const DEFAULT_PRESET_ITEMS = [
   { itemId: 'fuzil_militar', name: 'Fuzil Militar Tático', icon: '🎖️', category: 'firearms', rarity: 'very_rare', consumable: false, isQuestItem: false, description: 'Armamento de ponta das forças armadas.' },
   { itemId: 'colete_balistico', name: 'Colete Balístico Kevlar', icon: '🛡️', category: 'clothing', rarity: 'very_rare', consumable: false, isQuestItem: false, description: 'Proteção blindada contra tiros e mordidas.' },
   { itemId: 'reliquia_sobrevivente', name: 'Amuleto do Fundador', icon: '👑', category: 'general', rarity: 'exceptional', isQuestItem: true, consumable: false, description: 'Item lendário único deixado pelos primeiros colonizadores.' },
+
+  // EQUIPAMENTOS E PROFISSÕES / ESPECIALIZAÇÕES
+  { itemId: 'algemas', name: 'Algemas de Aço', icon: '⛓️', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Algemas de aço padrão policial com chave.' },
+  { itemId: 'machado_incendio', name: 'Machado de Incêndio', icon: '🪓', category: 'melee', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Machado pesado de cabo longo, excelente contra portas e infectados.' },
+  { itemId: 'roupa_bombeiro', name: 'Uniforme de Proteção Térmica', icon: '🦺', category: 'clothing', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Traje de bombeiro resistente a chamas e rasgos.' },
+  { itemId: 'mascara_respiratoria', name: 'Máscara Respiratória', icon: '🎭', category: 'clothing', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Filtro facial contra fumaça, poeira e toxinas leves.' },
+  { itemId: 'municao_militar', name: 'Munição Militar 5.56mm', icon: '📦', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Pente de alta perfuração para fuzis táticos.' },
+  { itemId: 'traje_militar', name: 'Traje Militar Camuflado', icon: '🪖', category: 'clothing', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Uniforme de combate reforçado com camuflagem urbana.' },
+  { itemId: 'faca_tatica', name: 'Faca de Combate Militar', icon: '🗡️', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Lâmina serrilhada de aço forjado para combate tático.' },
+  { itemId: 'kit_primeiros_socorros', name: 'Kit de Primeiros Socorros', icon: '🚑', category: 'medical', rarity: 'uncommon', consumable: true, consumeEffect: { blood: 40 }, isQuestItem: false, description: 'Kit compacto para estancar sangramentos emergenciais.' },
+  { itemId: 'bolsa_farmaceutica', name: 'Bolsa Farmacêutica', icon: '🧰', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Mala com compartimentos térmicos e frascos de ensaio.' },
+  { itemId: 'ferramentas_tecnicas', name: 'Estojo de Ferramentas Técnicas', icon: '🔬', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Multímetro, chave de precisão e solda rápida.' },
+  { itemId: 'rifle_caca', name: 'Rifle de Caça com Luneta', icon: '🎯', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Rifle de ferrolho com mira telescópica para disparos precisos.' },
+  { itemId: 'municao_caca', name: 'Caixa de Cartuchos de Caça', icon: '📦', category: 'firearms', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Cartuchos pesados calibre .308 de alto impacto.' },
+  { itemId: 'faca_caca', name: 'Faca de Caça Afiada', icon: '🔪', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Lâmina especial para escalpelar presas e corte de tecidos grossos.' },
+  { itemId: 'mochila_sobrevivencia', name: 'Mochila Tática de Mateiro', icon: '🎒', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Mochila robusta com alças e bolsos para longas caminhadas.' },
+  { itemId: 'kit_armadilhas', name: 'Kit de Armadilhas Mecânicas', icon: '🐺', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Arapucas e laços para captura de animais de pequeno porte.' },
+  { itemId: 'canivete_multiuso', name: 'Canivete Multiuso', icon: '🗡️', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Canivete com múltiplas lâminas, abridor e serra fina.' },
+  { itemId: 'ferramentas_agricolas', name: 'Conjunto de Ferramentas Agrícolas', icon: '🧑‍🌾', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Enxada e foice manual para manejo de plantio.' },
+  { itemId: 'sementes_iniciais', name: 'Pacote de Sementes Mistas', icon: '🌱', category: 'supplies', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Sementes selecionadas de hortaliças e grãos nutritivos.' },
+  { itemId: 'equipamento_quimico', name: 'Equipamento Químico Portátil', icon: '🧪', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Kit de tubos de ensaio, reagentes e medidores de pH.' },
+  { itemId: 'caderno_pesquisa', name: 'Caderno de Anotações & Lupa', icon: '📖', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Diário de laboratório e lentes de aumento de precisão.' },
 ]
 
 /**
@@ -182,9 +204,12 @@ export function getVitalsDebuffs(vitals = {}) {
   const penalties = {
     forca: 0,
     destreza: 0,
-    constituicao: 0,
+    agilidade: 0,
     sabedoria: 0,
+    percepcao: 0,
+    inteligencia: 0,
     carisma: 0,
+    constituicao: 0,
   }
 
   const reasons = []
@@ -195,21 +220,27 @@ export function getVitalsDebuffs(vitals = {}) {
   if (minVital === 0) {
     penalties.forca -= 3
     penalties.destreza -= 3
+    penalties.agilidade -= 3
     penalties.constituicao -= 3
     penalties.sabedoria -= 3
+    penalties.percepcao -= 3
+    penalties.inteligencia -= 2
     penalties.carisma -= 3
     reasons.push(hunger === 0 ? '💀 Inanição Extrema (Fome em 0%)' : '💀 Desidratação Extrema (Sede em 0%)')
   } else if (minVital < 25) {
     penalties.forca -= 2
     penalties.destreza -= 2
+    penalties.agilidade -= 2
     penalties.constituicao -= 2
     penalties.sabedoria -= 1
+    penalties.percepcao -= 1
     penalties.carisma -= 1
     if (hunger < 25) reasons.push('⚠️ Fome Crítica (< 25%)')
     if (thirst < 25) reasons.push('⚠️ Sede Crítica (< 25%)')
   } else if (minVital <= 50) {
     penalties.forca -= 1
     penalties.destreza -= 1
+    penalties.agilidade -= 1
     if (hunger <= 50) reasons.push('🥖 Fome Moderada (≤ 50%)')
     if (thirst <= 50) reasons.push('💧 Sede Moderada (≤ 50%)')
   }
@@ -218,6 +249,7 @@ export function getVitalsDebuffs(vitals = {}) {
   if (blood > 0 && blood < 25) {
     penalties.forca -= 1
     penalties.destreza -= 1
+    penalties.agilidade -= 1
     penalties.constituicao -= 1
     reasons.push('🩸 Hemorragia / Sangue Crítico (< 25%)')
   }
@@ -243,18 +275,21 @@ export function calculateEffectiveAttributes(baseAttributes = {}, vitals = {}) {
 
   for (const [attr, val] of Object.entries(baseAttributes)) {
     const penalty = penalties[attr] || 0
-    effective[attr] = Math.max(1, (val ?? 1) + penalty)
+    effective[attr] = (val ?? 0) + penalty  // SEM clamp: atributos podem ser negativos
   }
 
   return effective
 }
 
-export function rollSupplyLoot(lootConfig) {
+export function rollSupplyLoot(lootConfig, characterPerks = []) {
   if (!lootConfig || !lootConfig.enabled) return []
   if (Math.random() < (lootConfig.emptyChance ?? 0.25)) return []
 
   const table = lootConfig.table || []
   if (table.length === 0) return []
+
+  const isLucky = Array.isArray(characterPerks) && characterPerks.includes('sortudo')
+  const isUnlucky = Array.isArray(characterPerks) && characterPerks.includes('azarado')
 
   // Quantidade de itens para sortear (1 a maxItemsPerSearch)
   const maxItems = Math.min(table.length, lootConfig.maxItemsPerSearch || 2)
@@ -262,12 +297,22 @@ export function rollSupplyLoot(lootConfig) {
   const available = [...table]
 
   for (let i = 0; i < maxItems && available.length > 0; i++) {
-    const totalChance = available.reduce((acc, it) => acc + (it.chance || 0.3), 0)
+    const totalChance = available.reduce((acc, it) => {
+      let weight = it.chance || 0.3
+      if (isLucky && (it.rarity === 'uncommon' || it.rarity === 'rare' || it.rarity === 'very_rare')) {
+        weight *= 1.15
+      }
+      return acc + weight
+    }, 0)
     let randomVal = Math.random() * totalChance
     let chosenIdx = -1
 
     for (let j = 0; j < available.length; j++) {
-      randomVal -= (available[j].chance || 0.3)
+      let weight = available[j].chance || 0.3
+      if (isLucky && (available[j].rarity === 'uncommon' || available[j].rarity === 'rare' || available[j].rarity === 'very_rare')) {
+        weight *= 1.15
+      }
+      randomVal -= weight
       if (randomVal <= 0) {
         chosenIdx = j
         break
@@ -277,8 +322,15 @@ export function rollSupplyLoot(lootConfig) {
     if (chosenIdx !== -1) {
       const chosen = available.splice(chosenIdx, 1)[0]
       const preset = DEFAULT_PRESET_ITEMS.find(p => p.itemId === chosen.itemId)
-      const minQ = chosen.min || 1
-      const maxQ = chosen.max || 1
+      let minQ = chosen.min || 1
+      let maxQ = chosen.max || 1
+
+      // Desvantagem Azarado: encontra sucata em maior quantidade (2 a 5)
+      if (isUnlucky && (chosen.rarity === 'junk' || preset?.rarity === 'junk')) {
+        minQ = Math.max(2, minQ)
+        maxQ = Math.max(5, maxQ)
+      }
+
       const qty = Math.floor(Math.random() * (maxQ - minQ + 1)) + minQ
 
       rolled.push({
@@ -328,10 +380,11 @@ export function rollUniqueLoot(locationUniqueConfig) {
 }
 
 /**
- * Calcula a vida (HP/Sangue) máxima do personagem: 50 + (Constituição * 10)
+ * Calcula a vida (HP/Sangue) máxima do personagem: 100 + (Constituição * 5)
+ * Exemplo: 4 de constituição = 120 HP
  */
 export function getMaxHp(character) {
   const con = Number(character?.attributes?.constituicao) || 0
-  return 50 + (con * 10)
+  return 100 + (con * 5)
 }
 

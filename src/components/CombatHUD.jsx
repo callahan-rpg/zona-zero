@@ -199,7 +199,7 @@ export default function CombatHUD({ locationSlug }) {
 
                     {/* ATRIBUTOS SIMPLIFICADOS */}
                     <div className="combat-attributes-strip">
-                      {['forca', 'destreza', 'constituicao', 'sabedoria', 'carisma'].map(attrKey => {
+                      {Object.keys(ATTRIBUTE_ICONS).map(attrKey => {
                         const meta = ATTRIBUTE_ICONS[attrKey]
                         const val = char.attributes?.[attrKey] ?? 1
                         return (
@@ -309,7 +309,7 @@ export default function CombatHUD({ locationSlug }) {
                       {/* ATRIBUTOS SIMPLIFICADOS DO INIMIGO */}
                       {enemy.attributes && (
                         <div className="combat-attributes-strip">
-                          {['forca', 'destreza', 'constituicao', 'sabedoria', 'carisma'].map(attrKey => {
+                          {Object.keys(ATTRIBUTE_ICONS).map(attrKey => {
                             const meta = ATTRIBUTE_ICONS[attrKey]
                             const val = enemy.attributes?.[attrKey] ?? 0
                             return (
