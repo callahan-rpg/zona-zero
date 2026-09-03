@@ -279,7 +279,9 @@ export default function CharacterPopup({ onClose }) {
                           </span>
                         )}
                       </div>
-                      <span className="character-float-attr-lbl" style={{ fontSize: 9.5 }}>{attr.label}</span>
+                      <span className="character-float-attr-lbl" style={{ fontSize: 9.5 }}>
+                        {{'forca':'FOR','destreza':'DES','agilidade':'AGI','sabedoria':'SAB','percepcao':'PER','inteligencia':'INT','carisma':'CAR','constituicao':'CON'}[attr.key] || attr.label}
+                      </span>
                     </div>
                   )
                 })}

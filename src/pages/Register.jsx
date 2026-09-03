@@ -411,7 +411,7 @@ export default function Register() {
 
   // Accordions
   const [expandTraitsSection, setExpandTraitsSection] = useState(true)
-  const [expandPerksSection, setExpandPerksSection] = useState(false)
+  const [expandPerksSection, setExpandPerksSection] = useState(true)
 
   // Firestore data
   const [registeredUsers, setRegisteredUsers] = useState([])
@@ -530,10 +530,51 @@ export default function Register() {
   }
 
   function toggleTrait(traitId) {
+    const trait = TRAITS[traitId]
+    if (!trait) return
+
+    // Se está tentando ATIVAR um traço, verifica conflito com o traço opostor da mesma attrKey
+    if (!selectedTraits.includes(traitId)) {
+      const opposingType = trait.type === 'positive' ? 'negative' : 'positive'
+      const conflict = Object.values(TRAITS).find(
+        t => t.attrKey === trait.attrKey && t.type === opposingType && selectedTraits.includes(t.id)
+      )
+      if (conflict) {
+        alert(`⚠️ Conflito! O traço "${trait.name}" e "${conflict.name}" afetam o mesmo atributo (${conflict.summary.replace(/[+-]3 /, '')}) e se anulam mutuamente. Remova "${conflict.name}" primeiro para poder escolher "${trait.name}".`)
+        return
+      }
+    }
+
     setSelectedTraits(prev => prev.includes(traitId) ? prev.filter(t => t !== traitId) : [...prev, traitId])
   }
 
   function togglePerk(perkId) {
+    const perk = PERKS[perkId]
+    if (!perk) return
+
+    // Se está tentando ATIVAR uma vantagem/desvantagem, verifica conflito com a oposta
+    if (!selectedPerks.includes(perkId)) {
+      // Pares de conflito conhecidos (mesma mecânica, efeito oposto)
+      const PERK_CONFLICTS = {
+        hidratado:        'sedento',
+        sedento:          'hidratado',
+        estomago_pequeno: 'faminto',
+        faminto:          'estomago_pequeno',
+        sortudo:          'azarado',
+        azarado:          'sortudo',
+        alta_imunidade:   'baixa_imunidade',
+        baixa_imunidade:  'alta_imunidade',
+        pele_grossa:      'pele_fragil',
+        pele_fragil:      'pele_grossa',
+      }
+      const conflictId = PERK_CONFLICTS[perkId]
+      if (conflictId && selectedPerks.includes(conflictId)) {
+        const conflict = PERKS[conflictId]
+        alert(`⚠️ Conflito! "${perk.name}" e "${conflict?.name || conflictId}" têm efeitos opostos e se anulam mutuamente. Remova "${conflict?.name || conflictId}" primeiro para poder escolher "${perk.name}".`)
+        return
+      }
+    }
+
     setSelectedPerks(prev => prev.includes(perkId) ? prev.filter(p => p !== perkId) : [...prev, perkId])
   }
 
