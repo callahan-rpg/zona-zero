@@ -11,7 +11,14 @@ import NotificationBell from './NotificationBell.jsx'
 import MoneyTransferModal from './MoneyTransferModal.jsx'
 import GameIcon from './GameIcon.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
-import { hasFeatureUnlocked, getTimeOfDay, getVitalsDebuffs, getMaxHp } from '../utils/itemSystem'
+import {
+  hasFeatureUnlocked,
+  getTimeOfDay,
+  getVitalsDebuffs,
+  getMaxHp,
+  calculateCharacterEquipmentStats,
+  calculateBodyTemperature
+} from '../utils/itemSystem'
 
 export default function HUD({ locationName }) {
   const { character, role, logout } = useAuth()
@@ -106,6 +113,10 @@ export default function HUD({ locationName }) {
   const isBloodLow = bloodPct < 30
   const hasVitalWarning = isHungerLow || isThirstLow || isBloodLow
 
+  // Equipamento e Proteção Térmica do Personagem
+  const equipmentStats = calculateCharacterEquipmentStats(character?.inventory || [])
+  const thermalInfo = calculateBodyTemperature(weather.temperature, equipmentStats.totalInsulation)
+
   return (
     <>
       <header className="hud">
@@ -134,10 +145,15 @@ export default function HUD({ locationName }) {
           <button
             className={`hud-weather ${showCalendar ? 'active' : ''}`}
             onClick={() => setShowCalendar(prev => !prev)}
-            title={hasClock ? "Clique para abrir o Calendário de Sobrevivência & Eventos" : "Você não possui um relógio. Exibindo estimativa solar do período."}
+            title={`Clima: ${weather.label} (${weather.temperature}°C) | ${hasClock ? `Horário: ${gameTime.timeString}` : `Estimativa: ${periodOfDay.label}`}${equipmentStats.totalInsulation > 0 ? `\nIsolamento das Roupas: +${equipmentStats.totalInsulation}°C (Sensação: ${thermalInfo.effectiveTemp}°C - ${thermalInfo.label})` : ''}\nClique para abrir o Calendário de Sobrevivência & Eventos`}
           >
             <span className="weather-icon">{weather.icon}</span>
             <span className="temp">{weather.temperature}°C</span>
+            {equipmentStats.totalInsulation > 0 && (
+              <span className="thermal-insulation-tag" title={`Roupas equipadas: +${equipmentStats.totalInsulation}°C (Sensação: ${thermalInfo.effectiveTemp}°C)`}>
+                +{equipmentStats.totalInsulation}°
+              </span>
+            )}
             <span className="separator">|</span>
             {hasClock ? (
               <span className="time" style={{ fontWeight: 'bold' }}>{gameTime.timeString}</span>

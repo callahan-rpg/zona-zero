@@ -5,7 +5,15 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
 import GameIcon from '../components/GameIcon.jsx'
 import MoneyTransferModal from '../components/MoneyTransferModal.jsx'
-import { getVitalsDebuffs, getMaxHp, DEFAULT_PRESET_ITEMS, RARITY_META } from '../utils/itemSystem'
+import EquipmentPaperdoll from '../components/EquipmentPaperdoll.jsx'
+import {
+  getVitalsDebuffs,
+  getMaxHp,
+  DEFAULT_PRESET_ITEMS,
+  RARITY_META,
+  calculateCharacterEquipmentStats,
+  calculateBodyTemperature
+} from '../utils/itemSystem'
 import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
 import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
 
@@ -98,7 +106,16 @@ function xpForNextLevel(level) {
 }
 
 export default function Character() {
-  const { user, character, updateCharacter, transferItem, consumeItem, discardItem } = useAuth()
+  const {
+    user,
+    character,
+    updateCharacter,
+    transferItem,
+    consumeItem,
+    discardItem,
+    equipItem,
+    unequipItem
+  } = useAuth()
 
   const debuffInfo = getVitalsDebuffs(character?.vitals || {})
 
@@ -186,24 +203,51 @@ export default function Character() {
 
   const rawInventory = character?.inventory || []
 
-  // Hidrata itens do inventário com os dados mais recentes do catálogo (imagem, raridade, etc)
+  // Hidrata itens do inventário com os dados mais recentes do catálogo (imagem, raridade, equipSlot, dano, durabilidade, etc)
   const inventory = useMemo(() => {
     return rawInventory.map(item => {
       const catData = catalogMap[item.itemId]
-      if (!catData) return item
+      const presetData = DEFAULT_PRESET_ITEMS.find(p => p.itemId === item.itemId)
+
+      const equipSlot = catData?.equipSlot || item.equipSlot || presetData?.equipSlot || null
+      const insulation = catData?.insulation !== undefined ? Number(catData.insulation) : item.insulation !== undefined ? Number(item.insulation) : (presetData?.insulation ?? 0)
+      const damageReduction = catData?.damageReduction !== undefined ? Number(catData.damageReduction) : item.damageReduction !== undefined ? Number(item.damageReduction) : (presetData?.damageReduction ?? 0)
+      const damageMin = catData?.damageMin !== undefined ? Number(catData.damageMin) : item.damageMin !== undefined ? Number(item.damageMin) : (presetData?.damageMin ?? null)
+      const damageMax = catData?.damageMax !== undefined ? Number(catData.damageMax) : item.damageMax !== undefined ? Number(item.damageMax) : (presetData?.damageMax ?? null)
+      const maxDurability = catData?.maxDurability !== undefined ? Number(catData.maxDurability) : item.maxDurability !== undefined ? Number(item.maxDurability) : (presetData?.maxDurability ?? null)
+      const durability = item.durability !== undefined ? Number(item.durability) : (maxDurability ?? null)
+
       return {
         ...item,
-        name: catData.name || item.name,
-        icon: catData.icon || item.icon,
-        imageUrl: catData.imageUrl || item.imageUrl || '',
-        rarity: catData.rarity || item.rarity || 'common',
-        category: catData.category || item.category,
-        consumable: catData.consumable !== undefined ? catData.consumable : item.consumable,
-        consumeEffect: catData.consumeEffect || item.consumeEffect,
-        description: catData.description || item.description,
+        name: catData?.name || item.name || presetData?.name || 'Item',
+        icon: catData?.icon || item.icon || presetData?.icon || '📦',
+        imageUrl: catData?.imageUrl || item.imageUrl || '',
+        rarity: catData?.rarity || item.rarity || presetData?.rarity || 'common',
+        category: catData?.category || item.category || presetData?.category || 'general',
+        consumable: catData?.consumable !== undefined ? catData.consumable : item.consumable,
+        consumeEffect: catData?.consumeEffect || item.consumeEffect,
+        description: catData?.description || item.description || presetData?.description || '',
+        equipSlot,
+        insulation,
+        damageReduction,
+        damageMin,
+        damageMax,
+        maxDurability,
+        durability,
+        equipped: item.equipped === true,
       }
     })
   }, [rawInventory, catalogMap])
+
+  // Estatísticas de Equipamento e Térmica
+  const equipmentStats = useMemo(() => {
+    return calculateCharacterEquipmentStats(inventory)
+  }, [inventory])
+
+  const thermalInfo = useMemo(() => {
+    // 20°C clima base padrão se não estiver em ambiente específico
+    return calculateBodyTemperature(20, equipmentStats.totalInsulation)
+  }, [equipmentStats.totalInsulation])
 
   // Agrupamento e contagem por categorias
   const { filteredItems, categoryCounts } = useMemo(() => {
@@ -691,6 +735,14 @@ export default function Character() {
               </div>
             </div>
 
+            {/* Painel do Esqueleto de Equipamento & Traje */}
+            <EquipmentPaperdoll
+              equipmentStats={equipmentStats}
+              thermalInfo={thermalInfo}
+              onUnequipItem={(item) => unequipItem(item.instanceId)}
+              disabled={actionLoading}
+            />
+
             {/* Abas de Categoria */}
             <div className="inventory-tabs">
               {INVENTORY_CATEGORIES.map((cat) => {
@@ -731,9 +783,24 @@ export default function Character() {
                   const catMeta = CATEGORY_LABELS[item._category] || CATEGORY_LABELS.general
                   const rMeta = RARITY_META[item.rarity] || RARITY_META.common
                   const isConsumable = item.consumable === true || (item.consumeEffect && Object.keys(item.consumeEffect).length > 0)
+                  const canEquip = !!item.equipSlot
+                  const isEquipped = item.equipped === true
+
+                  // Cálculo de Durabilidade
+                  const maxDur = item.maxDurability ? Number(item.maxDurability) : null
+                  const curDur = item.durability !== undefined ? Number(item.durability) : maxDur
+                  const durPct = maxDur && maxDur > 0 ? Math.max(0, Math.min(100, Math.round((curDur / maxDur) * 100))) : null
+                  const isBroken = durPct !== null && durPct <= 0
+
+                  let durColor = '#4ade80'
+                  if (durPct !== null) {
+                    if (durPct <= 25) durColor = '#ef4444'
+                    else if (durPct <= 50) durColor = '#f59e0b'
+                  }
+
                   return (
                     <div
-                      className="inventory-item-card"
+                      className={`inventory-item-card ${isEquipped ? 'item-is-equipped' : ''}`}
                       key={item.instanceId}
                       style={{
                         borderLeft: `3px solid ${rMeta.color || 'var(--glass-border)'}`,
@@ -762,7 +829,12 @@ export default function Character() {
                           >
                             {catMeta.label}
                           </span>
-                          {rMeta && (
+                          {isEquipped && (
+                            <span style={{ fontSize: 9, color: '#38bdf8', fontWeight: 'bold', background: 'rgba(56, 189, 248, 0.15)', padding: '1px 5px', borderRadius: 4, border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+                              ⚡ EQUIPADO
+                            </span>
+                          )}
+                          {!isEquipped && rMeta && (
                             <span style={{ fontSize: 9, color: rMeta.color, fontWeight: 'bold', textTransform: 'uppercase' }}>
                               {rMeta.label}
                             </span>
@@ -777,6 +849,41 @@ export default function Character() {
                         <div className="inventory-item-card-qty">
                           Quantidade: <span>×{item.quantity}</span>
                         </div>
+
+                        {/* Badges de Atributos (Dano, Isolamento, Redução Fixa) */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                          {item.insulation > 0 && (
+                            <span style={{ fontSize: 9, background: 'rgba(74,222,128,0.12)', color: '#4ade80', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(74,222,128,0.25)' }}>
+                              🧥 +{item.insulation}°C
+                            </span>
+                          )}
+                          {item.damageReduction > 0 && (
+                            <span style={{ fontSize: 9, background: 'rgba(56,189,248,0.12)', color: '#38bdf8', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(56,189,248,0.25)' }}>
+                              🛡️ -{item.damageReduction} fixo
+                            </span>
+                          )}
+                          {item.damageMin && (
+                            <span style={{ fontSize: 9, background: 'rgba(239,68,68,0.12)', color: '#f87171', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(239,68,68,0.25)' }}>
+                              ⚔️ {item.damageMin}–{item.damageMax}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Barra de Durabilidade */}
+                        {maxDur !== null && (
+                          <div style={{ marginTop: 6 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>
+                              <span>Durabilidade</span>
+                              <strong style={{ color: isBroken ? '#ef4444' : durColor }}>
+                                {isBroken ? '⚠️ QUEBRADO' : `${curDur}/${maxDur}`}
+                              </strong>
+                            </div>
+                            <div style={{ height: 4, width: '100%', background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${durPct}%`, background: durColor, borderRadius: 2 }} />
+                            </div>
+                          </div>
+                        )}
+
                         {item.description && (
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, lineClamp: 2 }}>
                             {item.description}
@@ -785,7 +892,53 @@ export default function Character() {
                       </div>
 
                       {/* Ações do Item */}
-                      <div className="inventory-item-actions" style={{ display: 'grid', gridTemplateColumns: isConsumable ? '1fr 1fr 1fr' : '1fr 1fr', gap: 4, marginTop: 8 }}>
+                      <div className="inventory-item-actions" style={{ display: 'grid', gridTemplateColumns: canEquip ? '1fr 1fr' : isConsumable ? '1fr 1fr 1fr' : '1fr 1fr', gap: 4, marginTop: 8 }}>
+                        {canEquip && (
+                          isEquipped ? (
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              style={{ background: 'rgba(56, 189, 248, 0.15)', borderColor: '#38bdf8', color: '#38bdf8', padding: '4px 6px', fontSize: 11 }}
+                              onClick={async () => {
+                                try {
+                                  setActionLoading(true)
+                                  await unequipItem(item.instanceId)
+                                } catch (err) {
+                                  console.error(err)
+                                  alert('Erro ao desequipar: ' + err.message)
+                                } finally {
+                                  setActionLoading(false)
+                                }
+                              }}
+                              disabled={actionLoading}
+                              title="Desequipar item"
+                            >
+                              <span>✕ Desequipar</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              style={{ background: 'rgba(56, 189, 248, 0.2)', borderColor: '#38bdf8', color: '#38bdf8', padding: '4px 6px', fontSize: 11, fontWeight: 600 }}
+                              onClick={async () => {
+                                try {
+                                  setActionLoading(true)
+                                  await equipItem(item.instanceId)
+                                } catch (err) {
+                                  console.error(err)
+                                  alert('Erro ao equipar: ' + err.message)
+                                } finally {
+                                  setActionLoading(false)
+                                }
+                              }}
+                              disabled={actionLoading}
+                              title="Equipar / Vestir no personagem"
+                            >
+                              <span>⚡ Equipar</span>
+                            </button>
+                          )
+                        )}
+
                         {isConsumable && (
                           <button
                             className="btn btn-sm"
@@ -796,6 +949,7 @@ export default function Character() {
                             <span>🍽️ Usar</span>
                           </button>
                         )}
+
                         <button
                           className="btn btn-sm inventory-transfer-btn"
                           style={{ padding: '4px 6px', fontSize: 11 }}
@@ -804,6 +958,7 @@ export default function Character() {
                         >
                           <span>🤝 Enviar</span>
                         </button>
+
                         {!item.isQuestItem && (
                           <button
                             className="btn btn-sm btn-danger"

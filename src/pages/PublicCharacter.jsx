@@ -4,7 +4,13 @@ import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import HUD from '../components/HUD.jsx'
 import GameIcon from '../components/GameIcon.jsx'
-import { RARITY_META } from '../utils/itemSystem'
+import EquipmentPaperdoll from '../components/EquipmentPaperdoll.jsx'
+import {
+  RARITY_META,
+  DEFAULT_PRESET_ITEMS,
+  calculateCharacterEquipmentStats,
+  calculateBodyTemperature
+} from '../utils/itemSystem'
 import { getItemCategory, INVENTORY_CATEGORIES } from './Character.jsx'
 import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
 import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
@@ -71,18 +77,43 @@ export default function PublicCharacter() {
   const inventory = useMemo(() => {
     return rawInventory.map(item => {
       const catData = catalogMap[item.itemId]
-      if (!catData) return item
+      const presetData = DEFAULT_PRESET_ITEMS.find(p => p.itemId === item.itemId)
+
+      const equipSlot = catData?.equipSlot || item.equipSlot || presetData?.equipSlot || null
+      const insulation = catData?.insulation !== undefined ? Number(catData.insulation) : item.insulation !== undefined ? Number(item.insulation) : (presetData?.insulation ?? 0)
+      const damageReduction = catData?.damageReduction !== undefined ? Number(catData.damageReduction) : item.damageReduction !== undefined ? Number(item.damageReduction) : (presetData?.damageReduction ?? 0)
+      const damageMin = catData?.damageMin !== undefined ? Number(catData.damageMin) : item.damageMin !== undefined ? Number(item.damageMin) : (presetData?.damageMin ?? null)
+      const damageMax = catData?.damageMax !== undefined ? Number(catData.damageMax) : item.damageMax !== undefined ? Number(item.damageMax) : (presetData?.damageMax ?? null)
+      const maxDurability = catData?.maxDurability !== undefined ? Number(catData.maxDurability) : item.maxDurability !== undefined ? Number(item.maxDurability) : (presetData?.maxDurability ?? null)
+      const durability = item.durability !== undefined ? Number(item.durability) : (maxDurability ?? null)
+
       return {
         ...item,
-        name: catData.name || item.name,
-        icon: catData.icon || item.icon,
-        imageUrl: catData.imageUrl || item.imageUrl || '',
-        rarity: catData.rarity || item.rarity || 'common',
-        category: catData.category || item.category,
-        description: catData.description || item.description,
+        name: catData?.name || item.name || presetData?.name || 'Item',
+        icon: catData?.icon || item.icon || presetData?.icon || '📦',
+        imageUrl: catData?.imageUrl || item.imageUrl || '',
+        rarity: catData?.rarity || item.rarity || presetData?.rarity || 'common',
+        category: catData?.category || item.category || presetData?.category || 'general',
+        description: catData?.description || item.description || presetData?.description || '',
+        equipSlot,
+        insulation,
+        damageReduction,
+        damageMin,
+        damageMax,
+        maxDurability,
+        durability,
+        equipped: item.equipped === true,
       }
     })
   }, [rawInventory, catalogMap])
+
+  const equipmentStats = useMemo(() => {
+    return calculateCharacterEquipmentStats(inventory)
+  }, [inventory])
+
+  const thermalInfo = useMemo(() => {
+    return calculateBodyTemperature(20, equipmentStats.totalInsulation)
+  }, [equipmentStats.totalInsulation])
 
   const { filteredItems, categoryCounts } = useMemo(() => {
     const counts = { all: inventory.length, general: 0, supplies: 0, clothing: 0, melee: 0, firearms: 0, medical: 0 }
@@ -343,6 +374,13 @@ export default function PublicCharacter() {
                 </span>
               </div>
             </div>
+
+            {/* Painel de Equipamento & Traje do Sobrevivente */}
+            <EquipmentPaperdoll
+              equipmentStats={equipmentStats}
+              thermalInfo={thermalInfo}
+              disabled={true}
+            />
 
             {/* Abas de Categoria */}
             <div className="inventory-tabs">

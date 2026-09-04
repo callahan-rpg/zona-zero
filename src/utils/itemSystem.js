@@ -12,6 +12,24 @@ export const RARITY_META = {
   exceptional: { id: 'exceptional', label: 'Excepcional',  color: '#ff9800', bg: 'rgba(255, 152, 0, 0.28)',   border: '#ff9800', icon: '🟠' },
 }
 
+export const EQUIPMENT_SLOTS = [
+  { id: 'head',          label: 'Cabeça / Rosto',            icon: '🧢', placeholder: 'Nenhum item na cabeça' },
+  { id: 'torso_inner',   label: 'Tórax (Blusa / Traje)',     icon: '👕', placeholder: 'Sem blusa / camiseta' },
+  { id: 'torso_outer',   label: 'Tórax (Colete / Armadura)', icon: '🛡️', placeholder: 'Sem colete / armadura' },
+  { id: 'hands_gloves',  label: 'Mãos (Luvas)',              icon: '🧤', placeholder: 'Sem luvas de proteção' },
+  { id: 'hands_weapon',  label: 'Mãos (Arma Principal)',     icon: '⚔️', placeholder: 'Desarmado (Soco: 3–6)' },
+  { id: 'legs',          label: 'Pernas (Calças)',           icon: '👖', placeholder: 'Sem calças resistentes' },
+  { id: 'feet',          label: 'Pés (Calçados)',            icon: '👟', placeholder: 'Descalço' },
+]
+
+export const UNARMED_ATTACK = {
+  name: 'Desarmado (Soco)',
+  icon: '👊',
+  damageMin: 3,
+  damageMax: 6,
+  damageText: '3–6'
+}
+
 export const DEFAULT_PRESET_ITEMS = [
   // COZINHA
   { itemId: 'saco_lixo', name: 'Sacos de Lixo', icon: '🗑️', category: 'general', rarity: 'junk', consumable: false, isQuestItem: false, description: 'Sacos plásticos usados para descarte ou contenção rápida.' },
@@ -25,23 +43,23 @@ export const DEFAULT_PRESET_ITEMS = [
   { itemId: 'produto_limpeza', name: 'Produto de Limpeza', icon: '🧴', category: 'general', rarity: 'common', consumable: false, isQuestItem: false, description: 'Detergente e desinfetante.' },
   { itemId: 'abridor_latas', name: 'Abridor de Latas', icon: '🧰', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Ferramenta compacta para abrir conservas.' },
   { itemId: 'isqueiro_fosforo', name: 'Isqueiro e Fósforos', icon: '🔥', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Fonte portátil para fazer fogo.' },
-  { itemId: 'faca_cozinha', name: 'Faca de Cozinha', icon: '🔪', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Lâmina afiada usada na culinária e defesa.' },
-  { itemId: 'panela_frigideira', name: 'Panela de Ferro', icon: '🍳', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Utensílio culinário resistente e pesado.' },
+  { itemId: 'faca_cozinha', name: 'Faca de Cozinha', icon: '🔪', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 12, damageMax: 18, maxDurability: 80, durability: 80, description: 'Lâmina afiada usada na culinária e defesa.' },
+  { itemId: 'panela_frigideira', name: 'Panela de Ferro', icon: '🍳', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 10, damageMax: 16, maxDurability: 120, durability: 120, description: 'Utensílio culinário resistente e pesado.' },
 
   // QUARTO
   { itemId: 'livros_revistas', name: 'Livros e Revistas', icon: '📚', category: 'general', rarity: 'junk', consumable: false, isQuestItem: false, description: 'Leituras do velho mundo.' },
   { itemId: 'celular_descarregado', name: 'Celular sem Bateria', icon: '📱', category: 'general', rarity: 'junk', consumable: false, isQuestItem: false, description: 'Aparelho inútil sem rede elétrica.' },
   { itemId: 'dinheiro_papel', name: 'Notas de Dinheiro', icon: '💵', category: 'general', rarity: 'junk', consumable: false, isQuestItem: false, description: 'Cédulas de papel sem valor comercial atual.' },
-  { itemId: 'roupas_comuns', name: 'Roupas Comuns', icon: '👕', category: 'clothing', rarity: 'common', consumable: false, isQuestItem: false, description: 'Camisa e calça em bom estado.' },
-  { itemId: 'meias', name: 'Par de Meias', icon: '🧦', category: 'clothing', rarity: 'common', consumable: false, isQuestItem: false, description: 'Mantém os pés secos e protegidos.' },
-  { itemId: 'calcados_tenis', name: 'Tênis Resistente', icon: '👟', category: 'clothing', rarity: 'common', consumable: false, isQuestItem: false, description: 'Calçado confortável para caminhadas longas.' },
+  { itemId: 'roupas_comuns', name: 'Roupas Comuns', icon: '👕', category: 'clothing', rarity: 'common', consumable: false, isQuestItem: false, equipSlot: 'torso_inner', insulation: 6, damageReduction: 0, maxDurability: 100, durability: 100, description: 'Camisa e calça em bom estado.' },
+  { itemId: 'meias', name: 'Par de Meias', icon: '🧦', category: 'clothing', rarity: 'common', consumable: false, isQuestItem: false, equipSlot: 'feet', insulation: 2, damageReduction: 0, maxDurability: 80, durability: 80, description: 'Mantém os pés secos e protegidos.' },
+  { itemId: 'calcados_tenis', name: 'Tênis Resistente', icon: '👟', category: 'clothing', rarity: 'common', consumable: false, isQuestItem: false, equipSlot: 'feet', insulation: 3, damageReduction: 1, maxDurability: 150, durability: 150, description: 'Calçado confortável para caminhadas longas.' },
   { itemId: 'bandagem', name: 'Bandagem Estéril', icon: '🩹', category: 'medical', rarity: 'common', consumable: true, consumeEffect: { blood: 25 }, isQuestItem: false, description: 'Estanca sangramentos leves e protege feridas.' },
   { itemId: 'remedio_basico', name: 'Remédios Básicos', icon: '💊', category: 'medical', rarity: 'common', consumable: true, consumeEffect: { blood: 15, hunger: -5 }, isQuestItem: false, description: 'Analgésicos e anti-inflamatórios.' },
   { itemId: 'perfume', name: 'Vidro de Perfume', icon: '✨', category: 'general', rarity: 'common', consumable: false, isQuestItem: false, description: 'Fragrância ainda preservada.' },
   { itemId: 'carregador_cabos', name: 'Carregador e Cabos', icon: '🔌', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Cabos elétricos diversos.' },
   { itemId: 'mochila_pequena', name: 'Mochila Pequena', icon: '🎒', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Espaço extra de transporte.' },
   { itemId: 'chaves_genericas', name: 'Molho de Chaves', icon: '🗝️', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Chaves de portas e cadeados residenciais.' },
-  { itemId: 'oculos_grau', name: 'Óculos', icon: '👓', category: 'clothing', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Óculos com armação preservada.' },
+  { itemId: 'oculos_grau', name: 'Óculos', icon: '👓', category: 'clothing', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'head', insulation: 0, damageReduction: 0, maxDurability: 80, durability: 80, description: 'Óculos com armação preservada.' },
   { itemId: 'relogio_pulso', name: 'Relógio de Pulso', icon: '⌚', category: 'general', rarity: 'rare', unlocks: ['hud_clock'], consumable: false, isQuestItem: false, description: 'Relógio mecânico analógico. Permite ver o horário exato.' },
 
   // BANHEIRO
@@ -56,12 +74,12 @@ export const DEFAULT_PRESET_ITEMS = [
   // GARAGEM / ÁREA DE SERVIÇO
   { itemId: 'pregos_parafusos', name: 'Caixa de Pregos e Parafusos', icon: '🔩', category: 'general', rarity: 'junk', consumable: false, isQuestItem: false, description: 'Peças metálicas para carpintaria.' },
   { itemId: 'pregadores', name: 'Pregadores de Roupa', icon: '📎', category: 'general', rarity: 'junk', consumable: false, isQuestItem: false, description: 'Presilhas plásticas e de madeira.' },
-  { itemId: 'tabua_madeira', name: 'Tábua de Madeira', icon: '🪵', category: 'melee', rarity: 'junk', consumable: false, isQuestItem: false, description: 'Pedaço de tábua que pode ser improvisado.' },
+  { itemId: 'tabua_madeira', name: 'Tábua de Madeira', icon: '🪵', category: 'melee', rarity: 'junk', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 8, damageMax: 14, maxDurability: 50, durability: 50, description: 'Pedaço de tábua que pode ser improvisado.' },
   { itemId: 'fita_adesiva', name: 'Fita Adesiva Reforçada', icon: '🩹', category: 'general', rarity: 'common', consumable: false, isQuestItem: false, description: 'Fita adesiva de alta resistência.' },
-  { itemId: 'luvas_trabalho', name: 'Luvas de Proteção', icon: '🧤', category: 'clothing', rarity: 'common', consumable: false, isQuestItem: false, description: 'Protegem as mãos contra detritos e cortes.' },
-  { itemId: 'chave_fenda', name: 'Chave de Fenda', icon: '🪛', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Ferramenta de manutenção e perfuração.' },
-  { itemId: 'alicate', name: 'Alicate Universal', icon: '🔧', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Corta fios e prende estruturas.' },
-  { itemId: 'martelo', name: 'Martelo de Orelha', icon: '🔨', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Ferramenta pesada contundente.' },
+  { itemId: 'luvas_trabalho', name: 'Luvas de Proteção', icon: '🧤', category: 'clothing', rarity: 'common', consumable: false, isQuestItem: false, equipSlot: 'hands_gloves', insulation: 3, damageReduction: 1, maxDurability: 120, durability: 120, description: 'Protegem as mãos contra detritos e cortes.' },
+  { itemId: 'chave_fenda', name: 'Chave de Fenda', icon: '🪛', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 8, damageMax: 14, maxDurability: 90, durability: 90, description: 'Ferramenta de manutenção e perfuração.' },
+  { itemId: 'alicate', name: 'Alicate Universal', icon: '🔧', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 8, damageMax: 14, maxDurability: 110, durability: 110, description: 'Corta fios e prende estruturas.' },
+  { itemId: 'martelo', name: 'Martelo de Orelha', icon: '🔨', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 10, damageMax: 16, maxDurability: 150, durability: 150, description: 'Ferramenta pesada contundente.' },
   { itemId: 'baterias_pilhas', name: 'Pilhas e Baterias', icon: '🔋', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Alimentação para eletrônicos e lanternas.' },
   { itemId: 'extensao_eletrica', name: 'Extensão Elétrica', icon: '🔌', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Fio longo emborrachado.' },
   { itemId: 'lanterna_portatil', name: 'Lanterna Portátil', icon: '🔦', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Facho de luz portátil.' },
@@ -71,32 +89,32 @@ export const DEFAULT_PRESET_ITEMS = [
   // RAROS DE BUSCA ÚNICA & APARTAMENTOS
   { itemId: 'notebook_estudante', name: 'Notebook Funcional', icon: '💻', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Computador portátil com arquivos e bateria preservada.' },
   { itemId: 'celular_funcional', name: 'Smartphone Operacional', icon: '📱', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Aparelho desbloqueado com dados armazenados.' },
-  { itemId: 'pistola_glock', name: 'Pistola 9mm', icon: '🔫', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Arma de fogo semi-automática confiável.' },
+  { itemId: 'pistola_glock', name: 'Pistola 9mm', icon: '🔫', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 22, damageMax: 28, maxDurability: 200, durability: 200, description: 'Arma de fogo semi-automática confiável.' },
   { itemId: 'municao_9mm', name: 'Caixa de Munição 9mm', icon: '📦', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Cartuchos para armas curtas.' },
   { itemId: 'kit_cirurgico', name: 'Kit Médico Avançado', icon: '🩺', category: 'medical', rarity: 'rare', consumable: true, consumeEffect: { blood: 60, thirst: 10 }, isQuestItem: false, description: 'Suturas estéreis, tesouras e analgésicos fortes.' },
-  { itemId: 'ferramentas_pro', name: 'Maleta de Ferramentas Pro', icon: '🧰', category: 'melee', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Conjunto completo de ferramentas pesadas.' },
-  { itemId: 'fuzil_militar', name: 'Fuzil Militar Tático', icon: '🎖️', category: 'firearms', rarity: 'very_rare', consumable: false, isQuestItem: false, description: 'Armamento de ponta das forças armadas.' },
-  { itemId: 'colete_balistico', name: 'Colete Balístico Kevlar', icon: '🛡️', category: 'clothing', rarity: 'very_rare', consumable: false, isQuestItem: false, description: 'Proteção blindada contra tiros e mordidas.' },
+  { itemId: 'ferramentas_pro', name: 'Maleta de Ferramentas Pro', icon: '🧰', category: 'melee', rarity: 'rare', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 10, damageMax: 16, maxDurability: 200, durability: 200, description: 'Conjunto completo de ferramentas pesadas.' },
+  { itemId: 'fuzil_militar', name: 'Fuzil Militar Tático', icon: '🎖️', category: 'firearms', rarity: 'very_rare', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 35, damageMax: 45, maxDurability: 250, durability: 250, description: 'Armamento de ponta das forças armadas.' },
+  { itemId: 'colete_balistico', name: 'Colete Balístico Kevlar', icon: '🛡️', category: 'clothing', rarity: 'very_rare', consumable: false, isQuestItem: false, equipSlot: 'torso_outer', damageReduction: 8, insulation: 2, maxDurability: 250, durability: 250, description: 'Proteção blindada contra tiros e mordidas (Redução fixa de dano).' },
   { itemId: 'reliquia_sobrevivente', name: 'Amuleto do Fundador', icon: '👑', category: 'general', rarity: 'exceptional', isQuestItem: true, consumable: false, description: 'Item lendário único deixado pelos primeiros colonizadores.' },
 
   // EQUIPAMENTOS E PROFISSÕES / ESPECIALIZAÇÕES
   { itemId: 'algemas', name: 'Algemas de Aço', icon: '⛓️', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Algemas de aço padrão policial com chave.' },
-  { itemId: 'machado_incendio', name: 'Machado de Incêndio', icon: '🪓', category: 'melee', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Machado pesado de cabo longo, excelente contra portas e infectados.' },
-  { itemId: 'roupa_bombeiro', name: 'Uniforme de Proteção Térmica', icon: '🦺', category: 'clothing', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Traje de bombeiro resistente a chamas e rasgos.' },
-  { itemId: 'mascara_respiratoria', name: 'Máscara Respiratória', icon: '🎭', category: 'clothing', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Filtro facial contra fumaça, poeira e toxinas leves.' },
+  { itemId: 'machado_incendio', name: 'Machado de Incêndio', icon: '🪓', category: 'melee', rarity: 'rare', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 25, damageMax: 35, maxDurability: 220, durability: 220, description: 'Machado pesado de cabo longo, excelente contra portas e infectados.' },
+  { itemId: 'roupa_bombeiro', name: 'Uniforme de Proteção Térmica', icon: '🦺', category: 'clothing', rarity: 'rare', consumable: false, isQuestItem: false, equipSlot: 'torso_inner', damageReduction: 4, insulation: 12, maxDurability: 200, durability: 200, description: 'Traje de bombeiro resistente a chamas e rasgos.' },
+  { itemId: 'mascara_respiratoria', name: 'Máscara Respiratória', icon: '🎭', category: 'clothing', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'head', damageReduction: 0, insulation: 1, maxDurability: 100, durability: 100, description: 'Filtro facial contra fumaça, poeira e toxinas leves.' },
   { itemId: 'municao_militar', name: 'Munição Militar 5.56mm', icon: '📦', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Pente de alta perfuração para fuzis táticos.' },
-  { itemId: 'traje_militar', name: 'Traje Militar Camuflado', icon: '🪖', category: 'clothing', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Uniforme de combate reforçado com camuflagem urbana.' },
-  { itemId: 'faca_tatica', name: 'Faca de Combate Militar', icon: '🗡️', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Lâmina serrilhada de aço forjado para combate tático.' },
+  { itemId: 'traje_militar', name: 'Traje Militar Camuflado', icon: '🪖', category: 'clothing', rarity: 'rare', consumable: false, isQuestItem: false, equipSlot: 'torso_inner', damageReduction: 3, insulation: 8, maxDurability: 180, durability: 180, description: 'Uniforme de combate reforçado com camuflagem urbana.' },
+  { itemId: 'faca_tatica', name: 'Faca de Combate Militar', icon: '🗡️', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 15, damageMax: 22, maxDurability: 140, durability: 140, description: 'Lâmina serrilhada de aço forjado para combate tático.' },
   { itemId: 'kit_primeiros_socorros', name: 'Kit de Primeiros Socorros', icon: '🚑', category: 'medical', rarity: 'uncommon', consumable: true, consumeEffect: { blood: 40 }, isQuestItem: false, description: 'Kit compacto para estancar sangramentos emergenciais.' },
   { itemId: 'bolsa_farmaceutica', name: 'Bolsa Farmacêutica', icon: '🧰', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Mala com compartimentos térmicos e frascos de ensaio.' },
   { itemId: 'ferramentas_tecnicas', name: 'Estojo de Ferramentas Técnicas', icon: '🔬', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Multímetro, chave de precisão e solda rápida.' },
-  { itemId: 'rifle_caca', name: 'Rifle de Caça com Luneta', icon: '🎯', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Rifle de ferrolho com mira telescópica para disparos precisos.' },
+  { itemId: 'rifle_caca', name: 'Rifle de Caça com Luneta', icon: '🎯', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 45, damageMax: 60, maxDurability: 200, durability: 200, description: 'Rifle de ferrolho com mira telescópica para disparos precisos.' },
   { itemId: 'municao_caca', name: 'Caixa de Cartuchos de Caça', icon: '📦', category: 'firearms', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Cartuchos pesados calibre .308 de alto impacto.' },
-  { itemId: 'faca_caca', name: 'Faca de Caça Afiada', icon: '🔪', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Lâmina especial para escalpelar presas e corte de tecidos grossos.' },
+  { itemId: 'faca_caca', name: 'Faca de Caça Afiada', icon: '🔪', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 15, damageMax: 22, maxDurability: 130, durability: 130, description: 'Lâmina especial para escalpelar presas e corte de tecidos grossos.' },
   { itemId: 'mochila_sobrevivencia', name: 'Mochila Tática de Mateiro', icon: '🎒', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Mochila robusta com alças e bolsos para longas caminhadas.' },
   { itemId: 'kit_armadilhas', name: 'Kit de Armadilhas Mecânicas', icon: '🐺', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Arapucas e laços para captura de animais de pequeno porte.' },
-  { itemId: 'canivete_multiuso', name: 'Canivete Multiuso', icon: '🗡️', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Canivete com múltiplas lâminas, abridor e serra fina.' },
-  { itemId: 'ferramentas_agricolas', name: 'Conjunto de Ferramentas Agrícolas', icon: '🧑‍🌾', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Enxada e foice manual para manejo de plantio.' },
+  { itemId: 'canivete_multiuso', name: 'Canivete Multiuso', icon: '🗡️', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 8, damageMax: 14, maxDurability: 100, durability: 100, description: 'Canivete com múltiplas lâminas, abridor e serra fina.' },
+  { itemId: 'ferramentas_agricolas', name: 'Conjunto de Ferramentas Agrícolas', icon: '🧑‍🌾', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 12, damageMax: 18, maxDurability: 120, durability: 120, description: 'Enxada e foice manual para manejo de plantio.' },
   { itemId: 'sementes_iniciais', name: 'Pacote de Sementes Mistas', icon: '🌱', category: 'supplies', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Sementes selecionadas de hortaliças e grãos nutritivos.' },
   { itemId: 'equipamento_quimico', name: 'Equipamento Químico Portátil', icon: '🧪', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Kit de tubos de ensaio, reagentes e medidores de pH.' },
   { itemId: 'caderno_pesquisa', name: 'Caderno de Anotações & Lupa', icon: '📖', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Diário de laboratório e lentes de aumento de precisão.' },
@@ -344,6 +362,14 @@ export function rollSupplyLoot(lootConfig, characterPerks = []) {
         consumable: chosen.consumable !== undefined ? chosen.consumable : (preset?.consumable ?? false),
         consumeEffect: chosen.consumeEffect || preset?.consumeEffect || null,
         isQuestItem: chosen.isQuestItem !== undefined ? chosen.isQuestItem : (preset?.isQuestItem ?? false),
+        equipSlot: chosen.equipSlot || preset?.equipSlot || null,
+        insulation: chosen.insulation !== undefined ? chosen.insulation : (preset?.insulation ?? 0),
+        damageReduction: chosen.damageReduction !== undefined ? chosen.damageReduction : (preset?.damageReduction ?? 0),
+        damageMin: chosen.damageMin !== undefined ? chosen.damageMin : (preset?.damageMin ?? null),
+        damageMax: chosen.damageMax !== undefined ? chosen.damageMax : (preset?.damageMax ?? null),
+        maxDurability: chosen.maxDurability !== undefined ? chosen.maxDurability : (preset?.maxDurability ?? null),
+        durability: chosen.durability !== undefined ? chosen.durability : (preset?.durability ?? preset?.maxDurability ?? null),
+        equipped: false,
         description: chosen.description || preset?.description || '',
         unlocks: chosen.unlocks || preset?.unlocks || [],
         obtainedAt: new Date().toISOString(),
@@ -372,6 +398,14 @@ export function rollUniqueLoot(locationUniqueConfig) {
       consumable: item.consumable !== undefined ? item.consumable : (preset?.consumable ?? false),
       consumeEffect: item.consumeEffect || preset?.consumeEffect || null,
       isQuestItem: item.isQuestItem !== undefined ? item.isQuestItem : (preset?.isQuestItem ?? false),
+      equipSlot: item.equipSlot || preset?.equipSlot || null,
+      insulation: item.insulation !== undefined ? item.insulation : (preset?.insulation ?? 0),
+      damageReduction: item.damageReduction !== undefined ? item.damageReduction : (preset?.damageReduction ?? 0),
+      damageMin: item.damageMin !== undefined ? item.damageMin : (preset?.damageMin ?? null),
+      damageMax: item.damageMax !== undefined ? item.damageMax : (preset?.damageMax ?? null),
+      maxDurability: item.maxDurability !== undefined ? item.maxDurability : (preset?.maxDurability ?? null),
+      durability: item.durability !== undefined ? item.durability : (preset?.durability ?? preset?.maxDurability ?? null),
+      equipped: false,
       description: item.description || preset?.description || '',
       unlocks: item.unlocks || preset?.unlocks || [],
       selected: false
@@ -387,4 +421,131 @@ export function getMaxHp(character) {
   const con = Number(character?.attributes?.constituicao) || 0
   return 100 + (con * 5)
 }
+
+/**
+ * Retorna as estatísticas totais e itens agrupados por slot de equipamento.
+ * Considera itens equipados no inventário (item.equipped === true).
+ */
+export function calculateCharacterEquipmentStats(inventory = []) {
+  const equippedMap = {
+    head: null,
+    torso_inner: null,
+    torso_outer: null,
+    hands_gloves: null,
+    hands_weapon: null,
+    legs: null,
+    feet: null,
+  }
+
+  let totalInsulation = 0
+  let totalDamageReduction = 0
+  let weapon = null
+
+  if (Array.isArray(inventory)) {
+    inventory.forEach(item => {
+      if (!item || !item.equipped) return
+
+      // Determina slot de equipamento do item (ou fallback)
+      const slot = item.equipSlot || (item.equippedSlot || null)
+      if (slot && equippedMap[slot] === null) {
+        equippedMap[slot] = item
+
+        const isBroken = (item.durability !== undefined && Number(item.durability) <= 0)
+
+        // Itens não quebrados concedem isolamento e redução de dano
+        if (!isBroken) {
+          if (item.insulation) {
+            totalInsulation += Number(item.insulation) || 0
+          }
+          if (item.damageReduction) {
+            totalDamageReduction += Number(item.damageReduction) || 0
+          }
+        }
+
+        if (slot === 'hands_weapon') {
+          weapon = item
+        }
+      }
+    })
+  }
+
+  let weaponStats = null
+  if (weapon) {
+    const isBroken = (weapon.durability !== undefined && Number(weapon.durability) <= 0)
+    const min = Number(weapon.damageMin) || 3
+    const max = Number(weapon.damageMax) || (min + 4)
+    weaponStats = {
+      name: weapon.name,
+      icon: weapon.icon || '⚔️',
+      damageMin: min,
+      damageMax: max,
+      damageText: `${min}–${max}`,
+      isBroken,
+      durability: weapon.durability,
+      maxDurability: weapon.maxDurability
+    }
+  } else {
+    weaponStats = { ...UNARMED_ATTACK }
+  }
+
+  return {
+    equippedMap,
+    totalInsulation,
+    totalDamageReduction,
+    weaponStats,
+    equippedCount: Object.values(equippedMap).filter(Boolean).length
+  }
+}
+
+/**
+ * Calcula a temperatura corporal sentida do sobrevivente baseado no clima e no isolamento das roupas.
+ */
+export function calculateBodyTemperature(weatherTemp = 20, totalInsulation = 0) {
+  const effectiveTemp = Number(weatherTemp) + Number(totalInsulation)
+  let status = 'normal'
+  let label = 'Conforto Térmico'
+  let color = '#4ade80'
+  let icon = '🌡️'
+
+  if (effectiveTemp < 5) {
+    status = 'freezing'
+    label = 'Hipotermia / Frio Extremo'
+    color = '#38bdf8'
+    icon = '🥶'
+  } else if (effectiveTemp < 15) {
+    status = 'cold'
+    label = 'Frio'
+    color = '#60a5fa'
+    icon = '🧣'
+  } else if (effectiveTemp > 38) {
+    status = 'heatstroke'
+    label = 'Insolação / Calor Extremo'
+    color = '#ef4444'
+    icon = '🥵'
+  } else if (effectiveTemp > 30) {
+    status = 'warm'
+    label = 'Aquecido'
+    color = '#f59e0b'
+    icon = '☀️'
+  }
+
+  return {
+    effectiveTemp,
+    status,
+    label,
+    color,
+    icon
+  }
+}
+
+/**
+ * Rola o dano variável de uma arma (ou ataque desarmado).
+ */
+export function rollWeaponDamage(weaponStats = UNARMED_ATTACK) {
+  const min = Number(weaponStats.damageMin) || 3
+  const max = Number(weaponStats.damageMax) || min
+  const rolled = Math.floor(Math.random() * (max - min + 1)) + min
+  return rolled
+}
+
 

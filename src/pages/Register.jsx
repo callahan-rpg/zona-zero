@@ -143,12 +143,22 @@ function TraitsPerksSelector({
   expandTraits, setExpandTraits, expandPerks, setExpandPerks,
   balanceInfo
 }) {
+  const traitPosCount = (selectedTraits || []).filter(tId => TRAITS[tId]?.type === 'positive').length
+  const traitNegCount = (selectedTraits || []).filter(tId => TRAITS[tId]?.type === 'negative').length
+  const perkPosCount = (selectedPerks || []).filter(pId => PERKS[pId]?.type === 'positive').length
+  const perkNegCount = (selectedPerks || []).filter(pId => PERKS[pId]?.type === 'negative').length
+
   return (
     <>
       {/* Status do Balanço se Inválido */}
       {!balanceInfo.isValid && (
-        <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '8px 12px', borderRadius: 8, color: '#fca5a5', fontSize: 11.5 }}>
-          ⚠️ {balanceInfo.message}
+        <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '10px 14px', borderRadius: 8, color: '#fca5a5', fontSize: 11.5, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {balanceInfo.errors?.map((err, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>⚠️</span>
+              <span>{err}</span>
+            </div>
+          )) || <div>⚠️ {balanceInfo.message}</div>}
         </div>
       )}
 
@@ -158,49 +168,25 @@ function TraitsPerksSelector({
           onClick={() => setExpandTraits(prev => !prev)}
           style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', userSelect: 'none' }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 16 }}>🧠</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 16 }}>🧬</span>
             <strong style={{ fontSize: 12.5, color: '#fff', textTransform: 'uppercase' }}>Traços de Atributos (+3 / -3)</strong>
-            {selectedTraits.length > 0 && (
-              <span style={{ fontSize: 10, background: 'rgba(38,200,143,0.2)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
-                {selectedTraits.length} selecionado(s)
-              </span>
-            )}
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>(Máx. 3 positivos & 3 negativos)</span>
+            <span style={{ fontSize: 10, background: traitPosCount === traitNegCount && traitPosCount > 0 ? 'rgba(38,200,143,0.2)' : 'rgba(255,255,255,0.06)', color: traitPosCount === traitNegCount && traitPosCount > 0 ? 'var(--accent)' : '#fff', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+              +{traitPosCount} / -{traitNegCount}
+            </span>
           </div>
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{expandTraits ? '▲ Recolher' : '▼ Expandir Traços'}</span>
         </div>
 
         {expandTraits && (
-          <div style={{ padding: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            {/* Traços Negativos (-3) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>Traços Negativos (-3):</span>
-              {Object.values(TRAITS).filter(t => t.type === 'negative').map(trait => {
-                const isSelected = selectedTraits.includes(trait.id)
-                return (
-                  <div
-                    key={trait.id}
-                    onClick={() => onToggleTrait(trait.id)}
-                    style={{
-                      padding: '6px 8px', borderRadius: 6, cursor: 'pointer',
-                      background: isSelected ? 'rgba(239, 68, 68, 0.2)' : 'rgba(0,0,0,0.3)',
-                      border: isSelected ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.05)',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      fontSize: 11, transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>{trait.icon}</span>
-                      <strong style={{ color: isSelected ? '#fca5a5' : '#fff' }}>{trait.name}</strong>
-                    </div>
-                    <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 700 }}>{trait.summary}</span>
-                  </div>
-                )
-              })}
-            </div>
+          <div style={{ padding: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
             {/* Traços Positivos (+3) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>Traços Positivos (+3):</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                <span style={{ fontSize: 10.5, color: '#4ade80', fontWeight: 700, textTransform: 'uppercase' }}>Traços Positivos (+3):</span>
+                <span style={{ fontSize: 9.5, color: traitPosCount > 3 ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{traitPosCount}/3 máx</span>
+              </div>
               {Object.values(TRAITS).filter(t => t.type === 'positive').map(trait => {
                 const isSelected = selectedTraits.includes(trait.id)
                 return (
@@ -208,18 +194,62 @@ function TraitsPerksSelector({
                     key={trait.id}
                     onClick={() => onToggleTrait(trait.id)}
                     style={{
-                      padding: '6px 8px', borderRadius: 6, cursor: 'pointer',
-                      background: isSelected ? 'rgba(74, 222, 128, 0.2)' : 'rgba(0,0,0,0.3)',
-                      border: isSelected ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.05)',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                      background: isSelected ? 'rgba(74, 222, 128, 0.18)' : 'rgba(0,0,0,0.3)',
+                      border: isSelected ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.06)',
+                      display: 'flex', flexDirection: 'column', gap: 3,
                       fontSize: 11, transition: 'all 0.15s ease'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>{trait.icon}</span>
-                      <strong style={{ color: isSelected ? '#86efac' : '#fff' }}>{trait.name}</strong>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>{trait.icon}</span>
+                        <strong style={{ color: isSelected ? '#86efac' : '#fff' }}>{trait.name}</strong>
+                      </div>
+                      <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 700 }}>{trait.summary}</span>
                     </div>
-                    <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 700 }}>{trait.summary}</span>
+                    {trait.description && (
+                      <div style={{ fontSize: 9.5, color: isSelected ? '#dcfce7' : 'var(--text-muted)', lineHeight: 1.25 }}>
+                        {trait.description}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Traços Negativos (-3) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                <span style={{ fontSize: 10.5, color: '#f87171', fontWeight: 700, textTransform: 'uppercase' }}>Traços Negativos (-3):</span>
+                <span style={{ fontSize: 9.5, color: '#f87171', fontWeight: 700 }}>{traitNegCount} selecionado(s)</span>
+              </div>
+              {Object.values(TRAITS).filter(t => t.type === 'negative').map(trait => {
+                const isSelected = selectedTraits.includes(trait.id)
+                return (
+                  <div
+                    key={trait.id}
+                    onClick={() => onToggleTrait(trait.id)}
+                    style={{
+                      padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                      background: isSelected ? 'rgba(239, 68, 68, 0.18)' : 'rgba(0,0,0,0.3)',
+                      border: isSelected ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.06)',
+                      display: 'flex', flexDirection: 'column', gap: 3,
+                      fontSize: 11, transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>{trait.icon}</span>
+                        <strong style={{ color: isSelected ? '#fca5a5' : '#fff' }}>{trait.name}</strong>
+                      </div>
+                      <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 700 }}>{trait.summary}</span>
+                    </div>
+                    {trait.description && (
+                      <div style={{ fontSize: 9.5, color: isSelected ? '#fee2e2' : 'var(--text-muted)', lineHeight: 1.25 }}>
+                        {trait.description}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -234,49 +264,25 @@ function TraitsPerksSelector({
           onClick={() => setExpandPerks(prev => !prev)}
           style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', userSelect: 'none' }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 16 }}>⚡</span>
             <strong style={{ fontSize: 12.5, color: '#fff', textTransform: 'uppercase' }}>Vantagens & Desvantagens (Mecânicas)</strong>
-            {selectedPerks.length > 0 && (
-              <span style={{ fontSize: 10, background: 'rgba(245,158,11,0.2)', color: '#fbbf24', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
-                {selectedPerks.length} selecionada(s)
-              </span>
-            )}
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>(Máx. 2 vantagens & 2 desvantagens)</span>
+            <span style={{ fontSize: 10, background: perkPosCount === perkNegCount && perkPosCount > 0 ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.06)', color: perkPosCount === perkNegCount && perkPosCount > 0 ? '#fbbf24' : '#fff', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+              +{perkPosCount} / -{perkNegCount}
+            </span>
           </div>
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{expandPerks ? '▲ Recolher' : '▼ Expandir Vantagens'}</span>
         </div>
 
         {expandPerks && (
-          <div style={{ padding: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            {/* Desvantagens */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>Desvantagens:</span>
-              {Object.values(PERKS).filter(p => p.type === 'negative').map(perk => {
-                const isSelected = selectedPerks.includes(perk.id)
-                return (
-                  <div
-                    key={perk.id}
-                    onClick={() => onTogglePerk(perk.id)}
-                    style={{
-                      padding: '6px 8px', borderRadius: 6, cursor: 'pointer',
-                      background: isSelected ? 'rgba(239, 68, 68, 0.2)' : 'rgba(0,0,0,0.3)',
-                      border: isSelected ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.05)',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      fontSize: 11, transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>{perk.icon}</span>
-                      <strong style={{ color: isSelected ? '#fca5a5' : '#fff' }}>{perk.name}</strong>
-                    </div>
-                    <span style={{ fontSize: 9.5, color: '#f87171', textAlign: 'right' }}>{perk.summary}</span>
-                  </div>
-                )
-              })}
-            </div>
+          <div style={{ padding: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
             {/* Vantagens */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>Vantagens:</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                <span style={{ fontSize: 10.5, color: '#4ade80', fontWeight: 700, textTransform: 'uppercase' }}>Vantagens:</span>
+                <span style={{ fontSize: 9.5, color: perkPosCount > 2 ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{perkPosCount}/2 máx</span>
+              </div>
               {Object.values(PERKS).filter(p => p.type === 'positive').map(perk => {
                 const isSelected = selectedPerks.includes(perk.id)
                 return (
@@ -284,18 +290,62 @@ function TraitsPerksSelector({
                     key={perk.id}
                     onClick={() => onTogglePerk(perk.id)}
                     style={{
-                      padding: '6px 8px', borderRadius: 6, cursor: 'pointer',
-                      background: isSelected ? 'rgba(74, 222, 128, 0.2)' : 'rgba(0,0,0,0.3)',
-                      border: isSelected ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.05)',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                      background: isSelected ? 'rgba(74, 222, 128, 0.18)' : 'rgba(0,0,0,0.3)',
+                      border: isSelected ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.06)',
+                      display: 'flex', flexDirection: 'column', gap: 3,
                       fontSize: 11, transition: 'all 0.15s ease'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>{perk.icon}</span>
-                      <strong style={{ color: isSelected ? '#86efac' : '#fff' }}>{perk.name}</strong>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>{perk.icon}</span>
+                        <strong style={{ color: isSelected ? '#86efac' : '#fff' }}>{perk.name}</strong>
+                      </div>
+                      <span style={{ fontSize: 9.5, color: '#4ade80', textAlign: 'right' }}>{perk.summary}</span>
                     </div>
-                    <span style={{ fontSize: 9.5, color: '#4ade80', textAlign: 'right' }}>{perk.summary}</span>
+                    {perk.description && (
+                      <div style={{ fontSize: 9.5, color: isSelected ? '#dcfce7' : 'var(--text-muted)', lineHeight: 1.25 }}>
+                        {perk.description}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desvantagens */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                <span style={{ fontSize: 10.5, color: '#f87171', fontWeight: 700, textTransform: 'uppercase' }}>Desvantagens:</span>
+                <span style={{ fontSize: 9.5, color: '#f87171', fontWeight: 700 }}>{perkNegCount} selecionada(s)</span>
+              </div>
+              {Object.values(PERKS).filter(p => p.type === 'negative').map(perk => {
+                const isSelected = selectedPerks.includes(perk.id)
+                return (
+                  <div
+                    key={perk.id}
+                    onClick={() => onTogglePerk(perk.id)}
+                    style={{
+                      padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                      background: isSelected ? 'rgba(239, 68, 68, 0.18)' : 'rgba(0,0,0,0.3)',
+                      border: isSelected ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.06)',
+                      display: 'flex', flexDirection: 'column', gap: 3,
+                      fontSize: 11, transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>{perk.icon}</span>
+                        <strong style={{ color: isSelected ? '#fca5a5' : '#fff' }}>{perk.name}</strong>
+                      </div>
+                      <span style={{ fontSize: 9.5, color: '#f87171', textAlign: 'right' }}>{perk.summary}</span>
+                    </div>
+                    {perk.description && (
+                      <div style={{ fontSize: 9.5, color: isSelected ? '#fee2e2' : 'var(--text-muted)', lineHeight: 1.25 }}>
+                        {perk.description}
+                      </div>
+                    )}
                   </div>
                 )
               })}

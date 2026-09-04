@@ -11,7 +11,7 @@ import {
 import { db } from '../firebase/config'
 import HUD from '../components/HUD.jsx'
 import { SEASONS, MOON_PHASES, MONTHS, calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
-import { RARITY_META, DEFAULT_PRESET_ITEMS, SUPPLY_RARITIES, UNIQUE_RARITIES, getMaxHp } from '../utils/itemSystem'
+import { RARITY_META, DEFAULT_PRESET_ITEMS, SUPPLY_RARITIES, UNIQUE_RARITIES, getMaxHp, EQUIPMENT_SLOTS } from '../utils/itemSystem'
 import { COMBAT_STATUS_EFFECTS, MONSTER_TEMPLATES, ATTRIBUTE_ICONS } from '../utils/combatSystem'
 import { uploadImageFree } from '../utils/imageUpload'
 import { DEFAULT_WEATHER_SOUNDS, extractYouTubeId } from '../utils/audioSystem'
@@ -289,6 +289,12 @@ export default function Admin() {
       consumable: !!catalogForm.consumable,
       consumeEffect: Object.keys(consumeEffect).length > 0 ? consumeEffect : null,
       isQuestItem: !!catalogForm.isQuestItem,
+      equipSlot: catalogForm.equipSlot || null,
+      insulation: Number(catalogForm.insulation) || 0,
+      damageReduction: Number(catalogForm.damageReduction) || 0,
+      damageMin: catalogForm.damageMin !== '' ? Number(catalogForm.damageMin) : null,
+      damageMax: catalogForm.damageMax !== '' ? Number(catalogForm.damageMax) : null,
+      maxDurability: catalogForm.maxDurability !== '' ? Number(catalogForm.maxDurability) : null,
       unlocks: unlocks
     }
 
@@ -309,6 +315,12 @@ export default function Admin() {
         thirstEffect: 0,
         bloodEffect: 0,
         isQuestItem: false,
+        equipSlot: '',
+        insulation: 0,
+        damageReduction: 0,
+        damageMin: '',
+        damageMax: '',
+        maxDurability: '',
         unlocks: ''
       })
     } catch (err) {
@@ -341,6 +353,12 @@ export default function Admin() {
       thirstEffect: item.consumeEffect?.thirst || 0,
       bloodEffect: item.consumeEffect?.blood || 0,
       isQuestItem: !!item.isQuestItem,
+      equipSlot: item.equipSlot || '',
+      insulation: item.insulation !== undefined ? item.insulation : 0,
+      damageReduction: item.damageReduction !== undefined ? item.damageReduction : 0,
+      damageMin: item.damageMin !== undefined && item.damageMin !== null ? item.damageMin : '',
+      damageMax: item.damageMax !== undefined && item.damageMax !== null ? item.damageMax : '',
+      maxDurability: item.maxDurability !== undefined && item.maxDurability !== null ? item.maxDurability : '',
       unlocks: (item.unlocks || []).join(', ')
     })
   }
@@ -366,6 +384,12 @@ export default function Admin() {
     thirstEffect: 0,
     bloodEffect: 0,
     isQuestItem: false,
+    equipSlot: '',
+    insulation: 0,
+    damageReduction: 0,
+    damageMin: '',
+    damageMax: '',
+    maxDurability: '',
     unlocks: ''
   })
 
@@ -2100,6 +2124,34 @@ export default function Admin() {
                                   🍽️ {Object.entries(item.consumeEffect).map(([k, v]) => `+${v} ${k}`).join(' · ')}
                                 </div>
                               )}
+                              {/* Badges de Equipamento, Dano e Isolamento */}
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                                {item.equipSlot && (
+                                  <span style={{ fontSize: 9, background: 'rgba(56,189,248,0.12)', color: '#38bdf8', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(56,189,248,0.25)' }}>
+                                    🎽 {item.equipSlot}
+                                  </span>
+                                )}
+                                {item.insulation > 0 && (
+                                  <span style={{ fontSize: 9, background: 'rgba(74,222,128,0.12)', color: '#4ade80', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(74,222,128,0.25)' }}>
+                                    🧥 +{item.insulation}°C
+                                  </span>
+                                )}
+                                {item.damageReduction > 0 && (
+                                  <span style={{ fontSize: 9, background: 'rgba(56,189,248,0.12)', color: '#38bdf8', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(56,189,248,0.25)' }}>
+                                    🛡️ -{item.damageReduction} fixo
+                                  </span>
+                                )}
+                                {item.damageMin && (
+                                  <span style={{ fontSize: 9, background: 'rgba(239,68,68,0.12)', color: '#f87171', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(239,68,68,0.25)' }}>
+                                    ⚔️ {item.damageMin}–{item.damageMax}
+                                  </span>
+                                )}
+                                {item.maxDurability && (
+                                  <span style={{ fontSize: 9, background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', padding: '1px 4px', borderRadius: 3 }}>
+                                    🔨 {item.maxDurability} dur
+                                  </span>
+                                )}
+                              </div>
                               {item.unlocks && item.unlocks.length > 0 && (
                                 <div style={{ fontSize: 10, color: '#70d6ff', marginTop: 2 }}>
                                   🔓 {item.unlocks.join(', ')}
@@ -2281,6 +2333,49 @@ export default function Admin() {
                   )}
                 </div>
 
+                {/* Configurações de Equipamento, Dano e Proteção */}
+                <div style={{ padding: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <label style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--accent-yellow)', margin: 0 }}>
+                    🛡️ Equipamento, Dano e Sobrevivência
+                  </label>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 10 }}>Slot do Esqueleto Corporal</label>
+                    <select value={catalogForm.equipSlot} onChange={e => setCatalogForm(prev => ({ ...prev, equipSlot: e.target.value }))}>
+                      <option value="">🚫 Nenhum (Item de Mochila / Não Equipável)</option>
+                      {EQUIPMENT_SLOTS.map(slot => (
+                        <option key={slot.id} value={slot.id}>{slot.icon} {slot.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 9 }}>🧥 Isolamento (+°C)</label>
+                      <input type="number" placeholder="0" value={catalogForm.insulation} onChange={e => setCatalogForm(prev => ({ ...prev, insulation: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 9 }}>🛡️ Redução Fixa Dano</label>
+                      <input type="number" placeholder="0" value={catalogForm.damageReduction} onChange={e => setCatalogForm(prev => ({ ...prev, damageReduction: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 9 }}>⚔️ Dano Mínimo</label>
+                      <input type="number" placeholder="Ex: 12" value={catalogForm.damageMin} onChange={e => setCatalogForm(prev => ({ ...prev, damageMin: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 9 }}>⚔️ Dano Máximo</label>
+                      <input type="number" placeholder="Ex: 18" value={catalogForm.damageMax} onChange={e => setCatalogForm(prev => ({ ...prev, damageMax: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 9 }}>🔨 Durabilidade Máx</label>
+                      <input type="number" placeholder="Ex: 100" value={catalogForm.maxDurability} onChange={e => setCatalogForm(prev => ({ ...prev, maxDurability: e.target.value }))} />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label style={{ fontSize: 10 }}>Desbloqueia Features (ex: hud_clock, nav_chave_apt203)</label>
                   <input type="text" placeholder="hud_clock" value={catalogForm.unlocks} onChange={e => setCatalogForm(prev => ({ ...prev, unlocks: e.target.value }))} />
@@ -2293,7 +2388,35 @@ export default function Admin() {
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                   {editingCatalogItem && (
-                    <button type="button" className="btn btn-sm" onClick={() => { setEditingCatalogItem(null); setCatalogForm({ itemId: '', name: '', icon: '📦', category: 'general', rarity: 'common', description: '', consumable: false, hungerEffect: 0, thirstEffect: 0, bloodEffect: 0, isQuestItem: false, unlocks: '' }); }} style={{ flex: 1 }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => {
+                        setEditingCatalogItem(null)
+                        setCatalogForm({
+                          itemId: '',
+                          name: '',
+                          icon: '📦',
+                          imageUrl: '',
+                          category: 'general',
+                          rarity: 'common',
+                          description: '',
+                          consumable: false,
+                          hungerEffect: 0,
+                          thirstEffect: 0,
+                          bloodEffect: 0,
+                          isQuestItem: false,
+                          equipSlot: '',
+                          insulation: 0,
+                          damageReduction: 0,
+                          damageMin: '',
+                          damageMax: '',
+                          maxDurability: '',
+                          unlocks: ''
+                        })
+                      }}
+                      style={{ flex: 1 }}
+                    >
                       Cancelar
                     </button>
                   )}

@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
-import { getMaxHp } from '../utils/itemSystem'
+import { getMaxHp, DEFAULT_PRESET_ITEMS } from '../utils/itemSystem'
 
 const AuthContext = createContext(null)
 
@@ -407,6 +407,86 @@ export function AuthProvider({ children }) {
     await refreshCharacter()
   }
 
+  // Equipar um item no slot anatômico correspondente
+  async function equipItem(instanceId) {
+    if (!user || !instanceId) return
+    const userRef = doc(db, 'users', user.uid)
+
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(userRef)
+      if (!snap.exists()) throw new Error('Personagem não encontrado.')
+
+      const charData = snap.data().character || {}
+      const inventory = [...(charData.inventory || [])]
+      const targetItem = inventory.find((i) => i.instanceId === instanceId)
+
+      if (!targetItem) throw new Error('Item não encontrado no inventário.')
+
+      // Determina o equipSlot do item diretamente ou a partir do preset / catalog
+      let targetSlot = targetItem.equipSlot
+      if (!targetSlot) {
+        const preset = DEFAULT_PRESET_ITEMS.find((p) => p.itemId === targetItem.itemId)
+        if (preset?.equipSlot) {
+          targetSlot = preset.equipSlot
+          targetItem.equipSlot = preset.equipSlot
+        }
+      }
+
+      if (!targetSlot) {
+        // Tenta buscar na coleção items_db
+        const itemDbRef = doc(db, 'items_db', targetItem.itemId)
+        const itemDbSnap = await transaction.get(itemDbRef)
+        if (itemDbSnap.exists() && itemDbSnap.data().equipSlot) {
+          targetSlot = itemDbSnap.data().equipSlot
+          targetItem.equipSlot = targetSlot
+        }
+      }
+
+      if (!targetSlot) throw new Error('Este item não pode ser equipado em nenhum slot corporal.')
+
+      // Desequipa qualquer outro item que esteja atualmente no mesmo slot
+      inventory.forEach((i) => {
+        const itemSlot = i.equipSlot || DEFAULT_PRESET_ITEMS.find((p) => p.itemId === i.itemId)?.equipSlot
+        if (itemSlot === targetSlot && i.equipped && i.instanceId !== instanceId) {
+          i.equipped = false
+        }
+      })
+
+      // Equipa o item selecionado
+      targetItem.equipped = true
+
+      transaction.update(userRef, {
+        'character.inventory': inventory,
+      })
+    })
+
+    await refreshCharacter()
+  }
+
+  // Desequipar um item e mantê-lo na mochila
+  async function unequipItem(instanceId) {
+    if (!user || !instanceId) return
+    const userRef = doc(db, 'users', user.uid)
+
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(userRef)
+      if (!snap.exists()) throw new Error('Personagem não encontrado.')
+
+      const charData = snap.data().character || {}
+      const inventory = [...(charData.inventory || [])]
+      const targetItem = inventory.find((i) => i.instanceId === instanceId)
+
+      if (!targetItem) throw new Error('Item não encontrado.')
+      targetItem.equipped = false
+
+      transaction.update(userRef, {
+        'character.inventory': inventory,
+      })
+    })
+
+    await refreshCharacter()
+  }
+
   // Grava a conclusão da Busca Única e adiciona os itens selecionados ao inventário
   async function recordUniqueSearch(locationSlug, chosenItems = []) {
     if (!user || !locationSlug) return
@@ -675,6 +755,8 @@ export function AuthProvider({ children }) {
     transferMoney,
     consumeItem,
     discardItem,
+    equipItem,
+    unequipItem,
     recordUniqueSearch,
     markNotificationsRead,
     clearNotifications,
