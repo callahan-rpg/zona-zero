@@ -7,6 +7,7 @@ import HUD from '../components/HUD.jsx'
 import CombatHUD from '../components/CombatHUD.jsx'
 import WeatherEffects from '../components/WeatherEffects.jsx'
 import ShopModal from '../components/ShopModal.jsx'
+import StorageModal from '../components/StorageModal.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
 
@@ -95,6 +96,11 @@ export default function Location() {
   const [shopInfo, setShopInfo] = useState(null)
   const [catalogItems, setCatalogItems] = useState([])
 
+  // Estados de Armazenamento / Storages Locais
+  const [locationStorages, setLocationStorages] = useState([])
+  const [activeStorageId, setActiveStorageId] = useState(null)
+  const [showStorageModal, setShowStorageModal] = useState(false)
+
   const showToast = (msg) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
@@ -109,6 +115,17 @@ export default function Location() {
       } else {
         setShopInfo(null)
       }
+    })
+    return unsub
+  }, [slug])
+
+  // Escuta recipientes de armazenamento vinculados a esta locação
+  useEffect(() => {
+    if (!slug) return
+    const unsub = onSnapshot(collection(db, 'storages'), (snap) => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      const matched = docs.filter(st => st.locationSlug === slug)
+      setLocationStorages(matched)
     })
     return unsub
   }, [slug])
@@ -442,8 +459,31 @@ export default function Location() {
               />
             </div>
 
-            {/* Painel de Ações de Busca (Suprimentos + Busca Única + Loja / Comércio) */}
+            {/* Painel de Ações de Busca (Suprimentos + Busca Única + Loja / Comércio + Recipientes de Armazenamento) */}
             <div className="loot-search-actions-bar">
+              {/* Botões de Armazenamentos Locais (Baús, Armários, Geladeiras, Cofres, etc.) */}
+              {locationStorages.map(st => (
+                <button
+                  key={st.id}
+                  className="loot-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.35) 100%)',
+                    borderColor: '#3b82f6',
+                    color: '#93c5fd',
+                    fontWeight: 700,
+                    boxShadow: '0 0 12px rgba(59, 130, 246, 0.25)'
+                  }}
+                  onClick={() => {
+                    setActiveStorageId(st.id)
+                    setShowStorageModal(true)
+                  }}
+                  title={st.description || `Abrir ${st.name}`}
+                >
+                  <span>{st.icon || '📦'}</span>
+                  {st.name || 'Armazenamento'}
+                </button>
+              ))}
+
               {/* Botão 0: Acessar Loja / Comércio do Local */}
               {shopInfo && shopInfo.enabled !== false && (
                 <button
@@ -628,6 +668,16 @@ export default function Location() {
         locationSlug={slug}
         locationName={location?.name || 'Comércio Local'}
         catalogItems={catalogItems}
+      />
+
+      {/* Modal Universal de Armazenamento (Baús, Armários, Geladeiras, Cofres, etc.) */}
+      <StorageModal
+        isOpen={showStorageModal}
+        onClose={() => {
+          setShowStorageModal(false)
+          setActiveStorageId(null)
+        }}
+        storageId={activeStorageId}
       />
     </div>
   )

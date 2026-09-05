@@ -21,6 +21,7 @@ import { useSearchParams } from 'react-router-dom'
 import GameIcon from '../components/GameIcon.jsx'
 import AdminMapEditor from '../components/AdminMapEditor.jsx'
 import AdminRulesEditor from '../components/AdminRulesEditor.jsx'
+import AdminStorageEditor from '../components/AdminStorageEditor.jsx'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -1687,6 +1688,9 @@ export default function Admin() {
             <button className={`btn btn-sm ${activeTab === 'shops' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('shops')} style={{ borderColor: 'rgba(234, 179, 8, 0.4)', color: activeTab === 'shops' ? '#000' : '#facc15', background: activeTab === 'shops' ? '#f59e0b' : 'transparent' }}>
               🏪 Lojas & Economia
             </button>
+            <button className={`btn btn-sm ${activeTab === 'storages' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('storages')} style={{ borderColor: 'rgba(59, 130, 246, 0.4)', color: activeTab === 'storages' ? '#fff' : '#60a5fa', background: activeTab === 'storages' ? '#2563eb' : 'transparent', fontWeight: 'bold' }}>
+              📦 Armazenamentos (Storages)
+            </button>
             <button className={`btn btn-sm ${activeTab === 'combat' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('combat')} style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: activeTab === 'combat' ? '#fff' : '#f87171' }}>
               ⚔️ Mesa de Combate {activeCombatData?.active && '🔴'}
             </button>
@@ -1700,6 +1704,11 @@ export default function Admin() {
               📍 Editor de Mapa
             </button>
           </div>
+
+          {/* CONTEÚDO DA TAB STORAGES: GERENCIAMENTO DE ARMAZENAMENTOS */}
+          {activeTab === 'storages' && (
+            <AdminStorageEditor locations={locations} catalogItems={catalogItems} />
+          )}
 
           {/* CONTEÚDO DA TAB RULES: EDITOR DE REGRAS DO RPG */}
           {activeTab === 'rules' && (
