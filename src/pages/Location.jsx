@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { doc, getDoc, updateDoc, runTransaction, onSnapshot, collection } from 'firebase/firestore'
 import { db } from '../firebase/config'
@@ -9,6 +9,23 @@ import WeatherEffects from '../components/WeatherEffects.jsx'
 import ShopModal from '../components/ShopModal.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
+
+/**
+ * Retorna a imagem de fundo correta baseada na hora in-game.
+ *  06h–17h → Dia
+ *  05h–06h e 17h–18h → Amanhecer/Entardecer
+ *  18h–05h → Noite
+ * Fallback: backgroundImage geral → null
+ */
+function getBgForHour(hour, location) {
+  const isDay      = hour >= 6  && hour < 17
+  const isTwilight = (hour >= 5 && hour < 6) || (hour >= 17 && hour < 18)
+  // night: hour >= 18 || hour < 5
+
+  if (isDay)      return location.backgroundImageDay      || location.backgroundImage || null
+  if (isTwilight) return location.backgroundImageTwilight || location.backgroundImage || null
+  return               location.backgroundImageNight     || location.backgroundImage || null
+}
 
 // Locação padrão de teste (sala do hospital)
 const DEFAULT_LOCATION = {
@@ -52,6 +69,12 @@ export default function Location() {
   const [weatherFxEnabled, setWeatherFxEnabled] = useState(() => {
     return localStorage.getItem('zz_weather_fx') !== 'false'
   })
+
+  // --- Fade de imagem de fundo por período do dia ---
+  const [currentBg, setCurrentBg] = useState(null)   // imagem visível agora
+  const [prevBg,    setPrevBg]    = useState(null)   // imagem anterior (some com fade-out)
+  const [fading,    setFading]    = useState(false)  // true durante a transição
+  const fadingRef = useRef(false)
 
   // Toast de aviso (porta trancada, etc.)
   const [toastMessage, setToastMessage] = useState(null)
@@ -135,6 +158,45 @@ export default function Location() {
     }
     loadLocation()
   }, [slug])
+
+  // Inicializa a imagem de fundo quando a locação ou config carrega
+  useEffect(() => {
+    if (!location || !gameConfig) return
+    const gt = calculateGameTime(gameConfig)
+    const bg = getBgForHour(gt.hour, location)
+    setCurrentBg(bg)
+    setPrevBg(null)
+    setFading(false)
+    fadingRef.current = false
+  }, [location, gameConfig])
+
+  // Verifica a cada 30s se o período mudou e, se sim, dispara o fade
+  useEffect(() => {
+    if (!location || !gameConfig) return
+
+    const check = () => {
+      if (fadingRef.current) return // já em transição
+      const gt  = calculateGameTime(gameConfig)
+      const newBg = getBgForHour(gt.hour, location)
+      setCurrentBg(prev => {
+        if (newBg === prev) return prev // sem mudança
+        // Inicia transição
+        setPrevBg(prev)
+        fadingRef.current = true
+        setFading(true)
+        // Após a duração do fade (2s), limpa a camada anterior
+        setTimeout(() => {
+          setPrevBg(null)
+          setFading(false)
+          fadingRef.current = false
+        }, 2000)
+        return newBg
+      })
+    }
+
+    const timer = setInterval(check, 30_000)
+    return () => clearInterval(timer)
+  }, [location, gameConfig])
 
   // Verifica cooldown de busca de suprimentos para esta locação
   useEffect(() => {
@@ -300,10 +362,12 @@ export default function Location() {
 
   if (!location) return null
 
-  const hasBackground = !!location.backgroundImage
   const gameTime = calculateGameTime(gameConfig)
   const weather = getDynamicWeather(gameConfig, gameTime)
   const maxCarry = location.uniqueSearch?.maxCarry || 1
+
+  // Fallback puro quando nenhum período tiver imagem configurada
+  const hasAnyBg = !!(location.backgroundImage || location.backgroundImageDay || location.backgroundImageNight || location.backgroundImageTwilight)
 
   return (
     <div className="location-page">
@@ -314,10 +378,19 @@ export default function Location() {
         </div>
       )}
 
-      {/* Background */}
+      {/* Camada anterior — some com fade-out durante a transição */}
       <div
-        className={`location-bg ${hasBackground ? '' : 'fallback'}`}
-        style={hasBackground ? { backgroundImage: `url(${location.backgroundImage})` } : {}}
+        className="location-bg location-bg-prev"
+        style={{
+          backgroundImage: prevBg ? `url(${prevBg})` : 'none',
+          opacity: fading && prevBg ? 1 : 0,
+        }}
+      />
+
+      {/* Camada atual — aparece com fade-in */}
+      <div
+        className={`location-bg location-bg-current ${!hasAnyBg ? 'fallback' : ''}`}
+        style={currentBg ? { backgroundImage: `url(${currentBg})`, opacity: fading ? 0 : 1 } : { opacity: fading ? 0 : 1 }}
       />
 
       {/* Efeitos Climáticos */}

@@ -423,6 +423,9 @@ export default function Admin() {
   const [openFolders, setOpenFolders] = useState({}) // { [folderName]: boolean }
   const [openSubFolders, setOpenSubFolders] = useState({}) // { [`${folderName}::${subfolderName}`]: boolean }
   const [uploadingLocImage, setUploadingLocImage] = useState(false)
+  const [uploadingLocImageDay, setUploadingLocImageDay] = useState(false)
+  const [uploadingLocImageNight, setUploadingLocImageNight] = useState(false)
+  const [uploadingLocImageTwilight, setUploadingLocImageTwilight] = useState(false)
   const [locSearch, setLocSearch] = useState('')
   const [locForm, setLocForm] = useState({
     name: '',
@@ -431,6 +434,9 @@ export default function Admin() {
     subfolder: '', // Nome da Subpasta / Setor (ex: "Acampamento", "Centro da Cidade de Starelyug")
     description: '',
     backgroundImage: '',
+    backgroundImageDay: '',      // 06h–17h
+    backgroundImageNight: '',    // 18h–05h
+    backgroundImageTwilight: '', // 05h–06h e 17h–18h (amanhecer/entardecer)
     locationSound: '', // Link do YouTube de som específico do lugar
     disableWeatherSound: false, // Se verdadeiro, silencia o som do clima nesta sala
     xatIframe: '',
@@ -498,6 +504,9 @@ export default function Admin() {
       subfolder: subfolder,
       description: loc.description || '',
       backgroundImage: loc.backgroundImage || '',
+      backgroundImageDay: loc.backgroundImageDay || '',
+      backgroundImageNight: loc.backgroundImageNight || '',
+      backgroundImageTwilight: loc.backgroundImageTwilight || '',
       locationSound: loc.locationSound || '',
       disableWeatherSound: !!loc.disableWeatherSound,
       xatIframe: loc.xatIframe || '',
@@ -530,6 +539,9 @@ export default function Admin() {
       subfolder: targetSubfolder,
       description: '',
       backgroundImage: '',
+      backgroundImageDay: '',
+      backgroundImageNight: '',
+      backgroundImageTwilight: '',
       locationSound: '',
       disableWeatherSound: false,
       xatIframe: '',
@@ -566,6 +578,9 @@ export default function Admin() {
       subfolder: (locForm.subfolder || '').trim(),
       description: locForm.description.trim(),
       backgroundImage: locForm.backgroundImage ? locForm.backgroundImage.trim() : null,
+      backgroundImageDay: locForm.backgroundImageDay ? locForm.backgroundImageDay.trim() : null,
+      backgroundImageNight: locForm.backgroundImageNight ? locForm.backgroundImageNight.trim() : null,
+      backgroundImageTwilight: locForm.backgroundImageTwilight ? locForm.backgroundImageTwilight.trim() : null,
       locationSound: (locForm.locationSound || '').trim() || null,
       disableWeatherSound: !!locForm.disableWeatherSound,
       xatIframe: locForm.xatIframe.trim(),
@@ -3728,6 +3743,108 @@ export default function Admin() {
                         style={{ width: '100%', fontSize: 11, padding: '7px 10px' }}
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* IMAGENS DE FUNDO POR PERÍODO DO DIA */}
+                <div className="form-group" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', padding: '12px 14px', borderRadius: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 13 }}>🕐</span>
+                    <label style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
+                      Imagens por Período do Dia (Opcional)
+                    </label>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                      Sobrepõem a imagem geral quando configuradas
+                    </span>
+                  </div>
+
+                  {/* Grade de períodos */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+
+                    {/* --- DIA --- */}
+                    {[
+                      { key: 'backgroundImageDay',      icon: '☀️', label: 'Dia',                 sub: '06h – 17h',       color: '#fbbf24', uploadState: uploadingLocImageDay,      setUpload: setUploadingLocImageDay },
+                      { key: 'backgroundImageTwilight', icon: '🌅', label: 'Amanhecer/Entardecer', sub: '05h–06h · 17h–18h', color: '#fb923c', uploadState: uploadingLocImageTwilight, setUpload: setUploadingLocImageTwilight },
+                      { key: 'backgroundImageNight',    icon: '🌙', label: 'Noite',               sub: '18h – 05h',       color: '#818cf8', uploadState: uploadingLocImageNight,    setUpload: setUploadingLocImageNight },
+                    ].map(({ key, icon, label, sub, color, uploadState, setUpload }) => (
+                      <div key={key} style={{ background: 'rgba(0,0,0,0.25)', border: `1px solid rgba(255,255,255,0.07)`, borderRadius: 8, padding: '10px 10px 8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                          <span style={{ fontSize: 15 }}>{icon}</span>
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color }}>{label}</div>
+                            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{sub}</div>
+                          </div>
+                        </div>
+
+                        {/* Preview */}
+                        {locForm[key] && (
+                          <div style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', marginBottom: 8, background: '#000', position: 'relative' }}>
+                            <img
+                              src={locForm[key]}
+                              alt={`Preview ${label}`}
+                              style={{ width: '100%', height: 70, objectFit: 'cover', display: 'block', opacity: 0.9 }}
+                              onError={(e) => { e.target.style.display = 'none' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setLocForm(prev => ({ ...prev, [key]: '' }))}
+                              style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(239,68,68,0.85)', border: 'none', borderRadius: 4, color: '#fff', fontSize: 9, padding: '2px 6px', cursor: 'pointer', fontWeight: 700 }}
+                            >✕</button>
+                          </div>
+                        )}
+
+                        {/* Upload */}
+                        <label
+                          className="btn btn-sm"
+                          style={{
+                            cursor: uploadState ? 'wait' : 'pointer',
+                            background: `rgba(${color === '#fbbf24' ? '251,191,36' : color === '#fb923c' ? '251,146,60' : '129,140,248'}, 0.12)`,
+                            border: `1px solid ${color}55`,
+                            color,
+                            fontSize: 10,
+                            padding: '5px 8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            borderRadius: 6,
+                            fontWeight: 600,
+                            marginBottom: 6,
+                            width: '100%',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {uploadState ? '⏳ Enviando...' : '📁 Upload'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={uploadState}
+                            style={{ display: 'none' }}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+                              try {
+                                setUpload(true)
+                                const url = await uploadImageFree(file)
+                                setLocForm(prev => ({ ...prev, [key]: url }))
+                              } catch (err) {
+                                alert('Erro no upload: ' + err.message)
+                              } finally {
+                                setUpload(false)
+                              }
+                            }}
+                          />
+                        </label>
+
+                        {/* URL direta */}
+                        <input
+                          type="url"
+                          placeholder="Cole a URL..."
+                          value={locForm[key] || ''}
+                          onChange={(e) => setLocForm(prev => ({ ...prev, [key]: e.target.value }))}
+                          style={{ width: '100%', fontSize: 10, padding: '5px 8px' }}
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
 

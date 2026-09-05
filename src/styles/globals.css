@@ -965,8 +965,20 @@ body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  filter: brightness(0.99);
-  transition: background-image 0.5s ease;
+  filter: brightness(0.78);
+  transition: opacity 2s ease-in-out;
+}
+
+/* Camada anterior (some com fade-out) */
+.location-bg-prev {
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Camada atual (aparece com fade-in) */
+.location-bg-current {
+  z-index: 2;
+  transition: opacity 2s ease-in-out;
 }
 
 /* Fallback gradient quando não há imagem */
