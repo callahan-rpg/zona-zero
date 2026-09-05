@@ -16,6 +16,7 @@ import { COMBAT_STATUS_EFFECTS, MONSTER_TEMPLATES, ATTRIBUTE_ICONS } from '../ut
 import { uploadImageFree } from '../utils/imageUpload'
 import { DEFAULT_WEATHER_SOUNDS, extractYouTubeId } from '../utils/audioSystem'
 import { PROFESSIONS, ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getStarterItems, calculateProfessionBonuses } from '../utils/professionSystem'
+import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
 import { useSearchParams } from 'react-router-dom'
 import GameIcon from '../components/GameIcon.jsx'
 import AdminMapEditor from '../components/AdminMapEditor.jsx'

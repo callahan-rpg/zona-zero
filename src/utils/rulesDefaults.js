@@ -7,7 +7,7 @@ export const DEFAULT_RULES_CONFIG = {
       { num: '7', lbl: 'Profissões' },
       { num: '21+', lbl: 'Especializações' },
       { num: '80 XP', lbl: 'Por Nível' },
-      { num: '24h = 4d', lbl: 'Tempo OFF/ON' }
+      { num: '24h = 2d', lbl: 'Tempo OFF/ON' }
     ]
   },
   professionsIntro: {
@@ -18,11 +18,11 @@ export const DEFAULT_RULES_CONFIG = {
     {
       id: 'militar',
       name: 'Militar',
-      icon: '🎖️',
+      icon: '🪖',
       color: '#ef4444',
-      badge: 'Combate & Resistência',
+      badge: '🎖️ Forças Armadas & Segurança',
       attrBonus: '+2 Força',
-      summary: 'Profissão voltada para combate direto, disciplina marcial, resistência física e domínio de armamentos. Sobrevivem com facilidade a encontros violentos contra infectados e facções hostis.',
+      summary: 'Profissão voltada para combate tático, disciplina rigorosa, resistência física e uso eficiente de armas. Militares enfrentam infectados e ameaças com determinação letal.',
       quote: '"No caos, a disciplina é a única linha entre a vida e a morte."',
       specialties: [
         {
@@ -30,27 +30,27 @@ export const DEFAULT_RULES_CONFIG = {
           name: 'Policial',
           icon: '👮',
           attrBonus: '+1 Força',
-          proficiencies: ['Armas de fogo leves (Pistolas/Revólveres)', 'Procedimentos táticos de segurança'],
-          starterEquipment: ['Pistola 9mm policial', 'Colete balístico policial', 'Algemas de contenção', 'Coldre tático'],
-          perks: ['Conhecimento básico de contenção e protocolos de segurança urbana', 'Precisão aprimorada com armas curtas']
+          proficiencies: ['Armas de fogo leves (pistolas e submetralhadoras)', 'Procedimentos policiais e protocolos de segurança'],
+          starterEquipment: ['Pistola 9mm (x1)', 'Caixa de Munição 9mm (x1)', 'Colete Policial Balístico (x1)', 'Algemas de Aço (x1)'],
+          perks: ['Proficiência com armas de fogo leves (pistolas e submetralhadoras)', 'Conhecimento de protocolos policiais e procedimentos de segurança', 'Técnicas de imobilização e contenção']
         },
         {
           id: 'bombeiro',
           name: 'Bombeiro',
           icon: '🔥',
           attrBonus: '+1 Força',
-          proficiencies: ['Machados pesados e ferramentas de resgate', 'Arrombamento e demolição rápida'],
-          starterEquipment: ['Machado de incêndio pesado', 'Traje de proteção anti-chamas', 'Máscara respiratória de combate'],
-          perks: ['Maior eficiência para abrir portas trancadas ou barricadas', 'Resistência a fumaça e ambientes quentes']
+          proficiencies: ['Machados pesados e arrombamento estrutural', 'Resgate em ambientes asfixiantes'],
+          starterEquipment: ['Machado de Incêndio (x1)', 'Uniforme de Proteção Térmica (x1)', 'Máscara Respiratória (x1)', 'Lanterna Portátil Reforçada (x1)'],
+          perks: ['Proficiência extrema com machados e marretas', 'Maior facilidade e rapidez para arrombar portas e escombros', 'Resistência básica a fumaça e ambientes asfixiantes']
         },
         {
           id: 'sargento',
           name: 'Sargento',
           icon: '🎖️',
           attrBonus: '+1 Força',
-          proficiencies: ['Armas militares pesadas (Fuzis, Espingardas)', 'Táticas de liderança e esquadrão'],
-          starterEquipment: ['Fuzil militar ou arma de guerra inicial', 'Traje camuflado com bolsos táticos', 'Rádio comunicador militar'],
-          perks: ['Conhecimento avançado de patrulha e combate coordenado em grupo', 'Bônus de moral para aliados próximos']
+          proficiencies: ['Armamentos militares pesados (Fuzis)', 'Comando tático e patrulha'],
+          starterEquipment: ['Fuzil Militar Tático (x1)', 'Munição Militar 5.56mm (x1)', 'Traje Militar Camuflado (x1)', 'Faca de Combate Militar (x1)'],
+          perks: ['Proficiência com fuzis táticos e armamento pesado', 'Conhecimento de patrulha, formações defensivas e liderança de esquadrão', 'Táticas avançadas de sobrevivência em zonas de combate']
         }
       ]
     },
@@ -59,37 +59,37 @@ export const DEFAULT_RULES_CONFIG = {
       name: 'Médico',
       icon: '🩺',
       color: '#38bdf8',
-      badge: 'Suporte Vital & Ciência',
+      badge: '💉 Saúde & Bio-Emergência',
       attrBonus: '+2 Sabedoria',
-      summary: 'Especialistas em tratar traumas, doenças infecciosas e cirurgias de emergência. A espinha dorsal de qualquer refúgio quando remédios e antibióticos se tornam raros.',
+      summary: 'Profissionais acostumados a lidar com ferimentos, infecções, medicamentos e traumas críticos. São vitais para manter qualquer grupo de sobreviventes vivo.',
       quote: '"Sangramento estancado a tempo é a diferença entre um companheiro vivo e mais um corpo."',
       specialties: [
         {
           id: 'medico_clinico',
-          name: 'Médico Cirurgião / Clínico',
+          name: 'Médico Clínico',
           icon: '🩺',
           attrBonus: '+1 Sabedoria',
-          proficiencies: ['Cirurgias de campo', 'Procedimentos médicos complexos'],
-          starterEquipment: ['Kit cirúrgico profissional', 'Maleta de medicamentos básicos', 'Antibióticos e anestésicos'],
-          perks: ['Tratamento de traumas profundos e fraturas expostas', 'Capacidade de salvar personagens moribundos com maior eficácia']
+          proficiencies: ['Cirurgias de campo e diagnósticos avançados', 'Tratamento de infecções graves'],
+          starterEquipment: ['Kit Médico Avançado (x1)', 'Remédios Básicos (x2)', 'Bandagem Estéril (x3)', 'Álcool 70% (x1)'],
+          perks: ['Maior eficiência e rendimento ao tratar ferimentos graves', 'Capacidade de realizar cirurgias de campo e suturas avançadas', 'Diagnóstico precoce de sintomas infecciosos']
         },
         {
           id: 'socorrista',
-          name: 'Socorrista (Paramédico)',
+          name: 'Socorrista',
           icon: '🚑',
           attrBonus: '+1 Agilidade',
-          proficiencies: ['Primeiros socorros rápidos sob fogo', 'Torniquetes e estabilização'],
-          starterEquipment: ['Kit de primeiros socorros de trauma', 'Bandagens compressivas', 'Bolsa de fluidos e analgésicos'],
-          perks: ['Estabilização de aliados em estado crítico em metade do tempo', 'Agilidade para alcançar feridos em combate']
+          proficiencies: ['Intervenção médica de emergência e resgate veloz', 'Estabilização de feridos sob fogo'],
+          starterEquipment: ['Kit de Primeiros Socorros (x1)', 'Bandagem Estéril (x4)', 'Remédios Básicos (x2)'],
+          perks: ['Tratamento ultrarrápido de hemorragias em combate', 'Capacidade de estabilizar aliados em estado crítico ou inconscientes', 'Agilidade superior para manobras de resgate sob fogo cruzado']
         },
         {
           id: 'farmaceutico',
           name: 'Farmacêutico',
           icon: '🧪',
           attrBonus: '+1 Sabedoria',
-          proficiencies: ['Química medicinal', 'Síntese e purificação de fármacos'],
-          starterEquipment: ['Bolsa farmacêutica hermética', 'Frascos de reagentes e compostos', 'Extratos e desinfetantes concentrados'],
-          perks: ['Identificação instantânea de substâncias químicas e remédios vencidos', 'Produção de antídotos e pomadas curativas']
+          proficiencies: ['Química medicinal e síntese de fármacos', 'Purificação de compostos'],
+          starterEquipment: ['Bolsa Farmacêutica (x1)', 'Remédios Básicos (x3)', 'Álcool 70% (x2)'],
+          perks: ['Identificação precisa da eficácia e pureza de fármacos', 'Melhor aproveitamento de dosagens sem desperdício', 'Capacidade de sintetizar medicamentos e antissépticos básicos']
         }
       ]
     },
@@ -98,9 +98,9 @@ export const DEFAULT_RULES_CONFIG = {
       name: 'Mecânico',
       icon: '🔧',
       color: '#f59e0b',
-      badge: 'Engenharia & Infraestrutura',
+      badge: '⚙️ Engenharia & Maquinário',
       attrBonus: '+2 Inteligência',
-      summary: 'Peça indispensável no apocalipse. Recuperam veículos blindados, colocam geradores para funcionar, consertam armaduras e transformam sucata em fortificações.',
+      summary: 'Essenciais para o funcionamento do mundo: consertam veículos, operam geradores elétricos e constroem defesas sólidas contra hordas.',
       quote: '"Quem controla a energia e os motores controla o mapa."',
       specialties: [
         {
@@ -108,27 +108,27 @@ export const DEFAULT_RULES_CONFIG = {
           name: 'Mecânico Automotivo',
           icon: '🔧',
           attrBonus: '+1 Inteligência',
-          proficiencies: ['Motores a combustão', 'Sistemas de transmissão e blindagem de veículos'],
-          starterEquipment: ['Jogo de ferramentas mecânicas completo', 'Chave inglesa reforçada', 'Galão de óleo e peças sobressalentes'],
-          perks: ['Reparo avançado de carros, motos e caminhões', 'Maior eficiência no consumo de combustível de motores']
+          proficiencies: ['Mecânica a combustão e motores', 'Manutenção e ignição veicular'],
+          starterEquipment: ['Maleta de Ferramentas Pro (x1)', 'Galão de Combustível (Cheio) (x1)', 'Luvas de Proteção Reforçadas (x1)'],
+          perks: ['Capacidade de consertar e reativar veículos abandonados', 'Maior eficiência e rendimento ao reparar peças mecânicas', 'Conhecimento detalhado de sistemas de ignição e combustível']
         },
         {
           id: 'engenheiro',
-          name: 'Engenheiro Eletromecânico',
+          name: 'Engenheiro',
           icon: '⚙️',
           attrBonus: '+1 Inteligência',
-          proficiencies: ['Geradores industriais', 'Sistemas elétricos e circuitos de segurança'],
-          starterEquipment: ['Multímetro e alicates de precisão', 'Caixa de fusíveis e fios de cobre', 'Ferramentas técnicas avançadas'],
-          perks: ['Restauração de energia em bunkers e hospitais', 'Capacidade de sabotar ou ligar sistemas eletrônicos']
+          proficiencies: ['Sistemas elétricos, redes e circuitos de energia', 'Maquinário industrial'],
+          starterEquipment: ['Estojo de Ferramentas Técnicas (x1)', 'Extensão Elétrica Industrial (x1)', 'Pilhas e Baterias (x2)'],
+          perks: ['Reparação de máquinas industriais e complexas', 'Instalação e manutenção de geradores e redes elétricas', 'Análise estrutural de integridade de construções']
         },
         {
           id: 'construtor',
-          name: 'Construtor / Barricador',
+          name: 'Construtor',
           icon: '🏗️',
           attrBonus: '+1 Força',
-          proficiencies: ['Fortificações e carpintaria pesada', 'Alvenaria e reforço estrutural'],
-          starterEquipment: ['Pé de cabra de aço', 'Marreta e pregos industriais', 'Cinto de ferramentas de construção'],
-          perks: ['Construção de barricadas com 50% mais resistência a hordas', 'Eficiência dobrada no uso de tábuas e metais']
+          proficiencies: ['Alvenaria, carpintaria e fortificações', 'Barricadas e defesas estruturais'],
+          starterEquipment: ['Martelo de Orelha Pesado (x1)', 'Caixa de Pregos e Parafusos (x2)', 'Tábuas de Madeira Tratada (x3)', 'Fita Adesiva Reforçada (x1)'],
+          perks: ['Construção e reforço de barricadas duradouras', 'Maior velocidade e menor custo de material para obras', 'Criação de estruturas seguras e portões defensivos']
         }
       ]
     },
@@ -137,37 +137,37 @@ export const DEFAULT_RULES_CONFIG = {
       name: 'Caçador',
       icon: '🎯',
       color: '#10b981',
-      badge: 'Rastreamento & Vida Selvagem',
+      badge: '🌲 Sobrevivência Selvagem & Rastreio',
       attrBonus: '+2 Percepção',
-      summary: 'Inspirado nos sobreviventes clássicos de DayZ. Sabem se camuflar na floresta, rastrear animais e hostis, produzir arcos e conseguir comida limpa longe dos centros urbanos.',
+      summary: 'Inspirado na sobrevivência bruta de ermos: sabem rastrear alvos, encontrar água pura, caçar presas e sobreviver longe de qualquer cidade.',
       quote: '"Na floresta, ou você observa primeiro, ou se torna a presa."',
       specialties: [
         {
-          id: 'cacador_atirador',
-          name: 'Caçador Rastreador',
+          id: 'cacador_selvagem',
+          name: 'Caçador',
           icon: '🎯',
           attrBonus: '+1 Percepção',
-          proficiencies: ['Rifles de ferrolho e arcos', 'Tiroteio furtivo e identificação de pegadas'],
-          starterEquipment: ['Rifle de caça / Arco com flechas', 'Binóculo de precisão', 'Faca de esfolar'],
-          perks: ['Rastreamento de animais e sobreviventes pelo terreno', 'Maior rendimento de carne e couro limpo ao caçar']
+          proficiencies: ['Armas de caça e tiro de longa distância', 'Rastreamento de animais e presas'],
+          starterEquipment: ['Rifle de Caça com Luneta (x1)', 'Caixa de Cartuchos de Caça (x1)', 'Faca de Caça Afiada (x1)'],
+          perks: ['Proficiência completa com rifles de ferrolho e arcos', 'Rastreamento apurado de animais e presas selvagens', 'Maior aproveitamento de carne limpa e couros']
         },
         {
           id: 'mateiro',
-          name: 'Mateiro (Guia Florestal)',
+          name: 'Mateiro',
           icon: '🌲',
           attrBonus: '+1 Constituição',
-          proficiencies: ['Botânica de sobrevivência', 'Orientação em ermos e acampamentos seguros'],
-          starterEquipment: ['Mochila de sobrevivência militar', 'Cantil com filtro', 'Pederneira e corda reforçada'],
-          perks: ['Identificação imediata de plantas comestíveis e venenosas', 'Resistência natural a intempéries da floresta']
+          proficiencies: ['Sobrevivência em biomas selvagens e botânica', 'Orientação natural e acampamentos'],
+          starterEquipment: ['Mochila Tática de Mateiro (x1)', 'Faca de Sobrevivência (x1)', 'Isqueiro e Fósforos Impermeáveis (x1)', 'Rolo de Corda de Nylon (x1)'],
+          perks: ['Identificação confiável de plantas, raízes e cogumelos comestíveis', 'Melhor aproveitamento de recursos naturais e fontes de água', 'Resistência superior a intempéries e noites ao ar livre']
         },
         {
           id: 'trapper',
-          name: 'Trapper (Armadilheiro)',
+          name: 'Trapper',
           icon: '🐺',
           attrBonus: '+1 Percepção',
-          proficiencies: ['Armadilhas mecânicas', 'Iscas e captura de presas'],
-          starterEquipment: ['Kit de arames de disparo', 'Armadilhas de urso / laços de aço', 'Faca de caça'],
-          perks: ['Fabricação e desarme de armadilhas em portas e trilhas', 'Coleta passiva de pequenos animais para alimentação']
+          proficiencies: ['Manufatura de armadilhas mecânicas', 'Curtimento e extração animal'],
+          starterEquipment: ['Kit de Armadilhas Mecânicas (x2)', 'Canivete Multiuso (x1)', 'Rolo de Corda de Nylon (x1)'],
+          perks: ['Fabricação e desarme de armadilhas mecânicas', 'Captura eficiente de pequenos e médios animais', 'Conhecimento de extração de peles, ossos e tendões']
         }
       ]
     },
@@ -176,37 +176,37 @@ export const DEFAULT_RULES_CONFIG = {
       name: 'Agricultor',
       icon: '🌾',
       color: '#eab308',
-      badge: 'Produção Sustentável & Alimentos',
+      badge: '🌱 Produção & Sustentabilidade',
       attrBonus: '+2 Constituição',
-      summary: 'Enquanto a maioria saqueia enlatados vencidos, o agricultor produz comida fresca, cria animais e garante a renovação calórica da comunidade.',
+      summary: 'Enquanto a maioria disputa restos industrializados, o agricultor produz comida, cuida de animais e garante a renovação dos recursos da comunidade.',
       quote: '"As latas de comida vão acabar. Quem souber plantar herdará a terra."',
       specialties: [
         {
-          id: 'cultivador',
-          name: 'Agricultor Cultivador',
+          id: 'agricultor_cultivo',
+          name: 'Agricultor',
           icon: '🌾',
           attrBonus: '+1 Constituição',
-          proficiencies: ['Horticultura', 'Sistemas de irrigação e adubagem'],
-          starterEquipment: ['Enxada / Pá reforçada', 'Saco de sementes variadas', 'Fertilizante orgânico', 'Luvas de couro'],
-          perks: ['Colheitas com ciclo acelerado e sem pragas', 'Maximização de sementes recuperadas']
+          proficiencies: ['Cultivo, botânica aplicada e horticultura', 'Rotação de culturas e plantio'],
+          starterEquipment: ['Conjunto de Ferramentas Agrícolas (x1)', 'Pacote de Sementes Mistas (x3)', 'Garrafa de Água Potável (x2)'],
+          perks: ['Técnicas avançadas de plantio e rotação de culturas', 'Melhor aproveitamento e multiplicação de sementes', 'Identificação do ciclo de colheita e saúde do solo']
         },
         {
           id: 'pecuarista',
           name: 'Pecuarista',
           icon: '🐄',
           attrBonus: '+1 Constituição',
-          proficiencies: ['Manejo de rebanhos', 'Tratamento de animais domésticos'],
-          starterEquipment: ['Laço de contenção', 'Sal mineral', 'Capa de chuva resistente', 'Botas de fazenda'],
-          perks: ['Criação e ordenha de animais sem perda por contaminação', 'Uso de tração animal para transporte de carga']
+          proficiencies: ['Manejo animal e veterinária básica', 'Comportamento de animais silvestres e de criação'],
+          starterEquipment: ['Luvas de Couro de Trabalho (x1)', 'Rolo de Corda Resistente (x1)', 'Faca Utilitária (x1)'],
+          perks: ['Cuidados, alimentação e reprodução de animais de abate/trabalho', 'Produção e extração de laticínios, ovos e derivados', 'Conhecimento do comportamento de animais silvestres e domesticados']
         },
         {
           id: 'produtor_alimentos',
-          name: 'Produtor / Conservador',
+          name: 'Produtor Culinário',
           icon: '🍞',
           attrBonus: '+1 Inteligência',
-          proficiencies: ['Desidratação e defumação', 'Conservas, fermentação e estoques de longo prazo'],
-          starterEquipment: ['Potes de vidro herméticos', 'Sal de cura', 'Facas de corte e utensílios culinários'],
-          perks: ['Alimentos conservados duram meses sem apodrecer', 'Maior ganho de energia e hidratação nas refeições preparadas']
+          proficiencies: ['Conservação, secagem e fermentação de alimentos', 'Preparo de rações nutritivas'],
+          starterEquipment: ['Panela de Ferro Culinária (x1)', 'Abridor de Latas (x1)', 'Pacote de Mantimentos (x2)', 'Isqueiro e Fósforos (x1)'],
+          perks: ['Conservação de alimentos sem necessidade de refrigeração', 'Técnicas de fermentação, defumação, desidratação e salga', 'Preparo de rações concentradas e nutritivas']
         }
       ]
     },
@@ -215,48 +215,48 @@ export const DEFAULT_RULES_CONFIG = {
       name: 'Cientista',
       icon: '🔬',
       color: '#a855f7',
-      badge: 'Pesquisa Viral & Tecnologia',
+      badge: '🧪 Pesquisa, Bio-Análise & Tecnologia',
       attrBonus: '+2 Inteligência',
-      summary: 'Compreendem a biologia do patógeno Strain Zero, formulam reagentes químicos, operam terminais de segurança militar e decodificam relatórios governamentais.',
+      summary: 'Indivíduos com conhecimento acadêmico avançado para decifrar a origem do vírus, analisar mutações, manipular produtos químicos e quebrar códigos.',
       quote: '"O vírus obedece a leis biológicas. Se entendermos o código, podemos resistir."',
       specialties: [
         {
           id: 'quimico',
-          name: 'Químico de Laboratório',
+          name: 'Químico',
           icon: '🧪',
           attrBonus: '+1 Inteligência',
-          proficiencies: ['Manipulação de reagentes voláteis', 'Purificação de compostos e solventes'],
-          starterEquipment: ['Kit químico portátil', 'Ácido / Solventes em frascos reforçados', 'Óculos de proteção'],
-          perks: ['Fabricação de combustíveis, explosivos controlados e neutralizadores', 'Identificação de contaminação química na água']
+          proficiencies: ['Síntese química e compostos voláteis', 'Neutralização de substâncias perigosas'],
+          starterEquipment: ['Equipamento Químico Portátil (x1)', 'Álcool 70% (x2)', 'Máscara com Filtro Químico (x1)'],
+          perks: ['Manipulação e neutralização de substâncias perigosas', 'Fabricação de compostos químicos, explosivos e desinfetantes', 'Identificação precisa de misturas e compostos tóxicos']
         },
         {
           id: 'pesquisador',
-          name: 'Pesquisador Viral',
+          name: 'Pesquisador',
           icon: '🔬',
           attrBonus: '+1 Sabedoria',
-          proficiencies: ['Análise de amostras biológicas', 'Microscopia e documentação técnica'],
-          starterEquipment: ['Microscópio de campo', 'Amostradores de tecido', 'Relatórios científicos confidenciais'],
-          perks: ['Interpretação de documentos em laboratórios abandonados', 'Diagnóstico preciso dos estágios da infecção zumbi']
+          proficiencies: ['Análise documental e investigação biológica', 'Padrões de mutações'],
+          starterEquipment: ['Caderno de Anotações & Lupa (x1)', 'Óculos de Alta Precisão (x1)', 'Lanterna UV / Portátil (x1)'],
+          perks: ['Análise de relatórios científicos, registros de quarentena e mapas', 'Interpretação de dados de amostras de infectados', 'Identificação de fraquezas e padrões comportamentais de mutações']
         },
         {
-          id: 'analista_sistemas',
-          name: 'Analista de Sistemas / Hacker',
+          id: 'analista_ti',
+          name: 'Analista de TI',
           icon: '💻',
           attrBonus: '+1 Inteligência',
-          proficiencies: ['Hardware e servidores', 'Bancos de dados e sistemas criptografados'],
-          starterEquipment: ['Terminal portátil / Notebook militar', 'Cabos e cartões de acesso', 'Pendrive com rotinas de bypass'],
-          perks: ['Desbloqueio de portas eletrônicas e cofres digitais', 'Recuperação de logs e coordenadas em computadores militares']
+          proficiencies: ['Sistemas eletrônicos, criptografia e bancos de dados', 'Hackeamento de terminais'],
+          starterEquipment: ['Notebook Tático Operacional (x1)', 'Smartphone Desbloqueado (x1)', 'Carregador Solar e Cabos (x1)', 'Pilhas e Baterias (x2)'],
+          perks: ['Hackeamento e acesso a terminais e sistemas de segurança trancados', 'Recuperação de dados e registros em computadores danificados', 'Manutenção e reconfiguração de equipamentos eletrônicos']
         }
       ]
     },
     {
-      id: 'sobrevivente_civil',
+      id: 'sobrevivente',
       name: 'Sobrevivente',
-      icon: '🎒',
+      icon: '🏕️',
       color: '#22c55e',
-      badge: 'Versatilidade & Resiliência Urbana',
+      badge: '🔪 Resiliência Urbana & Prática',
       attrBonus: '+1 Constituição | +1 Percepção',
-      summary: 'O cidadão comum que aprendeu na marra a resistir. Altamente adaptável, com grande instinto de autopreservação, capacidade de carga e lábia para negociações.',
+      summary: 'A profissão civil mais pura: sem teorias militares ou acadêmicas, aprendeu na marra a resistir ao caos diário com astúcia, adaptação e força de vontade.',
       quote: '"Eu não era militar nem médico. Só me recusei a morrer."',
       specialties: [
         {
@@ -264,27 +264,27 @@ export const DEFAULT_RULES_CONFIG = {
           name: 'Preparador (Prepper)',
           icon: '🏕️',
           attrBonus: '+1 Percepção',
-          proficiencies: ['Logística de suprimentos', 'Navegação urbana e esconderijos'],
-          starterEquipment: ['Mochila cargueira de grande capacidade', 'Rações de emergência e canivete suíço', 'Mapa anotado com rotas de fuga'],
-          perks: ['+25% de capacidade de carga no inventário', 'Inicia com estoques extras de água e enlatados']
+          proficiencies: ['Logística de mantimentos e capacidade de carga', 'Rotas de fuga urbanas'],
+          starterEquipment: ['Mochila Resistente (x1)', 'Comida Enlatada (x2)', 'Garrafa de Água Potável (x2)', 'Lanterna Portátil (x1)'],
+          perks: ['Excelente organização de mochila e capacidade de carga expandida', 'Início com reserva sólida de mantimentos e utilitários', 'Orientação rápida em rotas de fuga urbanas']
         },
         {
           id: 'sobrevivencialista',
           name: 'Sobrevivencialista',
           icon: '🔪',
           attrBonus: '+1 Percepção',
-          proficiencies: ['Fogueiras rápidas', 'Refúgios improvisados e coleta de sucata'],
-          starterEquipment: ['Facão de sobrevivência', 'Isqueiro e pederneira', 'Lona plástica reforçada'],
-          perks: ['Montagem de abrigos contra chuva e vento em minutos', 'Coleta de materiais com maior facilidade em escombros']
+          proficiencies: ['Bushcraft, fogueiras rápidas e coleta urbana', 'Abrigos improvisados em ruínas'],
+          starterEquipment: ['Faca Utilitária Afiada (x1)', 'Isqueiro e Fósforos (x1)', 'Rolo de Corda (x1)', 'Fita Adesiva Reforçada (x1)'],
+          perks: ['Acendimento veloz de fogueiras e fontes de calor seguras', 'Montagem rápida de abrigos improvisados em ruínas', 'Eficiência em vasculhas de sucatas e materiais reaproveitáveis']
         },
         {
           id: 'negociador',
-          name: 'Negociador / Comerciante',
+          name: 'Negociador',
           icon: '🗣️',
           attrBonus: '+1 Carisma',
-          proficiencies: ['Barganha e diplomacia', 'Avaliação de valor de itens raros'],
-          starterEquipment: ['Bolsa de moedas (Novos Rúblos extras)', 'Bens de alto valor de troca (cigarros, pilhas)', 'Rádio receptor'],
-          perks: ['Desconto de 15% nas lojas de NPCs e bônus na venda de itens', 'Melhor interação narrativa com facções neutras']
+          proficiencies: ['Diplomacia, persuasão e comércio', 'Poder de barganha'],
+          starterEquipment: ['Notas e Títulos Comerciais (x5)', 'Isqueiro de Colecionador (x1)', 'Vidro de Perfume Preservado (x1)', 'Relógio de Pulso Analógico (x1)'],
+          perks: ['Maior facilidade em interações pacíficas e diplomáticas com NPCs', 'Poder de barganha: melhores preços e trocas no comércio', 'Começa com pequenos recursos comerciais de alto valor de troca']
         }
       ]
     }
@@ -374,9 +374,8 @@ export const DEFAULT_RULES_CONFIG = {
       { name: '🩸🩸🩸🩸 Sangramento IV — Arterial', decay: '-10 HP por turno (Decai a cada 15 min OFF)', desc: 'Hemorragia desesperadora. O personagem perde a consciência em minutos se um médico não estancar imediatamente.' }
     ],
     weapons: [
-      { cat: 'Branca Leve', name: 'Soco / Chute / Improvisada', dmg: '3 – 10', effect: 'Trauma leve, atordoamento em teste' },
-      { cat: 'Branca Média', name: 'Faca de Combate / Pé de Cabra', dmg: '12 – 18', effect: 'Perfuração rápida, Sangramento I' },
-      { cat: 'Branca Pesada', name: 'Machado de Incêndio / Espada', dmg: '18 – 35', effect: 'Trauma severo, alto risco de fratura óssea' },
+      { cat: 'Corpo a Corpo', name: 'Facas e Adagas Táticas', dmg: '8 – 16', effect: 'Silencioso + Sangramento Leve' },
+      { cat: 'Corpo a Corpo', name: 'Machados & Marretas Pesadas', dmg: '18 – 35', effect: 'Quebra de ossos + Atordoamento' },
       { cat: 'Arma de Fogo', name: 'Pistolas (9mm, .45, Revólver)', dmg: '18 – 32', effect: 'Perfuração balística + Sangramento II' },
       { cat: 'Arma de Fogo', name: 'Rifles & Fuzis de Assalto', dmg: '35 – 45', effect: 'Perfura coletes leves + Sangramento III' },
       { cat: 'Arma de Fogo', name: 'Rifle de Sniper / Caça Pesada', dmg: '45 – 60', effect: 'Dano massivo, letal se atingir a cabeça' },
@@ -423,13 +422,13 @@ export const DEFAULT_RULES_CONFIG = {
   },
   survivalTime: {
     introTitle: '⏱️ Fluxo Temporal ON / OFF & O Sistema de Legado',
-    introText: 'No RPG Zona Zero, o tempo do jogo corre na proporção estabelecida de 24 horas OFF (Tempo Real) = 4 dias ON (Tempo de Jogo). Isso garante que viagens entre cidades, descanso em abrigos e ciclos biológicos façam sentido e tenham peso real.',
+    introText: 'No RPG Zona Zero, o tempo do jogo corre na proporção de 1 para 2 (1h OFF = 2h ON / 24h OFF = 2 Dias ON). Isso garante um ritmo dinâmico para viagens entre cidades, descanso em abrigos e ciclos biológicos do personagem.',
     timeConversions: [
-      { off: '1h OFF', on: '4h ON', highlight: false },
-      { off: '3h OFF', on: '12h ON', highlight: false },
-      { off: '6h OFF', on: '1 Dia ON', highlight: false },
-      { off: '12h OFF', on: '2 Dias ON', highlight: true },
-      { off: '24h OFF', on: '4 Dias ON', highlight: true }
+      { off: '1h OFF', on: '2h ON', highlight: false },
+      { off: '3h OFF', on: '6h ON', highlight: false },
+      { off: '6h OFF', on: '12h ON', highlight: false },
+      { off: '12h OFF', on: '1 Dia ON (24h)', highlight: true },
+      { off: '24h OFF', on: '2 Dias ON (48h)', highlight: true }
     ],
     deathPaths: [
       {

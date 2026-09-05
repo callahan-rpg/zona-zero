@@ -965,7 +965,7 @@ body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  filter: brightness(0.99);
+  filter: brightness(0.78);
   transition: background-image 0.5s ease;
 }
 
