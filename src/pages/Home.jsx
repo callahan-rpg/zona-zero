@@ -123,7 +123,7 @@ export default function Home() {
     if (type === 'lore') {
       setActiveModal('lore')
     } else if (type === 'rules') {
-      setActiveModal('rules')
+      navigate('/rules')
     } else if (type === 'login') {
       if (user) {
         navigate('/location/sala-hospital')
@@ -167,15 +167,14 @@ export default function Home() {
               <span className="home-nav-label">História do Jogo</span>
             </button>
 
-            <button
-              type="button"
+            <Link
+              to="/rules"
               className="home-nav-btn"
-              onClick={() => setActiveModal('rules')}
-              title="Regras do RPG"
+              title="Regras e Mecânicas do RPG"
             >
               <GameIcon name="rules" size={16} />
               <span className="home-nav-label">Regras</span>
-            </button>
+            </Link>
 
             {!user ? (
               <>

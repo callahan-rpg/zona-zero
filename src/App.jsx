@@ -13,6 +13,7 @@ import Admin from './pages/Admin.jsx'
 import Map from './pages/Map.jsx'
 import PublicCharacter from './pages/PublicCharacter.jsx'
 import Combat from './pages/Combat.jsx'
+import Rules from './pages/Rules.jsx'
 import AmbientSoundPlayer from './components/AmbientSoundPlayer.jsx'
 import { calculateGameTime, getDynamicWeather } from './utils/timeSystem'
 import { DEFAULT_WEATHER_SOUNDS } from './utils/audioSystem'
@@ -122,6 +123,7 @@ export default function App() {
       <Routes>
         {/* Rotas públicas */}
         <Route path="/" element={<Home />} />
+        <Route path="/rules" element={<Rules />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 

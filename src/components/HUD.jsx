@@ -199,6 +199,22 @@ export default function HUD({ locationName }) {
           <button
             type="button"
             onClick={() => {
+              if (location.pathname === '/rules') return
+              if (location.pathname.startsWith('/location')) {
+                window.open('/rules', '_blank', 'noopener,noreferrer')
+              } else {
+                navigate('/rules')
+              }
+            }}
+            className={`hud-btn ${location.pathname === '/rules' ? 'active' : ''}`}
+            title="Manual e Regras do RPG"
+          >
+            <GameIcon name="rules" size={16} className="hud-btn-icon" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
               if (location.pathname === '/combat') return
               if (location.pathname.startsWith('/location')) {
                 window.open('/combat', '_blank', 'noopener,noreferrer')

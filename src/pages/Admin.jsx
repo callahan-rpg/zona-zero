@@ -16,9 +16,10 @@ import { COMBAT_STATUS_EFFECTS, MONSTER_TEMPLATES, ATTRIBUTE_ICONS } from '../ut
 import { uploadImageFree } from '../utils/imageUpload'
 import { DEFAULT_WEATHER_SOUNDS, extractYouTubeId } from '../utils/audioSystem'
 import { PROFESSIONS, ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getStarterItems, calculateProfessionBonuses } from '../utils/professionSystem'
-import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
+import { useSearchParams } from 'react-router-dom'
 import GameIcon from '../components/GameIcon.jsx'
 import AdminMapEditor from '../components/AdminMapEditor.jsx'
+import AdminRulesEditor from '../components/AdminRulesEditor.jsx'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -30,7 +31,10 @@ const WEATHER_OPTIONS = [
 ]
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState('config') // config | calendar | locations | catalog | players
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => {
+    return searchParams.get('tab') || 'config'
+  }) // config | home | rules | calendar | locations | catalog | players
 
   // ==========================================
   // TAB 1: CONFIGURAÇÃO GLOBAL (TEMPO, ESTAÇÃO, CLIMA & SONS)
@@ -409,17 +413,21 @@ export default function Admin() {
   const [newCollectionItem, setNewCollectionItem] = useState({ itemId: '', name: '', icon: '📦', rarity: 'common', chance: 0.4, min: 1, max: 2, category: 'general' })
 
   // ==========================================
-  // TAB 2: LOCAÇÕES (CRUD COM PASTAS / COMPLEXOS)
+  // TAB 2: LOCAÇÕES (CRUD COM PASTAS, SUBPASTAS & COMPLEXOS)
   // ==========================================
   const [locations, setLocations] = useState([])
   const [editingLoc, setEditingLoc] = useState(null)
-  const [selectedFolder, setSelectedFolder] = useState('all') // 'all', 'sem_pasta' ou o nome da pasta
+  const [selectedFolder, setSelectedFolder] = useState('all') // 'all', 'sem_pasta' ou o nome da pasta principal
+  const [selectedSubfolder, setSelectedSubfolder] = useState('all') // 'all' ou o nome da subpasta
   const [openFolders, setOpenFolders] = useState({}) // { [folderName]: boolean }
+  const [openSubFolders, setOpenSubFolders] = useState({}) // { [`${folderName}::${subfolderName}`]: boolean }
+  const [uploadingLocImage, setUploadingLocImage] = useState(false)
   const [locSearch, setLocSearch] = useState('')
   const [locForm, setLocForm] = useState({
     name: '',
     slug: '',
-    folder: '', // Nome da Pasta / Complexo (ex: "Hotel do centro de Varsóvia")
+    folder: '', // Nome da Pasta Principal / Complexo / Cidade (ex: "Dravina", "Varsóvia")
+    subfolder: '', // Nome da Subpasta / Setor (ex: "Acampamento", "Centro da Cidade de Starelyug")
     description: '',
     backgroundImage: '',
     locationSound: '', // Link do YouTube de som específico do lugar
@@ -475,10 +483,18 @@ export default function Admin() {
 
   function handleLocEdit(loc) {
     setEditingLoc(loc.id)
+    let folder = loc.folder || ''
+    let subfolder = loc.subfolder || ''
+    if (!subfolder && folder.includes('/')) {
+      const parts = folder.split('/')
+      folder = parts[0].trim()
+      subfolder = parts.slice(1).join('/').trim()
+    }
     setLocForm({
       name: loc.name || '',
       slug: loc.slug || '',
-      folder: loc.folder || '',
+      folder: folder,
+      subfolder: subfolder,
       description: loc.description || '',
       backgroundImage: loc.backgroundImage || '',
       locationSound: loc.locationSound || '',
@@ -497,12 +513,20 @@ export default function Admin() {
     })
   }
 
-  function resetLocForm() {
+  function resetLocForm(initialFolder = '', initialSubfolder = '') {
     setEditingLoc(null)
+    const targetFolder = initialFolder !== '' 
+      ? initialFolder 
+      : (selectedFolder !== 'all' && selectedFolder !== 'sem_pasta' ? selectedFolder : '')
+    const targetSubfolder = initialSubfolder !== ''
+      ? initialSubfolder
+      : (selectedSubfolder !== 'all' ? selectedSubfolder : '')
+
     setLocForm({
       name: '',
       slug: '',
-      folder: selectedFolder !== 'all' && selectedFolder !== 'sem_pasta' ? selectedFolder : '',
+      folder: targetFolder,
+      subfolder: targetSubfolder,
       description: '',
       backgroundImage: '',
       locationSound: '',
@@ -538,8 +562,9 @@ export default function Admin() {
       name: locForm.name.trim(),
       slug: cleanSlug,
       folder: (locForm.folder || '').trim(),
+      subfolder: (locForm.subfolder || '').trim(),
       description: locForm.description.trim(),
-      backgroundImage: locForm.backgroundImage.trim() || null,
+      backgroundImage: locForm.backgroundImage ? locForm.backgroundImage.trim() : null,
       locationSound: (locForm.locationSound || '').trim() || null,
       disableWeatherSound: !!locForm.disableWeatherSound,
       xatIframe: locForm.xatIframe.trim(),
@@ -1614,7 +1639,7 @@ export default function Admin() {
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', overflowY: 'auto' }}>
       <HUD />
 
-      <div style={{ padding: 'calc(var(--hud-height) + 24px) 24px 24px', maxWidth: '1000px', margin: '0 auto' }}>
+      <div style={{ padding: 'calc(var(--hud-height) + 24px) 24px 24px', maxWidth: activeTab === 'locations' || activeTab === 'catalog' || activeTab === 'players' ? '1350px' : '1000px', margin: '0 auto' }}>
         <div className="glass" style={{ padding: '24px', marginBottom: '20px' }}>
           <h2 style={{ fontFamily: 'Oswald', letterSpacing: 2, textTransform: 'uppercase', color: 'var(--accent-yellow)', marginBottom: '16px' }}>
             🛠️ Painel do Administrador
@@ -1627,6 +1652,9 @@ export default function Admin() {
             </button>
             <button className={`btn btn-sm ${activeTab === 'home' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('home')} style={{ borderColor: 'rgba(168, 85, 247, 0.4)', color: activeTab === 'home' ? '#fff' : '#c084fc', background: activeTab === 'home' ? '#9333ea' : 'transparent' }}>
               🏠 Customizar Home
+            </button>
+            <button className={`btn btn-sm ${activeTab === 'rules' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('rules')} style={{ borderColor: 'rgba(234, 179, 8, 0.5)', color: activeTab === 'rules' ? '#000' : '#facc15', background: activeTab === 'rules' ? '#eab308' : 'transparent', fontWeight: 'bold' }}>
+              📜 Regras do RPG (/rules)
             </button>
             <button className={`btn btn-sm ${activeTab === 'catalog' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('catalog')}>
               🗃️ Catálogo de Itens ({catalogItems.length})
@@ -1656,6 +1684,11 @@ export default function Admin() {
               📍 Editor de Mapa
             </button>
           </div>
+
+          {/* CONTEÚDO DA TAB RULES: EDITOR DE REGRAS DO RPG */}
+          {activeTab === 'rules' && (
+            <AdminRulesEditor />
+          )}
 
 
           {/* CONTEÚDO DA TAB HOME: CUSTOMIZAÇÃO DA HOME & SLIDES */}
@@ -2891,37 +2924,90 @@ export default function Admin() {
             </div>
           )}
 
-          {/* CONTEÚDO DA TAB 2: LOCAÇÕES (COM PASTAS / COMPLEXOS & COLEÇÕES) */}
+          {/* CONTEÚDO DA TAB 2: LOCAÇÕES (COM PASTAS, SUBPASTAS, BUSCA & UPLOAD DIRETO) */}
           {activeTab === 'locations' && (() => {
-            // Extrai lista única de pastas das locações cadastradas
-            const allFolders = Array.from(
+            // Normaliza locações para estrutura hierárquica (Root Folder e Subfolder)
+            const normalizedLocs = locations.map(l => {
+              let root = (l.folder || '').trim()
+              let sub = (l.subfolder || '').trim()
+              if (!sub && root.includes('/')) {
+                const parts = root.split('/')
+                root = parts[0].trim()
+                sub = parts.slice(1).join('/').trim()
+              }
+              return {
+                ...l,
+                _rootFolder: root || 'Sem Pasta',
+                _subfolder: sub || ''
+              }
+            })
+
+            // Lista única de Pastas Principais
+            const allRootFolders = Array.from(
               new Set(
-                locations
-                  .map(l => (l.folder || '').trim())
-                  .filter(Boolean)
+                normalizedLocs
+                  .map(l => l._rootFolder)
+                  .filter(f => f && f !== 'Sem Pasta')
               )
             ).sort()
 
+            // Mapeamento de subpastas por pasta principal
+            const subfoldersByRoot = {}
+            normalizedLocs.forEach(l => {
+              if (!subfoldersByRoot[l._rootFolder]) subfoldersByRoot[l._rootFolder] = new Set()
+              if (l._subfolder) subfoldersByRoot[l._rootFolder].add(l._subfolder)
+            })
+
+            // Subpastas disponíveis para o formulário atual
+            const currentFormRoot = (locForm.folder || '').trim() || 'Sem Pasta'
+            const availableSubfoldersForForm = Array.from(subfoldersByRoot[currentFormRoot] || []).sort()
+
             // Filtro por busca de texto
             const q = locSearch.toLowerCase().trim()
-            const searchFiltered = locations.filter(l => {
+            const searchFiltered = normalizedLocs.filter(l => {
               if (!q) return true
               return (
                 (l.name || '').toLowerCase().includes(q) ||
                 (l.slug || '').toLowerCase().includes(q) ||
-                (l.folder || '').toLowerCase().includes(q)
+                (l._rootFolder || '').toLowerCase().includes(q) ||
+                (l._subfolder || '').toLowerCase().includes(q) ||
+                (l.description || '').toLowerCase().includes(q)
               )
             })
 
-            // Agrupamento
-            const grouped = {}
-            searchFiltered.forEach(loc => {
-              const f = (loc.folder || '').trim() || 'Sem Pasta'
-              if (!grouped[f]) grouped[f] = []
-              grouped[f].push(loc)
+            // Filtro por pasta/subpasta selecionada no topo
+            const folderFiltered = searchFiltered.filter(l => {
+              if (selectedFolder === 'all') return true
+              if (selectedFolder === 'sem_pasta') return l._rootFolder === 'Sem Pasta'
+              if (l._rootFolder !== selectedFolder) return false
+              if (selectedSubfolder !== 'all' && l._subfolder !== selectedSubfolder) return false
+              return true
             })
 
-            // Toggle para expandir/colapsar pasta
+            // Construção da árvore hierárquica
+            const tree = {}
+            folderFiltered.forEach(loc => {
+              const root = loc._rootFolder
+              const sub = loc._subfolder
+              if (!tree[root]) {
+                tree[root] = {
+                  totalCount: 0,
+                  direct: [],
+                  subfolders: {}
+                }
+              }
+              tree[root].totalCount++
+              if (sub) {
+                if (!tree[root].subfolders[sub]) {
+                  tree[root].subfolders[sub] = []
+                }
+                tree[root].subfolders[sub].push(loc)
+              } else {
+                tree[root].direct.push(loc)
+              }
+            })
+
+            // Funções de alternância de pasta e subpasta
             const toggleFolder = (folderName) => {
               setOpenFolders(prev => ({
                 ...prev,
@@ -2929,219 +3015,578 @@ export default function Admin() {
               }))
             }
 
+            const toggleSubfolder = (key) => {
+              setOpenSubFolders(prev => ({
+                ...prev,
+                [key]: prev[key] === undefined ? false : !prev[key]
+              }))
+            }
+
+            const expandAll = () => {
+              const oF = {}
+              const oS = {}
+              Object.keys(tree).forEach(f => {
+                oF[f] = true
+                Object.keys(tree[f]?.subfolders || {}).forEach(sf => {
+                  oS[`${f}::${sf}`] = true
+                })
+              })
+              setOpenFolders(oF)
+              setOpenSubFolders(oS)
+            }
+
+            const collapseAll = () => {
+              const oF = {}
+              const oS = {}
+              Object.keys(tree).forEach(f => {
+                oF[f] = false
+                Object.keys(tree[f]?.subfolders || {}).forEach(sf => {
+                  oS[`${f}::${sf}`] = false
+                })
+              })
+              setOpenFolders(oF)
+              setOpenSubFolders(oS)
+            }
+
+            // Subpastas para tabs rápidas quando uma pasta principal está selecionada
+            const activeRootSubfolders = selectedFolder !== 'all' && selectedFolder !== 'sem_pasta'
+              ? Array.from(subfoldersByRoot[selectedFolder] || []).sort()
+              : []
+
             return (
-            <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 20 }}>
-              {/* Esquerda: Lista de Pastas e Locações */}
+            <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 20, alignItems: 'start' }}>
+              {/* Esquerda: Lista Hierárquica de Pastas, Subpastas e Locações */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: 'var(--text-muted)', margin: 0 }}>
                     Locações ({locations.length})
                   </h4>
-                  <button className="btn btn-sm btn-primary" onClick={resetLocForm}>
-                    + Nova Sala
-                  </button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ fontSize: 10, padding: '3px 7px', background: 'rgba(255,255,255,0.04)' }}
+                      onClick={expandAll}
+                      title="Expandir todas as pastas e subpastas"
+                    >
+                      ▼ Expandir
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ fontSize: 10, padding: '3px 7px', background: 'rgba(255,255,255,0.04)' }}
+                      onClick={collapseAll}
+                      title="Recolher todas as pastas e subpastas"
+                    >
+                      ▲ Recolher
+                    </button>
+                    <button className="btn btn-sm btn-primary" onClick={() => resetLocForm()} style={{ fontSize: 11, padding: '4px 10px' }}>
+                      + Nova Sala
+                    </button>
+                  </div>
                 </div>
 
                 {/* Barra de Busca de Locação */}
-                <input
-                  type="text"
-                  placeholder="🔍 Buscar sala ou pasta..."
-                  value={locSearch}
-                  onChange={e => setLocSearch(e.target.value)}
-                  style={{ width: '100%', padding: '7px 10px', fontSize: 12 }}
-                />
-
-                {/* Filtro rápido por pasta (Tabs horizontais compactas) */}
-                {allFolders.length > 0 && (
-                  <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 Buscar sala, cidade, subpasta..."
+                    value={locSearch}
+                    onChange={e => setLocSearch(e.target.value)}
+                    style={{ width: '100%', padding: '7px 30px 7px 10px', fontSize: 12 }}
+                  />
+                  {locSearch && (
                     <button
                       type="button"
-                      onClick={() => setSelectedFolder('all')}
+                      onClick={() => setLocSearch('')}
                       style={{
-                        padding: '3px 8px',
-                        fontSize: 10.5,
-                        borderRadius: 6,
-                        border: selectedFolder === 'all' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-                        background: selectedFolder === 'all' ? 'rgba(38,200,143,0.15)' : 'rgba(255,255,255,0.02)',
-                        color: selectedFolder === 'all' ? 'var(--accent)' : 'var(--text-secondary)',
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-muted)',
                         cursor: 'pointer',
-                        whiteSpace: 'nowrap'
+                        fontSize: 12
                       }}
                     >
-                      Todas ({locations.length})
+                      ✕
                     </button>
-                    {allFolders.map(f => {
-                      const count = locations.filter(l => (l.folder || '').trim() === f).length
-                      const isSel = selectedFolder === f
-                      return (
+                  )}
+                </div>
+
+                {/* Filtro rápido por pasta principal */}
+                {allRootFolders.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }} className="admin-locs-scroll">
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedFolder('all'); setSelectedSubfolder('all'); }}
+                        style={{
+                          padding: '3px 8px',
+                          fontSize: 10.5,
+                          borderRadius: 6,
+                          border: selectedFolder === 'all' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
+                          background: selectedFolder === 'all' ? 'rgba(38,200,143,0.15)' : 'rgba(255,255,255,0.02)',
+                          color: selectedFolder === 'all' ? 'var(--accent)' : 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Todas ({locations.length})
+                      </button>
+                      {allRootFolders.map(f => {
+                        const count = normalizedLocs.filter(l => l._rootFolder === f).length
+                        const isSel = selectedFolder === f
+                        return (
+                          <button
+                            key={f}
+                            type="button"
+                            onClick={() => {
+                              setSelectedFolder(isSel ? 'all' : f)
+                              setSelectedSubfolder('all')
+                            }}
+                            style={{
+                              padding: '3px 8px',
+                              fontSize: 10.5,
+                              borderRadius: 6,
+                              border: isSel ? '1px solid #fbbf24' : '1px solid rgba(255,255,255,0.06)',
+                              background: isSel ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255,255,255,0.02)',
+                              color: isSel ? '#fbbf24' : 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title={`Filtrar apenas pasta ${f}`}
+                          >
+                            📁 {f} ({count})
+                          </button>
+                        )
+                      })}
+                      {normalizedLocs.some(l => l._rootFolder === 'Sem Pasta') && (
                         <button
-                          key={f}
                           type="button"
-                          onClick={() => setSelectedFolder(isSel ? 'all' : f)}
+                          onClick={() => {
+                            setSelectedFolder(selectedFolder === 'sem_pasta' ? 'all' : 'sem_pasta')
+                            setSelectedSubfolder('all')
+                          }}
                           style={{
                             padding: '3px 8px',
                             fontSize: 10.5,
                             borderRadius: 6,
-                            border: isSel ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-                            background: isSel ? 'rgba(38,200,143,0.15)' : 'rgba(255,255,255,0.02)',
-                            color: isSel ? 'var(--accent)' : 'var(--text-secondary)',
+                            border: selectedFolder === 'sem_pasta' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
+                            background: selectedFolder === 'sem_pasta' ? 'rgba(38,200,143,0.15)' : 'rgba(255,255,255,0.02)',
+                            color: selectedFolder === 'sem_pasta' ? 'var(--accent)' : 'var(--text-secondary)',
                             cursor: 'pointer',
                             whiteSpace: 'nowrap'
                           }}
-                          title={`Filtrar apenas ${f}`}
                         >
-                          📁 {f} ({count})
+                          🏷️ Sem Pasta ({normalizedLocs.filter(l => l._rootFolder === 'Sem Pasta').length})
                         </button>
-                      )
-                    })}
+                      )}
+                    </div>
+
+                    {/* Sub-tabs se uma pasta com subpastas estiver selecionada */}
+                    {activeRootSubfolders.length > 0 && (
+                      <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2, paddingLeft: 6, borderLeft: '2px solid rgba(96, 165, 250, 0.4)' }} className="admin-locs-scroll">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSubfolder('all')}
+                          style={{
+                            padding: '2px 6px',
+                            fontSize: 9.5,
+                            borderRadius: 4,
+                            border: selectedSubfolder === 'all' ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.05)',
+                            background: selectedSubfolder === 'all' ? 'rgba(96,165,250,0.2)' : 'transparent',
+                            color: selectedSubfolder === 'all' ? '#93c5fd' : 'var(--text-muted)',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Todas as subpastas
+                        </button>
+                        {activeRootSubfolders.map(sf => {
+                          const count = normalizedLocs.filter(l => l._rootFolder === selectedFolder && l._subfolder === sf).length
+                          const isSubSel = selectedSubfolder === sf
+                          return (
+                            <button
+                              key={sf}
+                              type="button"
+                              onClick={() => setSelectedSubfolder(isSubSel ? 'all' : sf)}
+                              style={{
+                                padding: '2px 6px',
+                                fontSize: 9.5,
+                                borderRadius: 4,
+                                border: isSubSel ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.05)',
+                                background: isSubSel ? 'rgba(96,165,250,0.2)' : 'transparent',
+                                color: isSubSel ? '#93c5fd' : 'var(--text-muted)',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              📂 {sf} ({count})
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Árvore de Pastas e Locações */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '620px', overflowY: 'auto' }}>
+                {/* Árvore de Pastas, Subpastas e Locações COM SCROLLBAR DEDICADA */}
+                <div 
+                  className="admin-locs-scroll"
+                  style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: 8, 
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    maxHeight: 'calc(100vh - 220px)',
+                    minHeight: '400px',
+                    padding: '8px',
+                    background: 'rgba(0,0,0,0.2)',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.06)'
+                  }}
+                >
                   {locations.length === 0 ? (
                     <div className="glass-light" style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
                       Nenhuma locação cadastrada.
                     </div>
-                  ) : Object.keys(grouped).length === 0 ? (
+                  ) : Object.keys(tree).length === 0 ? (
                     <div className="glass-light" style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
                       Nenhuma locação encontrada para "{locSearch}".
                     </div>
                   ) : (
-                    Object.entries(grouped)
-                      .filter(([folderName]) => {
-                        if (selectedFolder === 'all') return true
-                        if (selectedFolder === 'sem_pasta') return folderName === 'Sem Pasta'
-                        return folderName === selectedFolder
-                      })
-                      .map(([folderName, locList]) => {
-                        const isOpen = openFolders[folderName] !== false // Padrão aberto
-                        const isFolderReal = folderName !== 'Sem Pasta'
+                    Object.entries(tree).map(([rootName, rootData]) => {
+                      const isRootOpen = openFolders[rootName] !== false // Padrão aberto
+                      const isFolderReal = rootName !== 'Sem Pasta'
+                      const hasSubfolders = Object.keys(rootData.subfolders).length > 0
 
-                        return (
-                          <div key={folderName} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden', background: 'rgba(0,0,0,0.2)' }}>
-                            {/* Cabeçalho da Pasta */}
-                            <div
-                              onClick={() => toggleFolder(folderName)}
-                              style={{
-                                padding: '8px 10px',
-                                background: isFolderReal ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.01)',
-                                borderBottom: isOpen ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                userSelect: 'none'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ fontSize: 13, color: isFolderReal ? '#fbbf24' : 'var(--text-muted)' }}>
-                                  {isFolderReal ? (isOpen ? '📂' : '📁') : '🏷️'}
-                                </span>
-                                <strong style={{ fontSize: 12, color: isFolderReal ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                                  {folderName}
-                                </strong>
-                                <span style={{ fontSize: 10, color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '1px 5px', borderRadius: 4 }}>
-                                  {locList.length}
-                                </span>
-                              </div>
-                              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                                {isOpen ? '▲' : '▼'}
+                      return (
+                        <div 
+                          key={rootName} 
+                          style={{ 
+                            border: '1px solid rgba(255,255,255,0.08)', 
+                            borderRadius: 8, 
+                            overflow: 'hidden', 
+                            background: 'rgba(0,0,0,0.25)' 
+                          }}
+                        >
+                          {/* Cabeçalho da Pasta Principal */}
+                          <div
+                            onClick={() => toggleFolder(rootName)}
+                            style={{
+                              padding: '8px 10px',
+                              background: isFolderReal ? 'rgba(245, 158, 11, 0.08)' : 'rgba(255,255,255,0.02)',
+                              borderBottom: isRootOpen ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              userSelect: 'none'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                              <span style={{ fontSize: 13, color: isFolderReal ? '#fbbf24' : 'var(--text-muted)' }}>
+                                {isFolderReal ? (isRootOpen ? '📂' : '📁') : '🏷️'}
+                              </span>
+                              <strong style={{ fontSize: 12, color: isFolderReal ? 'var(--text-primary)' : 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                {rootName}
+                              </strong>
+                              <span style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(245, 158, 11, 0.15)', padding: '1px 5px', borderRadius: 4, fontWeight: 600 }}>
+                                {rootData.totalCount}
                               </span>
                             </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {isFolderReal && (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm"
+                                  style={{ padding: '1px 5px', fontSize: 9, background: 'rgba(255,255,255,0.06)' }}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    resetLocForm(rootName, '')
+                                  }}
+                                  title={`Criar nova sala na pasta ${rootName}`}
+                                >
+                                  + Sala
+                                </button>
+                              )}
+                              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                                {isRootOpen ? '▲' : '▼'}
+                              </span>
+                            </div>
+                          </div>
 
-                            {/* Conteúdo da Pasta: Lista de Salas */}
-                            {isOpen && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px' }}>
-                                {locList.map(loc => (
-                                  <div
-                                    key={loc.id}
-                                    className={`glass-light ${editingLoc === loc.id ? 'selected' : ''}`}
-                                    style={{
-                                      padding: '7px 10px',
-                                      cursor: 'pointer',
-                                      borderRadius: 6,
-                                      border: editingLoc === loc.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.03)',
-                                      background: editingLoc === loc.id ? 'rgba(38,200,143,0.1)' : 'rgba(255,255,255,0.015)'
+                          {/* Conteúdo da Pasta Principal */}
+                          {isRootOpen && (
+                            <div 
+                              className="admin-locs-scroll"
+                              style={{ 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                gap: 6, 
+                                padding: '6px',
+                                maxHeight: '420px',
+                                overflowY: 'auto'
+                              }}
+                            >
+                              {/* 1. Salas Diretas (sem subpasta) */}
+                              {rootData.direct.map(loc => (
+                                <div
+                                  key={loc.id}
+                                  className={`glass-light ${editingLoc === loc.id ? 'selected' : ''}`}
+                                  style={{
+                                    padding: '7px 10px',
+                                    cursor: 'pointer',
+                                    borderRadius: 6,
+                                    border: editingLoc === loc.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.03)',
+                                    background: editingLoc === loc.id ? 'rgba(38,200,143,0.1)' : 'rgba(255,255,255,0.015)'
+                                  }}
+                                  onClick={() => handleLocEdit(loc)}
+                                >
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                                      <strong style={{ fontSize: 11.5, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{loc.name}</strong>
+                                      {loc.isSpawnPoint && (
+                                        <span style={{ fontSize: 8.5, background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 4px', borderRadius: 4, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                          📍 Spawn
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 3 }}>
+                                      <button className="btn btn-sm" style={{ padding: '2px 5px', fontSize: 9 }} onClick={(e) => { e.stopPropagation(); handleLocEdit(loc); }}>
+                                        Editar
+                                      </button>
+                                      <a 
+                                        href={`/location/${loc.slug}`} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="btn btn-sm" 
+                                        style={{ padding: '2px 5px', fontSize: 9, background: 'rgba(255,255,255,0.05)' }}
+                                        onClick={e => e.stopPropagation()}
+                                        title="Abrir página do local em nova aba"
+                                      >
+                                        👁️
+                                      </a>
+                                      <button className="btn btn-sm btn-danger" style={{ padding: '2px 5px', fontSize: 9 }} onClick={(e) => { e.stopPropagation(); handleLocDelete(loc.id); }}>
+                                        🗑️
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: 9.5, color: 'var(--text-muted)', marginTop: 2 }}>/{loc.slug}</div>
+                                </div>
+                              ))}
+
+                              {/* 2. Subpastas Hierárquicas */}
+                              {hasSubfolders && Object.entries(rootData.subfolders).map(([subName, subLocList]) => {
+                                const subKey = `${rootName}::${subName}`
+                                const isSubOpen = openSubFolders[subKey] !== false // Padrão aberto
+
+                                return (
+                                  <div 
+                                    key={subKey} 
+                                    style={{ 
+                                      marginLeft: 6, 
+                                      borderLeft: '2px solid rgba(96, 165, 250, 0.4)', 
+                                      paddingLeft: 6, 
+                                      marginTop: 2, 
+                                      marginBottom: 2 
                                     }}
-                                    onClick={() => handleLocEdit(loc)}
                                   >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <strong style={{ fontSize: 12 }}>{loc.name}</strong>
-                                        {loc.isSpawnPoint && (
-                                          <span style={{ fontSize: 9, background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
-                                            📍 Spawn
-                                          </span>
-                                        )}
+                                    {/* Cabeçalho da Subpasta */}
+                                    <div
+                                      onClick={() => toggleSubfolder(subKey)}
+                                      style={{
+                                        padding: '5px 8px',
+                                        background: 'rgba(96, 165, 250, 0.07)',
+                                        borderRadius: 6,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        userSelect: 'none',
+                                        marginBottom: isSubOpen ? 4 : 0
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                                        <span style={{ fontSize: 11, color: '#93c5fd' }}>
+                                          {isSubOpen ? '📂' : '📁'}
+                                        </span>
+                                        <strong style={{ fontSize: 11, color: '#93c5fd', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                          {subName}
+                                        </strong>
+                                        <span style={{ fontSize: 9, color: '#93c5fd', background: 'rgba(96, 165, 250, 0.15)', padding: '1px 4px', borderRadius: 4, fontWeight: 600 }}>
+                                          {subLocList.length}
+                                        </span>
                                       </div>
-                                      <div style={{ display: 'flex', gap: 3 }}>
-                                        <button className="btn btn-sm" style={{ padding: '2px 5px', fontSize: 9 }} onClick={(e) => { e.stopPropagation(); handleLocEdit(loc); }}>
-                                          Editar
-                                        </button>
-                                        <a 
-                                          href={`/location/${loc.slug}`} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
-                                          className="btn btn-sm" 
-                                          style={{ padding: '2px 5px', fontSize: 9, background: 'rgba(255,255,255,0.05)' }}
-                                          onClick={e => e.stopPropagation()}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm"
+                                          style={{ padding: '1px 4px', fontSize: 8.5, background: 'rgba(255,255,255,0.06)' }}
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            resetLocForm(rootName, subName)
+                                          }}
+                                          title={`Criar nova sala na subpasta ${subName}`}
                                         >
-                                          👁️
-                                        </a>
-                                        <button className="btn btn-sm btn-danger" style={{ padding: '2px 5px', fontSize: 9 }} onClick={(e) => { e.stopPropagation(); handleLocDelete(loc.id); }}>
-                                          🗑️
+                                          + Sala
                                         </button>
+                                        <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>
+                                          {isSubOpen ? '▲' : '▼'}
+                                        </span>
                                       </div>
                                     </div>
-                                    <div style={{ fontSize: 9.5, color: 'var(--text-muted)', marginTop: 2 }}>/{loc.slug}</div>
+
+                                    {/* Lista de Salas da Subpasta */}
+                                    {isSubOpen && (
+                                      <div 
+                                        className="admin-locs-scroll"
+                                        style={{ 
+                                          display: 'flex', 
+                                          flexDirection: 'column', 
+                                          gap: 4, 
+                                          paddingLeft: 4, 
+                                          marginTop: 4,
+                                          maxHeight: '300px',
+                                          overflowY: 'auto'
+                                        }}
+                                      >
+                                        {subLocList.map(loc => (
+                                          <div
+                                            key={loc.id}
+                                            className={`glass-light ${editingLoc === loc.id ? 'selected' : ''}`}
+                                            style={{
+                                              padding: '6px 8px',
+                                              cursor: 'pointer',
+                                              borderRadius: 5,
+                                              border: editingLoc === loc.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.03)',
+                                              background: editingLoc === loc.id ? 'rgba(38,200,143,0.1)' : 'rgba(255,255,255,0.015)'
+                                            }}
+                                            onClick={() => handleLocEdit(loc)}
+                                          >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                                                <strong style={{ fontSize: 11, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{loc.name}</strong>
+                                                {loc.isSpawnPoint && (
+                                                  <span style={{ fontSize: 8, background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 3px', borderRadius: 3, fontWeight: 700 }}>
+                                                    📍 Spawn
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div style={{ display: 'flex', gap: 2 }}>
+                                                <button className="btn btn-sm" style={{ padding: '1px 4px', fontSize: 8.5 }} onClick={(e) => { e.stopPropagation(); handleLocEdit(loc); }}>
+                                                  Editar
+                                                </button>
+                                                <a 
+                                                  href={`/location/${loc.slug}`} 
+                                                  target="_blank" 
+                                                  rel="noopener noreferrer"
+                                                  className="btn btn-sm" 
+                                                  style={{ padding: '1px 4px', fontSize: 8.5, background: 'rgba(255,255,255,0.05)' }}
+                                                  onClick={e => e.stopPropagation()}
+                                                  title="Abrir página do local em nova aba"
+                                                >
+                                                  👁️
+                                                </a>
+                                                <button className="btn btn-sm btn-danger" style={{ padding: '1px 4px', fontSize: 8.5 }} onClick={(e) => { e.stopPropagation(); handleLocDelete(loc.id); }}>
+                                                  🗑️
+                                                </button>
+                                              </div>
+                                            </div>
+                                            <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>/{loc.slug}</div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
                   )}
                 </div>
               </div>
 
               {/* Direita: formulário */}
-              <form onSubmit={handleLocSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '20px', borderRadius: '12px', maxHeight: 'calc(100vh - 240px)', overflowY: 'auto' }} className="glass-light">
+              <form onSubmit={handleLocSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '20px', borderRadius: '12px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }} className="glass-light admin-locs-scroll">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ fontSize: 14, textTransform: 'uppercase', color: 'var(--accent)', margin: 0 }}>
                     {editingLoc ? `Editando: ${locForm.name}` : 'Criar Nova Locação'}
                   </h3>
                   {editingLoc && (
-                    <button type="button" className="btn btn-sm" onClick={resetLocForm} style={{ fontSize: 10 }}>
+                    <button type="button" className="btn btn-sm" onClick={() => resetLocForm()} style={{ fontSize: 10 }}>
                       ✕ Cancelar Edição
                     </button>
                   )}
                 </div>
 
-                {/* PASTA / COMPLEXO DA LOCAÇÃO */}
-                <div className="form-group" style={{ background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '10px 12px', borderRadius: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                {/* HIERARQUIA: PASTA PRINCIPAL & SUBPASTA */}
+                <div style={{ background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '12px 14px', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label style={{ margin: 0, fontSize: 11, color: '#fbbf24', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>📁</span> Pasta / Complexo Principal
+                      <span>📁</span> Organização Hierárquica (Pastas & Subpastas)
                     </label>
                     <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                      Agrupa cômodos no menu lateral
+                      Agrupa cômodos no menu do painel
                     </span>
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Ex: Hotel do centro de Varsóvia, Hospital de Povorek, Base Militar..."
-                    value={locForm.folder}
-                    onChange={(e) => setLocForm(prev => ({ ...prev, folder: e.target.value }))}
-                    list="existing-folders-list"
-                    style={{ width: '100%', fontSize: 12, padding: '7px 10px' }}
-                  />
-                  <datalist id="existing-folders-list">
-                    {allFolders.map(f => (
-                      <option key={f} value={f} />
-                    ))}
-                  </datalist>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 10.5, color: '#fde68a' }}>📁 Pasta Principal / Cidade / Região</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Dravina, Hotel Varsóvia, Base Militar..."
+                        value={locForm.folder || ''}
+                        onChange={(e) => setLocForm(prev => ({ ...prev, folder: e.target.value }))}
+                        list="existing-root-folders-list"
+                        style={{ width: '100%', fontSize: 11, padding: '7px 10px' }}
+                      />
+                      <datalist id="existing-root-folders-list">
+                        {allRootFolders.map(f => (
+                          <option key={f} value={f} />
+                        ))}
+                      </datalist>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 10.5, color: '#93c5fd' }}>📂 Subpasta / Setor / Bairro (Opcional)</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Acampamento, Centro da Cidade de Starelyug, Ala Médica..."
+                        value={locForm.subfolder || ''}
+                        onChange={(e) => setLocForm(prev => ({ ...prev, subfolder: e.target.value }))}
+                        list="existing-sub-folders-list"
+                        style={{ width: '100%', fontSize: 11, padding: '7px 10px' }}
+                      />
+                      <datalist id="existing-sub-folders-list">
+                        {(availableSubfoldersForForm || []).map(sf => (
+                          <option key={sf} value={sf} />
+                        ))}
+                      </datalist>
+                    </div>
+                  </div>
+
+                  {/* Caminho Visual Hierárquico */}
+                  <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.25)', padding: '5px 10px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Caminho:</span>
+                    <span style={{ color: '#fbbf24', fontWeight: 600 }}>📁 {locForm.folder || 'Sem Pasta'}</span>
+                    {locForm.subfolder && (
+                      <>
+                        <span>➔</span>
+                        <span style={{ color: '#93c5fd', fontWeight: 600 }}>📂 {locForm.subfolder}</span>
+                      </>
+                    )}
+                    <span>➔</span>
+                    <span style={{ color: 'var(--accent)', fontWeight: 600 }}>📍 {locForm.name || 'Nova Sala'}</span>
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -3189,9 +3634,100 @@ export default function Admin() {
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>Link da Imagem de Fundo (Opcional)</label>
-                  <input type="url" placeholder="https://exemplo.com/imagem.jpg" value={locForm.backgroundImage} onChange={(e) => setLocForm(prev => ({ ...prev, backgroundImage: e.target.value }))} />
+                {/* UPLOAD & LINK DA IMAGEM DE FUNDO */}
+                <div className="form-group" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', padding: '12px 14px', borderRadius: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <label style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>🖼️</span> Imagem de Fundo do Local
+                    </label>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                      Upload direto do computador ou link externo
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {/* Botão de Upload de Arquivo */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <label
+                        className="btn btn-sm"
+                        style={{
+                          cursor: uploadingLocImage ? 'wait' : 'pointer',
+                          background: 'rgba(38, 200, 143, 0.15)',
+                          border: '1px solid var(--accent)',
+                          color: 'var(--accent)',
+                          fontSize: 11,
+                          padding: '6px 14px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          borderRadius: 6,
+                          fontWeight: 600
+                        }}
+                      >
+                        {uploadingLocImage ? '⏳ Enviando Imagem...' : '📁 Fazer Upload de Imagem'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={uploadingLocImage}
+                          style={{ display: 'none' }}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (!file) return
+                            try {
+                              setUploadingLocImage(true)
+                              const url = await uploadImageFree(file)
+                              setLocForm(prev => ({ ...prev, backgroundImage: url }))
+                            } catch (err) {
+                              alert('Erro no upload: ' + err.message)
+                            } finally {
+                              setUploadingLocImage(false)
+                            }
+                          }}
+                        />
+                      </label>
+
+                      {locForm.backgroundImage && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger"
+                          style={{ fontSize: 10, padding: '5px 10px' }}
+                          onClick={() => setLocForm(prev => ({ ...prev, backgroundImage: '' }))}
+                        >
+                          🗑️ Remover Imagem
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Preview da Imagem */}
+                    {locForm.backgroundImage && (
+                      <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)', maxHeight: 150, background: '#000' }}>
+                        <img
+                          src={locForm.backgroundImage}
+                          alt="Preview do Local"
+                          style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block', opacity: 0.9 }}
+                          onError={(e) => { e.target.style.display = 'none' }}
+                        />
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '4px 8px', background: 'rgba(0,0,0,0.75)', fontSize: 10, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Pré-visualização do Fundo</span>
+                          <span style={{ color: 'var(--accent)', fontWeight: 600 }}>✓ Imagem Carregada</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Campo de Texto com a URL direta */}
+                    <div>
+                      <label style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>
+                        Ou cole a URL direta da imagem:
+                      </label>
+                      <input
+                        type="url"
+                        placeholder="https://exemplo.com/cenario.jpg"
+                        value={locForm.backgroundImage || ''}
+                        onChange={(e) => setLocForm(prev => ({ ...prev, backgroundImage: e.target.value }))}
+                        style={{ width: '100%', fontSize: 11, padding: '7px 10px' }}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* SOM ESPECÍFICO DESTE LUGAR (YOUTUBE) */}
