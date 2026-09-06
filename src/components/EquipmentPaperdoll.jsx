@@ -129,6 +129,61 @@ export default function EquipmentPaperdoll({
     )
   }
 
+  const accessorySlots = [
+    'accessory_1', 'accessory_2', 'accessory_3',
+    'accessory_4', 'accessory_5', 'accessory_6'
+  ]
+
+  const renderAccessorySlotCard = (slotId, index) => {
+    const slotDef = EQUIPMENT_SLOTS.find(s => s.id === slotId)
+    const item = equippedMap[slotId]
+    const hasItem = !!item
+    const rMeta = hasItem ? (RARITY_META[item.rarity] || RARITY_META.common) : null
+
+    const hasWeaponDamage = hasItem && (item.damageMin || item.damageMax)
+    const damageBadge = hasWeaponDamage ? `${item.damageMin || 0}–${item.damageMax || 0}` : null
+
+    return (
+      <div
+        key={slotId}
+        className={`paperdoll-accessory-slot ${hasItem ? 'occupied' : 'empty'} ${hasWeaponDamage ? 'has-weapon-damage' : ''}`}
+        style={{
+          borderColor: hasItem ? (rMeta?.color || 'var(--accent-yellow)') : 'rgba(255, 255, 255, 0.12)',
+        }}
+        title={hasItem ? `${item.name} (${slotDef?.label || `Acessório ${index + 1}`})${hasWeaponDamage ? ` — Dano: ${damageBadge}` : ''}` : `Slot de Acessório ${index + 1} (Vazio)`}
+      >
+        {hasItem ? (
+          <div className="paperdoll-accessory-content">
+            <div className="paperdoll-accessory-icon">
+              <GameIcon src={item.imageUrl} emoji={item.icon || '🪡'} size={20} />
+            </div>
+            {damageBadge && (
+              <span className="paperdoll-accessory-damage-badge" title={`Dano: ${damageBadge}`}>
+                ⚔️{damageBadge}
+              </span>
+            )}
+            <button
+              type="button"
+              className="paperdoll-accessory-unequip-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                !disabled && onUnequipItem && onUnequipItem(item)
+              }}
+              title="Desequipar acessório"
+              disabled={disabled}
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <div className="paperdoll-accessory-placeholder">
+            <span>🪡</span>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="equipment-paperdoll-panel">
       {/* Header com os 3 cards de status agregados */}
@@ -176,6 +231,16 @@ export default function EquipmentPaperdoll({
       <div className="paperdoll-body-layout">
         <div className="paperdoll-slots-col">
           {leftSlots.map(renderSlotCard)}
+
+          {/* Seção de Acessórios (6 Slots em Grid 3x2) */}
+          <div className="paperdoll-accessories-section">
+            <div className="paperdoll-accessories-label">
+              <span>ACESSÓRIOS</span>
+            </div>
+            <div className="paperdoll-accessories-grid">
+              {accessorySlots.map((slotId, idx) => renderAccessorySlotCard(slotId, idx))}
+            </div>
+          </div>
         </div>
 
         <div className="paperdoll-silhouette-container">

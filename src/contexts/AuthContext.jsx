@@ -408,7 +408,8 @@ export function AuthProvider({ children }) {
   }
 
   // Equipar um item no slot anatômico correspondente
-  async function equipItem(instanceId) {
+  // slotOverride permite forçar um acessório para o slot hands_weapon (para usar como arma principal)
+  async function equipItem(instanceId, slotOverride = null) {
     if (!user || !instanceId) return
     const userRef = doc(db, 'users', user.uid)
 
@@ -423,37 +424,56 @@ export function AuthProvider({ children }) {
       if (!targetItem) throw new Error('Item não encontrado no inventário.')
 
       // Determina o equipSlot do item diretamente ou a partir do preset / catalog
-      let targetSlot = targetItem.equipSlot
-      if (!targetSlot) {
+      let naturalSlot = targetItem.equipSlot
+      if (!naturalSlot) {
         const preset = DEFAULT_PRESET_ITEMS.find((p) => p.itemId === targetItem.itemId)
         if (preset?.equipSlot) {
-          targetSlot = preset.equipSlot
+          naturalSlot = preset.equipSlot
           targetItem.equipSlot = preset.equipSlot
         }
       }
 
-      if (!targetSlot) {
+      if (!naturalSlot) {
         // Tenta buscar na coleção items_db
         const itemDbRef = doc(db, 'items_db', targetItem.itemId)
         const itemDbSnap = await transaction.get(itemDbRef)
         if (itemDbSnap.exists() && itemDbSnap.data().equipSlot) {
-          targetSlot = itemDbSnap.data().equipSlot
-          targetItem.equipSlot = targetSlot
+          naturalSlot = itemDbSnap.data().equipSlot
+          targetItem.equipSlot = naturalSlot
         }
       }
 
-      if (!targetSlot) throw new Error('Este item não pode ser equipado em nenhum slot corporal.')
+      if (!naturalSlot) throw new Error('Este item não pode ser equipado em nenhum slot corporal.')
 
-      // Desequipa qualquer outro item que esteja atualmente no mesmo slot
+      // Se um slot de substituição foi solicitado (ex: equipar acessório como arma), usa ele
+      const targetSlot = slotOverride || naturalSlot
+
+      // Valida se o slotOverride é permitido (apenas hands_weapon por enquanto)
+      if (slotOverride && slotOverride !== naturalSlot) {
+        const hasWeaponDamage = (Number(targetItem.damageMin) > 0 || Number(targetItem.damageMax) > 0)
+        if (!hasWeaponDamage) throw new Error('Este acessório não possui dano e não pode ser equipado como arma.')
+      }
+
+      // Desequipa qualquer outro item que esteja atualmente no slot de destino
       inventory.forEach((i) => {
-        const itemSlot = i.equipSlot || DEFAULT_PRESET_ITEMS.find((p) => p.itemId === i.itemId)?.equipSlot
-        if (itemSlot === targetSlot && i.equipped && i.instanceId !== instanceId) {
+        if (i.instanceId === instanceId) return
+        const iSlot = i.equippedAsSlot || i.equipSlot || DEFAULT_PRESET_ITEMS.find((p) => p.itemId === i.itemId)?.equipSlot
+        if (iSlot === targetSlot && i.equipped) {
           i.equipped = false
+          // Limpa o slot forçado se existia
+          if (i.equippedAsSlot) delete i.equippedAsSlot
         }
       })
 
-      // Equipa o item selecionado
+      // Equipa o item no slot (normal ou forçado)
       targetItem.equipped = true
+      if (slotOverride && slotOverride !== naturalSlot) {
+        // Marca temporariamente o slot onde está equipado para cálculos corretos
+        targetItem.equippedAsSlot = slotOverride
+      } else {
+        // Remove slot forçado anterior se reequipando no slot natural
+        if (targetItem.equippedAsSlot) delete targetItem.equippedAsSlot
+      }
 
       transaction.update(userRef, {
         'character.inventory': inventory,
@@ -478,6 +498,8 @@ export function AuthProvider({ children }) {
 
       if (!targetItem) throw new Error('Item não encontrado.')
       targetItem.equipped = false
+      // Limpa slot forçado (ex: acessório usado como arma)
+      if (targetItem.equippedAsSlot) delete targetItem.equippedAsSlot
 
       transaction.update(userRef, {
         'character.inventory': inventory,

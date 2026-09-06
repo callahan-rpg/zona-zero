@@ -8,6 +8,7 @@ import CombatHUD from '../components/CombatHUD.jsx'
 import WeatherEffects from '../components/WeatherEffects.jsx'
 import ShopModal from '../components/ShopModal.jsx'
 import StorageModal from '../components/StorageModal.jsx'
+import ActivityButton from '../components/ActivityButton.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
 
@@ -119,6 +120,9 @@ export default function Location() {
     return unsub
   }, [slug])
 
+  // Estados de Atividades de Produção Locais (Pesca, Plantação, Galinheiro, etc.)
+  const [locationActivities, setLocationActivities] = useState([])
+
   // Escuta recipientes de armazenamento vinculados a esta locação
   useEffect(() => {
     if (!slug) return
@@ -126,6 +130,17 @@ export default function Location() {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       const matched = docs.filter(st => st.locationSlug === slug)
       setLocationStorages(matched)
+    })
+    return unsub
+  }, [slug])
+
+  // Escuta atividades de produção vinculadas a esta locação
+  useEffect(() => {
+    if (!slug) return
+    const unsub = onSnapshot(collection(db, 'activities'), (snap) => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      const matched = docs.filter(act => act.locationSlug === slug && act.enabled !== false)
+      setLocationActivities(matched)
     })
     return unsub
   }, [slug])
@@ -502,6 +517,16 @@ export default function Location() {
                   {shopInfo.name || 'Acessar Loja'}
                 </button>
               )}
+
+              {/* Atividades de Produção Locais (Pesca, Plantação, Galinheiro, etc.) */}
+              {locationActivities.map(act => (
+                <ActivityButton
+                  key={act.id}
+                  activity={act}
+                  character={character}
+                  locationSlug={slug}
+                />
+              ))}
 
               {/* Botão 1: Buscar Suprimentos (Repetível / Cooldown / Sucata & Comuns) */}
               {location.loot?.enabled && (

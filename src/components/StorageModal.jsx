@@ -369,6 +369,7 @@ export default function StorageModal({
                     <option value="general">🎒 Gerais</option>
                     <option value="supplies">🌾 Mantimentos</option>
                     <option value="clothing">👕 Roupas</option>
+                    <option value="accessories">🪡 Acessórios</option>
                     <option value="melee">🗡️ Armas Brancas</option>
                     <option value="firearms">🔫 Armas de Fogo</option>
                     <option value="medical">💉 Médicos</option>

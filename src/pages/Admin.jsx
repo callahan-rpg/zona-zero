@@ -22,6 +22,7 @@ import GameIcon from '../components/GameIcon.jsx'
 import AdminMapEditor from '../components/AdminMapEditor.jsx'
 import AdminRulesEditor from '../components/AdminRulesEditor.jsx'
 import AdminStorageEditor from '../components/AdminStorageEditor.jsx'
+import AdminActivitiesEditor from '../components/AdminActivitiesEditor.jsx'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -1703,7 +1704,15 @@ export default function Admin() {
             <button className={`btn btn-sm ${activeTab === 'map_editor' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('map_editor')} style={{ borderColor: 'rgba(56, 189, 248, 0.4)', color: activeTab === 'map_editor' ? '#fff' : '#38bdf8', background: activeTab === 'map_editor' ? '#0284c7' : 'transparent' }}>
               📍 Editor de Mapa
             </button>
+            <button className={`btn btn-sm ${activeTab === 'activities' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('activities')} style={{ borderColor: 'rgba(74, 222, 128, 0.4)', color: activeTab === 'activities' ? '#000' : '#4ade80', background: activeTab === 'activities' ? '#22c55e' : 'transparent', fontWeight: 'bold' }}>
+              🌾 Atividades de Produção
+            </button>
           </div>
+
+          {/* CONTEÚDO DA TAB ACTIVITIES: ATIVIDADES DE PRODUÇÃO */}
+          {activeTab === 'activities' && (
+            <AdminActivitiesEditor locations={locations} />
+          )}
 
           {/* CONTEÚDO DA TAB STORAGES: GERENCIAMENTO DE ARMAZENAMENTOS */}
           {activeTab === 'storages' && (
@@ -2132,6 +2141,7 @@ export default function Admin() {
                     <option value="general">🎒 Gerais</option>
                     <option value="supplies">🌾 Mantimentos</option>
                     <option value="clothing">👕 Roupas</option>
+                    <option value="accessories">🪡 Acessórios</option>
                     <option value="melee">🗡️ Armas Brancas</option>
                     <option value="firearms">🔫 Armas de Fogo</option>
                     <option value="medical">💉 Médicos</option>
@@ -2357,6 +2367,7 @@ export default function Admin() {
                     <option value="general">🎒 Itens Gerais</option>
                     <option value="supplies">🌾 Mantimentos</option>
                     <option value="clothing">👕 Roupas / Vestuário</option>
+                    <option value="accessories">🪡 Acessórios</option>
                     <option value="melee">🗡️ Armas Brancas</option>
                     <option value="firearms">🔫 Armas de Fogo</option>
                     <option value="medical">💉 Suprimentos Médicos</option>
@@ -2393,17 +2404,43 @@ export default function Admin() {
 
                 {/* Configurações de Equipamento, Dano e Proteção */}
                 <div style={{ padding: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <label style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--accent-yellow)', margin: 0 }}>
-                    🛡️ Equipamento, Dano e Sobrevivência
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--accent-yellow)', margin: 0 }}>
+                      🛡️ Equipamento, Dano e Armas / Acessórios
+                    </label>
+                    {catalogForm.category === 'accessories' && (
+                      <span style={{ fontSize: 9, background: 'rgba(234, 179, 8, 0.15)', color: 'var(--accent-yellow)', padding: '1px 5px', borderRadius: 4, border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+                        🪡 Acessório Multi-uso / Arma
+                      </span>
+                    )}
+                  </div>
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 10 }}>Slot do Esqueleto Corporal</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                      <label style={{ fontSize: 10, margin: 0 }}>Slot do Esqueleto Corporal</label>
+                      {catalogForm.category === 'accessories' && !catalogForm.equipSlot && (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{ fontSize: 9, padding: '1px 6px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' }}
+                          onClick={() => setCatalogForm(prev => ({ ...prev, equipSlot: 'accessory_1' }))}
+                        >
+                          ⚡ Auto: Slot Acessório 1
+                        </button>
+                      )}
+                    </div>
                     <select value={catalogForm.equipSlot} onChange={e => setCatalogForm(prev => ({ ...prev, equipSlot: e.target.value }))}>
                       <option value="">🚫 Nenhum (Item de Mochila / Não Equipável)</option>
-                      {EQUIPMENT_SLOTS.map(slot => (
-                        <option key={slot.id} value={slot.id}>{slot.icon} {slot.label}</option>
-                      ))}
+                      <optgroup label="Armas e Vestimentas">
+                        {EQUIPMENT_SLOTS.filter(s => !s.id.startsWith('accessory_')).map(slot => (
+                          <option key={slot.id} value={slot.id}>{slot.icon} {slot.label}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Slots de Acessórios (1 a 6)">
+                        {EQUIPMENT_SLOTS.filter(s => s.id.startsWith('accessory_')).map(slot => (
+                          <option key={slot.id} value={slot.id}>{slot.icon} {slot.label}</option>
+                        ))}
+                      </optgroup>
                     </select>
                   </div>
 
@@ -2418,19 +2455,37 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: 9 }}>⚔️ Dano Mínimo</label>
-                      <input type="number" placeholder="Ex: 12" value={catalogForm.damageMin} onChange={e => setCatalogForm(prev => ({ ...prev, damageMin: e.target.value }))} />
+                  {/* Configurações de Dano e Ataque (Armas ou Acessórios que funcionam como Armas) */}
+                  <div style={{ padding: '6px 8px', background: (catalogForm.damageMin || catalogForm.damageMax || catalogForm.category === 'melee' || catalogForm.category === 'firearms') ? 'rgba(239, 68, 68, 0.06)' : 'transparent', borderRadius: 6, border: (catalogForm.damageMin || catalogForm.damageMax) ? '1px solid rgba(239, 68, 68, 0.25)' : '1px dashed rgba(255,255,255,0.08)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 9.5, fontWeight: 'bold', color: (catalogForm.damageMin || catalogForm.damageMax) ? '#f87171' : 'var(--text-muted)' }}>
+                        ⚔️ Poder de Ataque / Arma {catalogForm.category === 'accessories' ? '(Acessório-Arma)' : ''}
+                      </span>
+                      {(catalogForm.damageMin || catalogForm.damageMax) && (
+                        <span style={{ fontSize: 9, color: '#f87171', fontWeight: 600 }}>
+                          {catalogForm.damageMin || 0}–{catalogForm.damageMax || 0} de dano
+                        </span>
+                      )}
                     </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: 9 }}>⚔️ Dano Máximo</label>
-                      <input type="number" placeholder="Ex: 18" value={catalogForm.damageMax} onChange={e => setCatalogForm(prev => ({ ...prev, damageMax: e.target.value }))} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: 9 }}>⚔️ Dano Mínimo</label>
+                        <input type="number" placeholder="Ex: 8" value={catalogForm.damageMin} onChange={e => setCatalogForm(prev => ({ ...prev, damageMin: e.target.value }))} />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: 9 }}>⚔️ Dano Máximo</label>
+                        <input type="number" placeholder="Ex: 14" value={catalogForm.damageMax} onChange={e => setCatalogForm(prev => ({ ...prev, damageMax: e.target.value }))} />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: 9 }}>🔨 Durabilidade</label>
+                        <input type="number" placeholder="Ex: 100" value={catalogForm.maxDurability} onChange={e => setCatalogForm(prev => ({ ...prev, maxDurability: e.target.value }))} />
+                      </div>
                     </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: 9 }}>🔨 Durabilidade Máx</label>
-                      <input type="number" placeholder="Ex: 100" value={catalogForm.maxDurability} onChange={e => setCatalogForm(prev => ({ ...prev, maxDurability: e.target.value }))} />
-                    </div>
+                    {catalogForm.category === 'accessories' && (
+                      <p style={{ margin: '4px 0 0', fontSize: 8.5, color: 'var(--text-muted)' }}>
+                        💡 Dica: Preencha o dano para que este acessório (ex: canivete de caça, pé de cabra) também funcione no combate quando empunhado ou equipado.
+                      </p>
+                    )}
                   </div>
                 </div>
 

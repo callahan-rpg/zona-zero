@@ -20,6 +20,12 @@ export const EQUIPMENT_SLOTS = [
   { id: 'hands_weapon',  label: 'Mãos (Arma Principal)',     icon: '⚔️', placeholder: 'Desarmado (Soco: 3–6)' },
   { id: 'legs',          label: 'Pernas (Calças)',           icon: '👖', placeholder: 'Sem calças resistentes' },
   { id: 'feet',          label: 'Pés (Calçados)',            icon: '👟', placeholder: 'Descalço' },
+  { id: 'accessory_1',   label: 'Acessório 1',               icon: '🎒', placeholder: 'Vazio' },
+  { id: 'accessory_2',   label: 'Acessório 2',               icon: '🎒', placeholder: 'Vazio' },
+  { id: 'accessory_3',   label: 'Acessório 3',               icon: '🎒', placeholder: 'Vazio' },
+  { id: 'accessory_4',   label: 'Acessório 4',               icon: '🎒', placeholder: 'Vazio' },
+  { id: 'accessory_5',   label: 'Acessório 5',               icon: '🎒', placeholder: 'Vazio' },
+  { id: 'accessory_6',   label: 'Acessório 6',               icon: '🎒', placeholder: 'Vazio' },
 ]
 
 export const UNARMED_ATTACK = {
@@ -118,6 +124,24 @@ export const DEFAULT_PRESET_ITEMS = [
   { itemId: 'sementes_iniciais', name: 'Pacote de Sementes Mistas', icon: '🌱', category: 'supplies', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Sementes selecionadas de hortaliças e grãos nutritivos.' },
   { itemId: 'equipamento_quimico', name: 'Equipamento Químico Portátil', icon: '🧪', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Kit de tubos de ensaio, reagentes e medidores de pH.' },
   { itemId: 'caderno_pesquisa', name: 'Caderno de Anotações & Lupa', icon: '📖', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Diário de laboratório e lentes de aumento de precisão.' },
+
+  // =========================================================================
+  // ATIVIDADES DE PRODUÇÃO — Pesca, Plantação e Galinheiro
+  // =========================================================================
+  { itemId: 'vara_pesca', name: 'Vara de Pesca', icon: '🎣', category: 'accessories', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'accessory_1', maxDurability: 150, durability: 150, description: 'Vara artesanal de bambu com linha e anzol. Necessária para pescar.' },
+  { itemId: 'enxada', name: 'Enxada', icon: '⛏️', category: 'accessories', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'accessory_1', maxDurability: 120, durability: 120, description: 'Ferramenta agrícola para cavar solo e plantar sementes.' },
+  { itemId: 'minhoca', name: 'Minhoca', icon: '🪱', category: 'general', rarity: 'common', consumable: false, isQuestItem: false, description: 'Isca para pesca. Encontrada ao preparar e cuidar da horta.' },
+  { itemId: 'peixe_pequeno', name: 'Peixe Pequeno', icon: '🐟', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 15, blood: 5 }, isQuestItem: false, description: 'Peixe pequeno capturado na pesca. Alivia a fome.' },
+  { itemId: 'peixe_medio', name: 'Peixe Médio', icon: '🐠', category: 'supplies', rarity: 'uncommon', consumable: true, consumeEffect: { hunger: 25, blood: 8 }, isQuestItem: false, description: 'Peixe de bom porte. Nutritivo e suficiente para uma refeição.' },
+  { itemId: 'peixe_grande', name: 'Peixe Grande', icon: '🐡', category: 'supplies', rarity: 'rare', consumable: true, consumeEffect: { hunger: 40, blood: 15 }, isQuestItem: false, description: 'Peixe raro e altamente nutritivo.' },
+  { itemId: 'adubo', name: 'Adubo', icon: '💩', category: 'general', rarity: 'common', consumable: false, isQuestItem: false, description: 'Composto orgânico do galinheiro. Melhora a saúde das plantações.' },
+  { itemId: 'milho', name: 'Milho', icon: '🌽', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 20 }, isQuestItem: false, description: 'Grão colhido da plantação. Também alimenta animais.' },
+  { itemId: 'semente_tomate', name: 'Semente de Tomate', icon: '🍅', category: 'supplies', rarity: 'common', consumable: false, isQuestItem: false, description: 'Semente para plantar. Crescimento: 3 dias reais.' },
+  { itemId: 'semente_milho', name: 'Semente de Milho', icon: '🌽', category: 'supplies', rarity: 'common', consumable: false, isQuestItem: false, description: 'Semente para plantar. Crescimento: 4 dias reais.' },
+  { itemId: 'semente_batata', name: 'Semente de Batata', icon: '🥔', category: 'supplies', rarity: 'common', consumable: false, isQuestItem: false, description: 'Tubérculo-semente para plantio. Crescimento: 3 dias reais.' },
+  { itemId: 'tomate', name: 'Tomate', icon: '🍅', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 15, thirst: 5 }, isQuestItem: false, description: 'Tomate fresco colhido da plantação.' },
+  { itemId: 'batata', name: 'Batata', icon: '🥔', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 20 }, isQuestItem: false, description: 'Batata colhida da plantação.' },
+  { itemId: 'ovo', name: 'Ovo de Galinha', icon: '🥚', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 15, blood: 5 }, isQuestItem: false, description: 'Ovo fresco coletado no galinheiro. Excelente fonte de proteína.' },
 ]
 
 /**
@@ -435,6 +459,12 @@ export function calculateCharacterEquipmentStats(inventory = []) {
     hands_weapon: null,
     legs: null,
     feet: null,
+    accessory_1: null,
+    accessory_2: null,
+    accessory_3: null,
+    accessory_4: null,
+    accessory_5: null,
+    accessory_6: null,
   }
 
   let totalInsulation = 0
@@ -446,7 +476,8 @@ export function calculateCharacterEquipmentStats(inventory = []) {
       if (!item || !item.equipped) return
 
       // Determina slot de equipamento do item (ou fallback)
-      const slot = item.equipSlot || (item.equippedSlot || null)
+      // equippedAsSlot tem prioridade: permite que um acessório ocupe hands_weapon
+      const slot = item.equippedAsSlot || item.equipSlot || (item.equippedSlot || null)
       if (slot && equippedMap[slot] === null) {
         equippedMap[slot] = item
 

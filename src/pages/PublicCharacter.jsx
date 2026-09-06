@@ -16,12 +16,13 @@ import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttribu
 import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
 
 const CATEGORY_LABELS = {
-  general:   { label: 'Item Geral',        color: 'var(--text-muted)' },
-  clothing:  { label: 'Roupa / Vestuário', color: '#70d6ff' },
-  melee:     { label: 'Arma Branca',       color: '#ff9770' },
-  firearms:  { label: 'Arma de Fogo',      color: '#ff70a6' },
-  medical:   { label: 'Suprimento Médico', color: '#5cff7a' },
-  supplies:  { label: 'Mantimentos',       color: '#fbbf24' },
+  general:     { label: 'Item Geral',        color: 'var(--text-muted)' },
+  clothing:    { label: 'Roupa / Vestuário', color: '#70d6ff' },
+  accessories: { label: 'Acessório',         color: '#eab308' },
+  melee:       { label: 'Arma Branca',       color: '#ff9770' },
+  firearms:    { label: 'Arma de Fogo',      color: '#ff70a6' },
+  medical:     { label: 'Suprimento Médico', color: '#5cff7a' },
+  supplies:    { label: 'Mantimentos',       color: '#fbbf24' },
 }
 
 function xpForNextLevel(level) {

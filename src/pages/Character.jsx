@@ -18,13 +18,14 @@ import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttribu
 import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
 
 export const INVENTORY_CATEGORIES = [
-  { id: 'all',      label: 'Todos',               icon: '📦' },
-  { id: 'general',  label: 'Itens Gerais',        icon: '🎒' },
-  { id: 'supplies', label: 'Mantimentos',         icon: '🌾' },
-  { id: 'clothing', label: 'Roupas',              icon: '👕' },
-  { id: 'melee',    label: 'Armas Brancas',       icon: '🗡️' },
-  { id: 'firearms', label: 'Armas de Fogo',       icon: '🔫' },
-  { id: 'medical',  label: 'Suprimentos Médicos', icon: '💉' },
+  { id: 'all',         label: 'Todos',               icon: '📦' },
+  { id: 'general',     label: 'Itens Gerais',        icon: '🎒' },
+  { id: 'supplies',    label: 'Mantimentos',         icon: '🌾' },
+  { id: 'clothing',    label: 'Roupas',              icon: '👕' },
+  { id: 'accessories', label: 'Acessórios',          icon: '🪡' },
+  { id: 'melee',       label: 'Armas Brancas',       icon: '🗡️' },
+  { id: 'firearms',    label: 'Armas de Fogo',       icon: '🔫' },
+  { id: 'medical',     label: 'Suprimentos Médicos', icon: '💉' },
 ]
 
 export function getItemCategory(item) {
@@ -33,6 +34,7 @@ export function getItemCategory(item) {
   // Se já tiver uma categoria válida definida (não sendo 'general' quando o nome/id indica outra)
   if (item.category) {
     const cat = item.category.toLowerCase().trim()
+    if (['accessories', 'acessorios', 'acessórios', 'acessorio', 'acessório'].includes(cat)) return 'accessories'
     if (['supplies', 'mantimentos', 'comida', 'bebida', 'alimento'].includes(cat)) return 'supplies'
     if (['clothing', 'roupas', 'roupa', 'vestimenta', 'equipamento'].includes(cat)) return 'clothing'
     if (['melee', 'armas brancas', 'branca', 'corpo a corpo'].includes(cat)) return 'melee'
@@ -93,12 +95,13 @@ export function getItemCategory(item) {
 }
 
 const CATEGORY_LABELS = {
-  general:   { label: 'Item Geral',         color: 'var(--text-muted)' },
-  clothing:  { label: 'Roupa / Vestuário',  color: '#70d6ff' },
-  melee:     { label: 'Arma Branca',        color: '#ff9770' },
-  firearms:  { label: 'Arma de Fogo',       color: '#ff70a6' },
-  medical:   { label: 'Suprimento Médico',  color: '#5cff7a' },
-  supplies:  { label: 'Mantimentos',        color: '#fbbf24' },
+  general:     { label: 'Item Geral',         color: 'var(--text-muted)' },
+  clothing:    { label: 'Roupa / Vestuário',  color: '#70d6ff' },
+  accessories: { label: 'Acessório',          color: '#eab308' },
+  melee:       { label: 'Arma Branca',        color: '#ff9770' },
+  firearms:    { label: 'Arma de Fogo',       color: '#ff70a6' },
+  medical:     { label: 'Suprimento Médico',  color: '#5cff7a' },
+  supplies:    { label: 'Mantimentos',        color: '#fbbf24' },
 }
 
 function xpForNextLevel(level) {
@@ -786,6 +789,13 @@ export default function Character() {
                   const canEquip = !!item.equipSlot
                   const isEquipped = item.equipped === true
 
+                  // Acessório com dano → pode ser usado como arma principal
+                  const isAccessory = item._category === 'accessories'
+                  const hasDamage = Number(item.damageMin) > 0 || Number(item.damageMax) > 0
+                  const canBeWeapon = isAccessory && hasDamage
+                  // Está atualmente equipado como arma (slot hands_weapon via override)?
+                  const isEquippedAsWeapon = isEquipped && item.equippedAsSlot === 'hands_weapon'
+
                   // Cálculo de Durabilidade
                   const maxDur = item.maxDurability ? Number(item.maxDurability) : null
                   const curDur = item.durability !== undefined ? Number(item.durability) : maxDur
@@ -892,7 +902,7 @@ export default function Character() {
                       </div>
 
                       {/* Ações do Item */}
-                      <div className="inventory-item-actions" style={{ display: 'grid', gridTemplateColumns: canEquip ? '1fr 1fr' : isConsumable ? '1fr 1fr 1fr' : '1fr 1fr', gap: 4, marginTop: 8 }}>
+                      <div className="inventory-item-actions" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 8 }}>
                         {canEquip && (
                           isEquipped ? (
                             <button
@@ -937,6 +947,54 @@ export default function Character() {
                               <span>⚡ Equipar</span>
                             </button>
                           )
+                        )}
+
+                        {/* Botão exclusivo: equipar acessório com dano como arma principal */}
+                        {canBeWeapon && !isEquippedAsWeapon && (
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            style={{ background: 'rgba(239, 68, 68, 0.18)', borderColor: '#f87171', color: '#f87171', padding: '4px 6px', fontSize: 11, fontWeight: 600 }}
+                            onClick={async () => {
+                              try {
+                                setActionLoading(true)
+                                await equipItem(item.instanceId, 'hands_weapon')
+                              } catch (err) {
+                                console.error(err)
+                                alert('Erro ao equipar como arma: ' + err.message)
+                              } finally {
+                                setActionLoading(false)
+                              }
+                            }}
+                            disabled={actionLoading}
+                            title="Equipar este acessório como arma principal"
+                          >
+                            <span>⚔️ Usar como Arma</span>
+                          </button>
+                        )}
+
+                        {/* Desequipar especificamente quando usado como arma */}
+                        {isEquippedAsWeapon && (
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            style={{ background: 'rgba(239, 68, 68, 0.15)', borderColor: '#f87171', color: '#f87171', padding: '4px 6px', fontSize: 11 }}
+                            onClick={async () => {
+                              try {
+                                setActionLoading(true)
+                                await unequipItem(item.instanceId)
+                              } catch (err) {
+                                console.error(err)
+                                alert('Erro ao desequipar: ' + err.message)
+                              } finally {
+                                setActionLoading(false)
+                              }
+                            }}
+                            disabled={actionLoading}
+                            title="Parar de usar como arma"
+                          >
+                            <span>✕ Desequipar Arma</span>
+                          </button>
                         )}
 
                         {isConsumable && (
