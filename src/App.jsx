@@ -17,6 +17,7 @@ import Rules from './pages/Rules.jsx'
 import AmbientSoundPlayer from './components/AmbientSoundPlayer.jsx'
 import { calculateGameTime, getDynamicWeather } from './utils/timeSystem'
 import { DEFAULT_WEATHER_SOUNDS } from './utils/audioSystem'
+import { checkAndTriggerAutoBroadcasts } from './utils/radioSystem'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -35,6 +36,30 @@ function AdminRoute({ children }) {
   if (loading) return <div className="loading-screen"><span className="loading-dot" /></div>
   if (!user) return <Navigate to="/login" replace />
   return role === 'admin' ? children : <Navigate to="/location/sala-hospital" replace />
+}
+
+/**
+ * GlobalRadioScheduler: Executa o scheduler de transmissões automáticas
+ * de forma atômica e independente de onde o jogador esteja navegando.
+ */
+function GlobalRadioScheduler() {
+  const { user } = useAuth()
+
+  useEffect(() => {
+    if (!user) return
+
+    // Checagem inicial
+    checkAndTriggerAutoBroadcasts().catch(() => {})
+
+    // Checagem periódica a cada 60 segundos
+    const interval = setInterval(() => {
+      checkAndTriggerAutoBroadcasts().catch(() => {})
+    }, 60_000)
+
+    return () => clearInterval(interval)
+  }, [user])
+
+  return null
 }
 
 /**
@@ -117,7 +142,8 @@ function GlobalAmbientSound() {
 export default function App() {
   return (
     <BrowserRouter>
-      {/* Player de áudio ambiente persistente em nível global */}
+      {/* Scheduler global de rádio & Player de áudio ambiente persistente */}
+      <GlobalRadioScheduler />
       <GlobalAmbientSound />
 
       <Routes>

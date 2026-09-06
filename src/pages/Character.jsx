@@ -862,21 +862,21 @@ export default function Character() {
 
                         {/* Badges de Atributos (Dano, Isolamento, Redução Fixa) */}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                          {item.insulation > 0 && (
+                          {Number(item.insulation) > 0 ? (
                             <span style={{ fontSize: 9, background: 'rgba(74,222,128,0.12)', color: '#4ade80', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(74,222,128,0.25)' }}>
                               🧥 +{item.insulation}°C
                             </span>
-                          )}
-                          {item.damageReduction > 0 && (
+                          ) : null}
+                          {Number(item.damageReduction) > 0 ? (
                             <span style={{ fontSize: 9, background: 'rgba(56,189,248,0.12)', color: '#38bdf8', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(56,189,248,0.25)' }}>
                               🛡️ -{item.damageReduction} fixo
                             </span>
-                          )}
-                          {item.damageMin && (
+                          ) : null}
+                          {Number(item.damageMin) > 0 ? (
                             <span style={{ fontSize: 9, background: 'rgba(239,68,68,0.12)', color: '#f87171', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(239,68,68,0.25)' }}>
                               ⚔️ {item.damageMin}–{item.damageMax}
                             </span>
-                          )}
+                          ) : null}
                         </div>
 
                         {/* Barra de Durabilidade */}

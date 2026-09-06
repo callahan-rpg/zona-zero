@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { RARITY_META } from '../utils/itemSystem.js'
+import { playRadioChime } from '../utils/radioSystem.js'
 import GameIcon from './GameIcon.jsx'
 
 export default function NotificationBell() {
@@ -23,6 +24,11 @@ export default function NotificationBell() {
     if (latest && !latest.read && latest.id !== lastProcessedIdRef.current) {
       lastProcessedIdRef.current = latest.id
       setToast(latest)
+
+      // Se for transmissão de rádio, toca áudio sutil de sintonia
+      if (latest.type === 'radio_message') {
+        playRadioChime()
+      }
 
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current)
       toastTimeoutRef.current = setTimeout(() => {
@@ -67,7 +73,7 @@ export default function NotificationBell() {
         type="button"
         className={`hud-btn ${isOpen ? 'active' : ''}`}
         onClick={handleToggleOpen}
-        title="Notificações de Itens"
+        title="Notificações e Transmissões"
         style={{ position: 'relative', padding: '7px 10px' }}
       >
         <GameIcon name="bell" size={16} className="hud-btn-icon" />
@@ -105,8 +111,8 @@ export default function NotificationBell() {
             position: 'absolute',
             top: 'calc(100% + 10px)',
             right: 0,
-            width: '330px',
-            maxHeight: '420px',
+            width: '350px',
+            maxHeight: '460px',
             display: 'flex',
             flexDirection: 'column',
             borderRadius: '12px',
@@ -136,7 +142,7 @@ export default function NotificationBell() {
             )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', maxHeight: '320px', paddingRight: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', maxHeight: '360px', paddingRight: 4 }}>
             {notifications.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: 12 }}>
                 <span style={{ fontSize: 24, display: 'block', marginBottom: 6 }}>📭</span>
@@ -144,7 +150,10 @@ export default function NotificationBell() {
               </div>
             ) : (
               notifications.map((n) => {
+                const isRadio = n.type === 'radio_message'
+                const isMoney = n.type === 'money_received'
                 const rarity = RARITY_META[n.item?.rarity] || { label: 'Comum', color: '#9ca3af' }
+
                 return (
                   <div
                     key={n.id}
@@ -152,15 +161,31 @@ export default function NotificationBell() {
                     style={{
                       padding: '10px 12px',
                       borderRadius: '8px',
-                      borderLeft: `3px solid ${n.read ? 'rgba(255,255,255,0.15)' : 'var(--accent)'}`,
-                      background: n.read ? 'rgba(255,255,255,0.02)' : 'rgba(92,255,122,0.05)',
+                      borderLeft: `3px solid ${
+                        isRadio
+                          ? '#22c55e'
+                          : isMoney
+                          ? '#facc15'
+                          : n.read
+                          ? 'rgba(255,255,255,0.15)'
+                          : 'var(--accent)'
+                      }`,
+                      background: isRadio
+                        ? 'rgba(34, 197, 94, 0.06)'
+                        : n.read
+                        ? 'rgba(255,255,255,0.02)'
+                        : 'rgba(92,255,122,0.05)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 6
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {n.senderAvatar ? (
+                      {isRadio ? (
+                        <div style={{ width: 26, height: 26, borderRadius: 6, background: 'rgba(34, 197, 94, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
+                          📻
+                        </div>
+                      ) : n.senderAvatar ? (
                         <img
                           src={n.senderAvatar}
                           alt={n.senderName}
@@ -171,14 +196,37 @@ export default function NotificationBell() {
                         <span style={{ fontSize: 16 }}>👤</span>
                       )}
                       <div style={{ minWidth: 0, flex: 1, fontSize: 12 }}>
-                        <strong style={{ color: '#fff' }}>{n.senderName}</strong>
+                        <strong style={{ color: isRadio ? '#4ade80' : '#fff' }}>{n.senderName || 'Rádio do Acampamento'}</strong>
                         <span style={{ color: 'var(--text-muted)' }}>
-                          {n.type === 'money_received' ? ' te transferiu dinheiro:' : ' te enviou um item:'}
+                          {isRadio ? ' transmitiu na frequência:' : isMoney ? ' te transferiu dinheiro:' : ' te enviou um item:'}
                         </span>
                       </div>
                     </div>
 
-                    {n.type === 'money_received' ? (
+                    {isRadio ? (
+                      <div
+                        style={{
+                          background: 'rgba(0, 0, 0, 0.45)',
+                          padding: '8px 10px',
+                          borderRadius: 6,
+                          border: '1px solid rgba(34, 197, 94, 0.2)',
+                          fontSize: 12,
+                          color: '#e2e8f0',
+                          lineHeight: 1.4,
+                          fontFamily: 'monospace'
+                        }}
+                      >
+                        <div style={{ fontSize: 10, color: '#86efac', marginBottom: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          📡 {n.category || 'Transmissão de Rádio'}
+                        </div>
+                        "{n.message}"
+                        {(n.gameDateFormatted || n.gameTimeString) && (
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
+                            📅 {n.gameDateFormatted} — {n.gameTimeString}
+                          </div>
+                        )}
+                      </div>
+                    ) : isMoney ? (
                       <div
                         style={{
                           display: 'flex',
@@ -247,12 +295,24 @@ export default function NotificationBell() {
             position: 'fixed',
             top: 'calc(var(--hud-height, 60px) + 16px)',
             right: '20px',
-            width: '320px',
+            width: '340px',
             padding: '14px 16px',
             borderRadius: '12px',
-            border: '1px solid var(--accent)',
-            background: 'rgba(15, 23, 42, 0.95)',
-            boxShadow: '0 12px 32px rgba(0,0,0,0.8), 0 0 16px rgba(92,255,122,0.2)',
+            border: `1px solid ${
+              toast.type === 'radio_message'
+                ? '#22c55e'
+                : toast.type === 'money_received'
+                ? '#facc15'
+                : 'var(--accent)'
+            }`,
+            background: 'rgba(15, 23, 42, 0.96)',
+            boxShadow: `0 12px 32px rgba(0,0,0,0.8), 0 0 16px ${
+              toast.type === 'radio_message'
+                ? 'rgba(34, 197, 94, 0.3)'
+                : toast.type === 'money_received'
+                ? 'rgba(234, 179, 8, 0.3)'
+                : 'rgba(92,255,122,0.2)'
+            }`,
             zIndex: 9999,
             display: 'flex',
             flexDirection: 'column',
@@ -262,9 +322,27 @@ export default function NotificationBell() {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 16 }}>{toast.type === 'money_received' ? '💰' : '🎁'}</span>
-              <strong style={{ fontSize: 12, textTransform: 'uppercase', color: toast.type === 'money_received' ? '#facc15' : 'var(--accent)', letterSpacing: 0.5 }}>
-                {toast.type === 'money_received' ? 'Rublos Recebidos!' : 'Item Recebido!'}
+              <span style={{ fontSize: 16 }}>
+                {toast.type === 'radio_message' ? '📻' : toast.type === 'money_received' ? '💰' : '🎁'}
+              </span>
+              <strong
+                style={{
+                  fontSize: 12,
+                  textTransform: 'uppercase',
+                  color:
+                    toast.type === 'radio_message'
+                      ? '#4ade80'
+                      : toast.type === 'money_received'
+                      ? '#facc15'
+                      : 'var(--accent)',
+                  letterSpacing: 0.5
+                }}
+              >
+                {toast.type === 'radio_message'
+                  ? 'Transmissão de Rádio'
+                  : toast.type === 'money_received'
+                  ? 'Rublos Recebidos!'
+                  : 'Item Recebido!'}
               </strong>
             </div>
             <button
@@ -276,31 +354,48 @@ export default function NotificationBell() {
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {toast.senderAvatar ? (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            {toast.type === 'radio_message' ? (
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(34, 197, 94, 0.2)', border: '1px solid #22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                📻
+              </div>
+            ) : toast.senderAvatar ? (
               <img
                 src={toast.senderAvatar}
                 alt={toast.senderName}
-                style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--glass-border)' }}
+                style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--glass-border)', flexShrink: 0 }}
                 onError={(e) => { e.target.onerror = null; e.target.src = ''; }}
               />
             ) : (
-              <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
                 👤
               </div>
             )}
             <div style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.3 }}>
-              <div><strong style={{ color: '#fff' }}>{toast.senderName}</strong> te enviou:</div>
-              {toast.type === 'money_received' ? (
-                <div style={{ color: '#facc15', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                  <span>💰</span>
-                  <span>+{Number(toast.amount || 0).toLocaleString('pt-BR')} Novos Rublos</span>
-                </div>
+              {toast.type === 'radio_message' ? (
+                <>
+                  <div style={{ color: '#86efac', fontWeight: 'bold', fontSize: 11 }}>
+                    {toast.senderName || 'Rádio do Acampamento'}
+                  </div>
+                  <div style={{ color: '#fff', fontStyle: 'italic', marginTop: 3, background: 'rgba(0,0,0,0.3)', padding: '5px 8px', borderRadius: 4, borderLeft: '2px solid #22c55e' }}>
+                    "{toast.message}"
+                  </div>
+                </>
               ) : (
-                <div style={{ color: 'var(--accent)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                  <span>{toast.item?.icon}</span>
-                  <span>{toast.item?.quantity}x {toast.item?.name}</span>
-                </div>
+                <>
+                  <div><strong style={{ color: '#fff' }}>{toast.senderName}</strong> te enviou:</div>
+                  {toast.type === 'money_received' ? (
+                    <div style={{ color: '#facc15', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                      <span>💰</span>
+                      <span>+{Number(toast.amount || 0).toLocaleString('pt-BR')} Novos Rublos</span>
+                    </div>
+                  ) : (
+                    <div style={{ color: 'var(--accent)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                      <span>{toast.item?.icon}</span>
+                      <span>{toast.item?.quantity}x {toast.item?.name}</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -311,7 +406,7 @@ export default function NotificationBell() {
               style={{
                 width: '100%',
                 height: '100%',
-                background: 'var(--accent)',
+                background: toast.type === 'radio_message' ? '#22c55e' : toast.type === 'money_received' ? '#facc15' : 'var(--accent)',
                 animation: 'toastProgress 10s linear forwards'
               }}
             />

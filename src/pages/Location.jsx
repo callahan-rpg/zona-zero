@@ -9,6 +9,9 @@ import WeatherEffects from '../components/WeatherEffects.jsx'
 import ShopModal from '../components/ShopModal.jsx'
 import StorageModal from '../components/StorageModal.jsx'
 import ActivityButton from '../components/ActivityButton.jsx'
+import RadioHistoryModal from '../components/RadioHistoryModal.jsx'
+import BaseDefenseBanner from '../components/BaseDefenseBanner.jsx'
+import CookingModal from '../components/CookingModal.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
 
@@ -102,10 +105,57 @@ export default function Location() {
   const [activeStorageId, setActiveStorageId] = useState(null)
   const [showStorageModal, setShowStorageModal] = useState(false)
 
+  // Estados de Ponto de Rádio Local
+  const [activeRadioPoint, setActiveRadioPoint] = useState(null)
+  const [showRadioModal, setShowRadioModal] = useState(false)
+
+  // Estados de Exibição da Defesa da Base
+  const [isDefenseDisplayPoint, setIsDefenseDisplayPoint] = useState(false)
+
+  // Estados de Cozinha / Culinária
+  const [showCookingModal, setShowCookingModal] = useState(false)
+
   const showToast = (msg) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
   }
+
+  // Escuta Pontos de Rádio vinculados a esta locação
+  useEffect(() => {
+    if (!slug) return
+    const unsub = onSnapshot(collection(db, 'radio_points'), (snap) => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      const matched = docs.find(pt => pt.enabled !== false && (pt.locationSlug === slug || (slug === 'casa-grande-2-andar' && pt.locationSlug === 'casa-grande-2-andar')))
+      if (matched) {
+        setActiveRadioPoint(matched)
+      } else if (slug === 'casa-grande-2-andar') {
+        setActiveRadioPoint({
+          id: 'def_radio_cg',
+          name: 'Rádio do Acampamento',
+          locationSlug: slug,
+          locationName: 'Casa Grande — 2º Andar'
+        })
+      } else {
+        setActiveRadioPoint(null)
+      }
+    })
+    return unsub
+  }, [slug])
+
+  // Escuta Pontos de Exibição da Defesa da Base
+  useEffect(() => {
+    if (!slug) return
+    const unsub = onSnapshot(doc(db, 'base_defense', 'global'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data()
+        const isPoint = (data.displayPoints || []).some(pt => pt.enabled !== false && (pt.targetSlug === slug || (slug === 'casa-grande' && pt.targetSlug === 'casa-grande')))
+        setIsDefenseDisplayPoint(isPoint)
+      } else {
+        setIsDefenseDisplayPoint(slug === 'casa-grande')
+      }
+    })
+    return unsub
+  }, [slug])
 
   // Escuta dados da loja desta locação em tempo real
   useEffect(() => {
@@ -462,6 +512,13 @@ export default function Location() {
 
           {/* Chat central */}
           <div className="chat-container">
+            {/* Banner de Defesa da Base caso a locação seja um ponto de exibição */}
+            {isDefenseDisplayPoint && (
+              <div style={{ marginBottom: 12 }}>
+                <BaseDefenseBanner compact={false} showHistory={true} />
+              </div>
+            )}
+
             <div className="chat-wrapper">
               <iframe
                 src={location.xatIframe}
@@ -474,8 +531,27 @@ export default function Location() {
               />
             </div>
 
-            {/* Painel de Ações de Busca (Suprimentos + Busca Única + Loja / Comércio + Recipientes de Armazenamento) */}
+            {/* Painel de Ações de Busca (Suprimentos + Busca Única + Loja / Comércio + Recipientes de Armazenamento + Ponto de Rádio) */}
             <div className="loot-search-actions-bar">
+              {/* Botão de Ponto de Rádio Local */}
+              {activeRadioPoint && (
+                <button
+                  className="loot-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.25) 0%, rgba(20, 83, 45, 0.35) 100%)',
+                    borderColor: '#22c55e',
+                    color: '#86efac',
+                    fontWeight: 700,
+                    boxShadow: '0 0 12px rgba(34, 197, 94, 0.25)'
+                  }}
+                  onClick={() => setShowRadioModal(true)}
+                  title={`Sintonizar e consultar transmissões no ${activeRadioPoint.name}`}
+                >
+                  <span>📻</span>
+                  {activeRadioPoint.name || 'Rádio do Acampamento'}
+                </button>
+              )}
+
               {/* Botões de Armazenamentos Locais (Baús, Armários, Geladeiras, Cofres, etc.) */}
               {locationStorages.map(st => (
                 <button
@@ -515,6 +591,25 @@ export default function Location() {
                 >
                   <span>🏪</span>
                   {shopInfo.name || 'Acessar Loja'}
+                </button>
+              )}
+
+              {/* Botão de Cozinha & Preparo de Alimentos */}
+              {location.hasKitchen !== false && (
+                <button
+                  className="loot-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.35) 100%)',
+                    borderColor: '#f59e0b',
+                    color: '#facc15',
+                    fontWeight: 700,
+                    boxShadow: '0 0 12px rgba(245, 158, 11, 0.25)'
+                  }}
+                  onClick={() => setShowCookingModal(true)}
+                  title="Preparar refeições e cozinhar alimentos com os itens do seu inventário"
+                >
+                  <span>🍳</span>
+                  Cozinhar
                 </button>
               )}
 
@@ -704,6 +799,22 @@ export default function Location() {
         }}
         storageId={activeStorageId}
       />
+
+      {/* Modal de Histórico de Transmissões do Rádio Presencial */}
+      <RadioHistoryModal
+        isOpen={showRadioModal}
+        onClose={() => setShowRadioModal(false)}
+        pointName={activeRadioPoint?.name || 'Rádio do Acampamento'}
+        locationName={location?.name || slug}
+      />
+
+      {/* Modal de Cozinha & Culinária */}
+      {showCookingModal && (
+        <CookingModal
+          locationSlug={slug}
+          onClose={() => setShowCookingModal(false)}
+        />
+      )}
     </div>
   )
 }

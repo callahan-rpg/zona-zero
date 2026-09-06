@@ -142,6 +142,25 @@ export const DEFAULT_PRESET_ITEMS = [
   { itemId: 'tomate', name: 'Tomate', icon: '🍅', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 15, thirst: 5 }, isQuestItem: false, description: 'Tomate fresco colhido da plantação.' },
   { itemId: 'batata', name: 'Batata', icon: '🥔', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 20 }, isQuestItem: false, description: 'Batata colhida da plantação.' },
   { itemId: 'ovo', name: 'Ovo de Galinha', icon: '🥚', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 15, blood: 5 }, isQuestItem: false, description: 'Ovo fresco coletado no galinheiro. Excelente fonte de proteína.' },
+  { itemId: 'bacon', name: 'Fatias de Bacon', icon: '🥓', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 20, blood: 5 }, isQuestItem: false, description: 'Bacon defumado suíno conservado.' },
+  { itemId: 'carne_crua', name: 'Carne Crua', icon: '🥩', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 15, thirst: -5 }, isQuestItem: false, description: 'Pedaço de carne fresca que deve ser cozinhada antes de comer.' },
+
+  // =========================================================================
+  // COZINHA & PRATOS PREPARADOS
+  // =========================================================================
+  { itemId: 'bacon_ovos', name: 'Bacon com Ovos', icon: '🍳', category: 'supplies', rarity: 'uncommon', consumable: true, consumeEffect: { hunger: 50, blood: 20, thirst: 5 }, isQuestItem: false, description: 'Prato clássico e altamente calórico. Fatias crocantes de bacon combinadas com ovos fritos na frigideira.' },
+  { itemId: 'peixe_grelhado', name: 'Peixe Grelhado', icon: '🐟', category: 'supplies', rarity: 'uncommon', consumable: true, consumeEffect: { hunger: 45, blood: 15, thirst: 5 }, isQuestItem: false, description: 'Peixe fresco dourado na panela com temperos rústicos.' },
+  { itemId: 'omelete', name: 'Omelete de Ovos', icon: '🍳', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 35, blood: 12 }, isQuestItem: false, description: 'Ovos batidos e fritos na panela até ficarem dourados e macios.' },
+  { itemId: 'sopa_legumes', name: 'Sopa Quente de Legumes', icon: '🍲', category: 'supplies', rarity: 'uncommon', consumable: true, consumeEffect: { hunger: 40, thirst: 35, blood: 10 }, isQuestItem: false, description: 'Sopa nutritiva feita com batatas, tomates e água limpa fervida.' },
+  { itemId: 'ensopado_carne', name: 'Ensopado de Carne e Batata', icon: '🍲', category: 'supplies', rarity: 'rare', consumable: true, consumeEffect: { hunger: 65, thirst: 25, blood: 25 }, isQuestItem: false, description: 'Guisado encorpado com carne macia e batatas cozidas em fogo brando.' },
+  { itemId: 'batata_assada', name: 'Batata Dourada na Frigideira', icon: '🥔', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 30, blood: 5 }, isQuestItem: false, description: 'Batatas fatiadas e tostadas na frigideira de ferro.' },
+  { itemId: 'milho_cozido', name: 'Milho Cozido na Panela', icon: '🌽', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 30, thirst: 10 }, isQuestItem: false, description: 'Espiga de milho fervida em água límpida.' },
+
+  // =========================================================================
+  // COMUNICAÇÃO & RÁDIO
+  // =========================================================================
+  { itemId: 'radio_portatil', name: 'Rádio', icon: '📻', category: 'general', rarity: 'rare', unlocks: ['radio_broadcast'], consumable: false, isQuestItem: false, description: 'Rádio transmissor e receptor analógico. Sintonizado na frequência de emergência de Varezhia para receber comunicados e transmissões.' },
+  { itemId: 'radio', name: 'Rádio', icon: '📻', category: 'general', rarity: 'rare', unlocks: ['radio_broadcast'], consumable: false, isQuestItem: false, description: 'Aparelho de rádio transmissor e receptor.' },
 ]
 
 /**
@@ -156,6 +175,34 @@ export function hasItem(inventory = [], targetId) {
     const matchInst = item.instanceId && String(item.instanceId).toLowerCase().trim() === cleanTarget
     const matchName = item.name && String(item.name).toLowerCase().trim() === cleanTarget
     return (matchId || matchInst || matchName) && (item.quantity ?? 1) > 0
+  })
+}
+
+/**
+ * Verifica se o inventário possui o item Rádio
+ */
+export function hasRadio(inventory = []) {
+  if (!inventory || !Array.isArray(inventory)) return false
+  return inventory.some(item => {
+    if (!item || (item.quantity ?? 1) <= 0) return false
+    const cleanId = String(item.itemId || '').toLowerCase().trim()
+    const cleanName = String(item.name || '').toLowerCase().trim()
+    if (
+      cleanId === 'radio' ||
+      cleanId === 'radio_portatil' ||
+      cleanId === 'radio_comunicador' ||
+      cleanId === 'walkie_talkie' ||
+      cleanName === 'rádio' ||
+      cleanName === 'radio' ||
+      cleanName.includes('rádio') ||
+      cleanName.includes('radio')
+    ) {
+      return true
+    }
+    if (Array.isArray(item.unlocks) && item.unlocks.includes('radio_broadcast')) {
+      return true
+    }
+    return false
   })
 }
 
@@ -192,6 +239,20 @@ export function hasFeatureUnlocked(inventory = [], featureId) {
         cleanName.includes('relogio') ||
         cleanName.includes('watch') ||
         cleanName.includes('clock')
+      ) {
+        return true
+      }
+    }
+
+    // 4. Fallback direto para o Rádio
+    if (featureId === 'radio_broadcast') {
+      const cleanId = String(item.itemId || '').toLowerCase()
+      const cleanName = String(item.name || '').toLowerCase()
+      if (
+        cleanId === 'radio' ||
+        cleanId === 'radio_portatil' ||
+        cleanName.includes('rádio') ||
+        cleanName.includes('radio')
       ) {
         return true
       }

@@ -83,21 +83,21 @@ export default function EquipmentPaperdoll({
                   {item.name}
                 </strong>
                 <div className="paperdoll-item-badges">
-                  {item.insulation > 0 && (
+                  {Number(item.insulation) > 0 ? (
                     <span className="paperdoll-badge badge-insulation" title={`Isolamento Térmico: +${item.insulation}°C`}>
                       🧥 +{item.insulation}°C
                     </span>
-                  )}
-                  {item.damageReduction > 0 && (
+                  ) : null}
+                  {Number(item.damageReduction) > 0 ? (
                     <span className="paperdoll-badge badge-defense" title={`Proteção Fixa: -${item.damageReduction} de dano por golpe`}>
                       🛡️ -{item.damageReduction} dano
                     </span>
-                  )}
-                  {item.damageMin && (
+                  ) : null}
+                  {Number(item.damageMin) > 0 ? (
                     <span className="paperdoll-badge badge-damage" title={`Dano Base: ${item.damageMin}–${item.damageMax}`}>
                       ⚔️ {item.damageMin}–{item.damageMax}
                     </span>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </div>

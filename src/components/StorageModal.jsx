@@ -6,6 +6,7 @@ import { RARITY_META } from '../utils/itemSystem.js'
 import { STORAGE_TYPES, depositToStorage, withdrawFromStorage } from '../utils/storageSystem.js'
 import { getItemCategory } from '../pages/Character.jsx'
 import GameIcon from './GameIcon.jsx'
+import BaseDefenseBanner from './BaseDefenseBanner.jsx'
 
 export default function StorageModal({
   isOpen,
@@ -16,6 +17,7 @@ export default function StorageModal({
   const { user, character, refreshCharacter } = useAuth()
 
   const [storageData, setStorageData] = useState(initialStorageData)
+  const [baseDefenseConfig, setBaseDefenseConfig] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -34,6 +36,17 @@ export default function StorageModal({
   const [actionLoading, setActionLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+
+  // Escuta configuração de Defesa da Base
+  useEffect(() => {
+    if (!isOpen) return
+    const unsub = onSnapshot(doc(db, 'base_defense', 'global'), (snap) => {
+      if (snap.exists()) {
+        setBaseDefenseConfig(snap.data())
+      }
+    })
+    return unsub
+  }, [isOpen])
 
   // Escuta o documento do Storage em tempo real
   useEffect(() => {
@@ -106,6 +119,34 @@ export default function StorageModal({
       return matchCat && matchQuery
     })
   }, [itemsInStorage, activeCategoryFilter, searchQuery])
+
+  // Verifica se este Storage é um Ponto de Exibição da Defesa da Base
+  const isDefenseDisplayPoint = useMemo(() => {
+    const sId = (storageId || '').toLowerCase()
+    const sName = (storageData?.name || '').toLowerCase()
+    const sLoc = (storageData?.locationSlug || '').toLowerCase()
+
+    // 1. Configuração inicial/requisito padrão: Armazém da Casa Grande
+    if (
+      sId.includes('armazem') ||
+      sId.includes('casa-grande') ||
+      sName.includes('armazém') ||
+      sName.includes('armazem') ||
+      sLoc.includes('casa-grande')
+    ) {
+      return true
+    }
+
+    // 2. Pontos cadastrados dinamicamente no Firestore
+    const displayPoints = baseDefenseConfig?.displayPoints || []
+    return displayPoints.some(pt => {
+      if (pt.enabled === false) return false
+      if (pt.storageId && pt.storageId.toLowerCase() === sId) return true
+      if (pt.targetSlug && pt.targetSlug.toLowerCase() === sLoc) return true
+      if (pt.name && sName.includes(pt.name.toLowerCase())) return true
+      return false
+    })
+  }, [storageData, storageId, baseDefenseConfig])
 
   // Destrancar com Chave ou Código
   function handleUnlockWithKey() {
@@ -257,6 +298,13 @@ export default function StorageModal({
             </button>
           </div>
         </div>
+
+        {/* EXIBIÇÃO DA DEFESA DA BASE NO ARMAZÉM / PONTO DE EXIBIÇÃO */}
+        {isDefenseDisplayPoint && (
+          <div style={{ padding: '14px 20px 0 20px' }}>
+            <BaseDefenseBanner compact={false} showHistory={true} />
+          </div>
+        )}
 
         {/* FEEDBACKS (ERRO / SUCESSO) */}
         {errorMsg && (

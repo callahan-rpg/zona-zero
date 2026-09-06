@@ -23,6 +23,9 @@ import AdminMapEditor from '../components/AdminMapEditor.jsx'
 import AdminRulesEditor from '../components/AdminRulesEditor.jsx'
 import AdminStorageEditor from '../components/AdminStorageEditor.jsx'
 import AdminActivitiesEditor from '../components/AdminActivitiesEditor.jsx'
+import AdminRadioEditor from '../components/AdminRadioEditor.jsx'
+import AdminBaseDefenseEditor from '../components/AdminBaseDefenseEditor.jsx'
+import AdminCookingEditor from '../components/AdminCookingEditor.jsx'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -514,6 +517,7 @@ export default function Admin() {
       xatIframe: loc.xatIframe || '',
       isIndoor: !!loc.isIndoor,
       isSpawnPoint: !!loc.isSpawnPoint,
+      hasKitchen: loc.hasKitchen !== undefined ? !!loc.hasKitchen : true,
       lootEnabled: loc.loot?.enabled !== false,
       cooldownMinutes: loc.loot?.cooldownMinutes || 30,
       emptyChance: loc.loot?.emptyChance || 0.25,
@@ -549,6 +553,7 @@ export default function Admin() {
       xatIframe: '',
       isIndoor: false,
       isSpawnPoint: false,
+      hasKitchen: true,
       lootEnabled: true,
       cooldownMinutes: 30,
       emptyChance: 0.25,
@@ -588,6 +593,7 @@ export default function Admin() {
       xatIframe: locForm.xatIframe.trim(),
       isIndoor: !!locForm.isIndoor,
       isSpawnPoint: !!locForm.isSpawnPoint,
+      hasKitchen: !!locForm.hasKitchen,
       loot: {
         enabled: locForm.lootEnabled,
         cooldownMinutes: Number(locForm.cooldownMinutes),
@@ -1707,7 +1713,31 @@ export default function Admin() {
             <button className={`btn btn-sm ${activeTab === 'activities' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('activities')} style={{ borderColor: 'rgba(74, 222, 128, 0.4)', color: activeTab === 'activities' ? '#000' : '#4ade80', background: activeTab === 'activities' ? '#22c55e' : 'transparent', fontWeight: 'bold' }}>
               🌾 Atividades de Produção
             </button>
+            <button className={`btn btn-sm ${activeTab === 'radio' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('radio')} style={{ borderColor: 'rgba(34, 197, 94, 0.4)', color: activeTab === 'radio' ? '#000' : '#86efac', background: activeTab === 'radio' ? '#22c55e' : 'transparent', fontWeight: 'bold' }}>
+              📻 Rádio & Transmissões
+            </button>
+            <button className={`btn btn-sm ${activeTab === 'base_defense' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('base_defense')} style={{ borderColor: 'rgba(59, 130, 246, 0.4)', color: activeTab === 'base_defense' ? '#fff' : '#93c5fd', background: activeTab === 'base_defense' ? '#2563eb' : 'transparent', fontWeight: 'bold' }}>
+              🛡️ Defesa da Base
+            </button>
+            <button className={`btn btn-sm ${activeTab === 'cooking' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('cooking')} style={{ borderColor: 'rgba(245, 158, 11, 0.4)', color: activeTab === 'cooking' ? '#000' : '#fbbf24', background: activeTab === 'cooking' ? '#f59e0b' : 'transparent', fontWeight: 'bold' }}>
+              🍳 Cozinha & Receitas
+            </button>
           </div>
+
+          {/* CONTEÚDO DA TAB RADIO: SISTEMA DE RÁDIO E TRANSMISSÕES */}
+          {activeTab === 'radio' && (
+            <AdminRadioEditor locations={locations} />
+          )}
+
+          {/* CONTEÚDO DA TAB COOKING: SISTEMA DE COZINHA & RECEITAS */}
+          {activeTab === 'cooking' && (
+            <AdminCookingEditor catalogItems={catalogItems} />
+          )}
+
+          {/* CONTEÚDO DA TAB BASE DEFENSE: SISTEMA DE DEFESA DA BASE */}
+          {activeTab === 'base_defense' && (
+            <AdminBaseDefenseEditor locations={locations} />
+          )}
 
           {/* CONTEÚDO DA TAB ACTIVITIES: ATIVIDADES DE PRODUÇÃO */}
           {activeTab === 'activities' && (
@@ -2199,26 +2229,26 @@ export default function Admin() {
                                     🎽 {item.equipSlot}
                                   </span>
                                 )}
-                                {item.insulation > 0 && (
+                                {Number(item.insulation) > 0 ? (
                                   <span style={{ fontSize: 9, background: 'rgba(74,222,128,0.12)', color: '#4ade80', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(74,222,128,0.25)' }}>
                                     🧥 +{item.insulation}°C
                                   </span>
-                                )}
-                                {item.damageReduction > 0 && (
+                                ) : null}
+                                {Number(item.damageReduction) > 0 ? (
                                   <span style={{ fontSize: 9, background: 'rgba(56,189,248,0.12)', color: '#38bdf8', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(56,189,248,0.25)' }}>
                                     🛡️ -{item.damageReduction} fixo
                                   </span>
-                                )}
-                                {item.damageMin && (
+                                ) : null}
+                                {Number(item.damageMin) > 0 ? (
                                   <span style={{ fontSize: 9, background: 'rgba(239,68,68,0.12)', color: '#f87171', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(239,68,68,0.25)' }}>
                                     ⚔️ {item.damageMin}–{item.damageMax}
                                   </span>
-                                )}
-                                {item.maxDurability && (
+                                ) : null}
+                                {Number(item.maxDurability) > 0 ? (
                                   <span style={{ fontSize: 9, background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', padding: '1px 4px', borderRadius: 3 }}>
                                     🔨 {item.maxDurability} dur
                                   </span>
-                                )}
+                                ) : null}
                               </div>
                               {item.unlocks && item.unlocks.length > 0 && (
                                 <div style={{ fontSize: 10, color: '#70d6ff', marginTop: 2 }}>
@@ -3986,6 +4016,22 @@ export default function Admin() {
                       <span style={{ fontWeight: 600, color: '#38bdf8' }}>📍 Ponto de Nascimento (Spawn de Novos Sobreviventes)</span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         Se marcado, esta locação ficará disponível para os jogadores escolherem como ponto de início/nascimento no formulário de registro.
+                      </span>
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
+                    <input
+                      type="checkbox"
+                      id="hasKitchen"
+                      checked={locForm.hasKitchen !== false}
+                      onChange={(e) => setLocForm(prev => ({ ...prev, hasKitchen: e.target.checked }))}
+                      style={{ width: 'auto', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="hasKitchen" style={{ margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: 600, color: '#fbbf24' }}>🍳 Estação de Cozinha / Culinária Permitida</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        Se marcado, sobreviventes neste local verão o botão "🍳 Cozinhar" para preparar refeições com seus ingredientes e utensílios equipados.
                       </span>
                     </label>
                   </div>
