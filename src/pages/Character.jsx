@@ -942,11 +942,11 @@ export default function Character() {
                   const catMeta = CATEGORY_LABELS[item._category] || CATEGORY_LABELS.general
                   const rMeta = RARITY_META[item.rarity] || RARITY_META.common
                   const isConsumable = item.consumable === true || (item.consumeEffect && Object.keys(item.consumeEffect).length > 0)
-                  const canEquip = !!item.equipSlot
+                  const isAccessory = item._category === 'accessories' || item.category === 'accessories' || (item.equipSlot && String(item.equipSlot).startsWith('accessory'))
+                  const canEquip = !!item.equipSlot || isAccessory
                   const isEquipped = item.equipped === true
 
                   // Acessório com dano → pode ser usado como arma principal
-                  const isAccessory = item._category === 'accessories'
                   const hasDamage = Number(item.damageMin) > 0 || Number(item.damageMax) > 0
                   const canBeWeapon = isAccessory && hasDamage
                   // Está atualmente equipado como arma (slot hands_weapon via override)?

@@ -466,8 +466,21 @@ export function AuthProvider({ children }) {
 
       if (!naturalSlot) throw new Error('Este item não pode ser equipado em nenhum slot corporal.')
 
-      // Se um slot de substituição foi solicitado (ex: equipar acessório como arma), usa ele
-      const targetSlot = slotOverride || naturalSlot
+      const ACCESSORY_SLOTS = [
+        'accessory_1',
+        'accessory_2',
+        'accessory_3',
+        'accessory_4',
+        'accessory_5',
+        'accessory_6',
+      ]
+
+      const isAccessory =
+        targetItem.category === 'accessories' ||
+        targetItem.category === 'accessory' ||
+        (naturalSlot && (naturalSlot === 'accessory' || naturalSlot.startsWith('accessory')))
+
+      let targetSlot = slotOverride || naturalSlot
 
       // Valida se o slotOverride é permitido (apenas hands_weapon por enquanto)
       if (slotOverride && slotOverride !== naturalSlot) {
@@ -475,25 +488,56 @@ export function AuthProvider({ children }) {
         if (!hasWeaponDamage) throw new Error('Este acessório não possui dano e não pode ser equipado como arma.')
       }
 
-      // Desequipa qualquer outro item que esteja atualmente no slot de destino
-      inventory.forEach((i) => {
-        if (i.instanceId === instanceId) return
-        const iSlot = i.equippedAsSlot || i.equipSlot || DEFAULT_PRESET_ITEMS.find((p) => p.itemId === i.itemId)?.equipSlot
-        if (iSlot === targetSlot && i.equipped) {
-          i.equipped = false
-          // Limpa o slot forçado se existia
-          if (i.equippedAsSlot) delete i.equippedAsSlot
-        }
-      })
+      if (isAccessory && !slotOverride) {
+        // Encontra quais slots de acessórios já estão ocupados por outros itens equipados
+        const occupiedAccessorySlots = new Set()
+        inventory.forEach((i) => {
+          if (i.instanceId === instanceId || !i.equipped) return
+          const iSlot = i.equippedAsSlot || i.equipSlot || DEFAULT_PRESET_ITEMS.find((p) => p.itemId === i.itemId)?.equipSlot
+          if (iSlot && ACCESSORY_SLOTS.includes(iSlot)) {
+            occupiedAccessorySlots.add(iSlot)
+          }
+        })
 
-      // Equipa o item no slot (normal ou forçado)
-      targetItem.equipped = true
-      if (slotOverride && slotOverride !== naturalSlot) {
-        // Marca temporariamente o slot onde está equipado para cálculos corretos
-        targetItem.equippedAsSlot = slotOverride
+        // Procura o primeiro slot de acessório livre (de 1 a 6)
+        const freeSlot = ACCESSORY_SLOTS.find((slot) => !occupiedAccessorySlots.has(slot))
+        targetSlot = freeSlot || 'accessory_1'
+
+        // Se todos os 6 slots estavam cheios e teve que substituir accessory_1, desequipa quem estava nele
+        if (!freeSlot) {
+          inventory.forEach((i) => {
+            if (i.instanceId === instanceId) return
+            const iSlot = i.equippedAsSlot || i.equipSlot || DEFAULT_PRESET_ITEMS.find((p) => p.itemId === i.itemId)?.equipSlot
+            if (iSlot === 'accessory_1' && i.equipped) {
+              i.equipped = false
+              if (i.equippedAsSlot) delete i.equippedAsSlot
+            }
+          })
+        }
+
+        targetItem.equipped = true
+        targetItem.equippedAsSlot = targetSlot
       } else {
-        // Remove slot forçado anterior se reequipando no slot natural
-        if (targetItem.equippedAsSlot) delete targetItem.equippedAsSlot
+        // Desequipa qualquer outro item que esteja atualmente no slot de destino
+        inventory.forEach((i) => {
+          if (i.instanceId === instanceId) return
+          const iSlot = i.equippedAsSlot || i.equipSlot || DEFAULT_PRESET_ITEMS.find((p) => p.itemId === i.itemId)?.equipSlot
+          if (iSlot === targetSlot && i.equipped) {
+            i.equipped = false
+            // Limpa o slot forçado se existia
+            if (i.equippedAsSlot) delete i.equippedAsSlot
+          }
+        })
+
+        // Equipa o item no slot (normal ou forçado)
+        targetItem.equipped = true
+        if (slotOverride && slotOverride !== naturalSlot) {
+          // Marca temporariamente o slot onde está equipado para cálculos corretos
+          targetItem.equippedAsSlot = slotOverride
+        } else {
+          // Remove slot forçado anterior se reequipando no slot natural
+          if (targetItem.equippedAsSlot) delete targetItem.equippedAsSlot
+        }
       }
 
       transaction.update(userRef, {

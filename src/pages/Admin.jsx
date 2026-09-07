@@ -2504,9 +2504,9 @@ export default function Admin() {
                           type="button"
                           className="btn btn-sm"
                           style={{ fontSize: 9, padding: '1px 6px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' }}
-                          onClick={() => setCatalogForm(prev => ({ ...prev, equipSlot: 'accessory_1' }))}
+                          onClick={() => setCatalogForm(prev => ({ ...prev, equipSlot: 'accessory' }))}
                         >
-                          ⚡ Auto: Slot Acessório 1
+                          ⚡ Auto: Acessório (Livre 1-6)
                         </button>
                       )}
                     </div>
@@ -2517,10 +2517,8 @@ export default function Admin() {
                           <option key={slot.id} value={slot.id}>{slot.icon} {slot.label}</option>
                         ))}
                       </optgroup>
-                      <optgroup label="Slots de Acessórios (1 a 6)">
-                        {EQUIPMENT_SLOTS.filter(s => s.id.startsWith('accessory_')).map(slot => (
-                          <option key={slot.id} value={slot.id}>{slot.icon} {slot.label}</option>
-                        ))}
+                      <optgroup label="Acessórios (Qualquer Slot Livre 1 a 6)">
+                        <option value="accessory">🎒 Acessório (Próximo Slot Livre 1–6)</option>
                       </optgroup>
                     </select>
                   </div>

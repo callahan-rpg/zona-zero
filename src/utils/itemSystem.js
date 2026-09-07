@@ -128,8 +128,8 @@ export const DEFAULT_PRESET_ITEMS = [
   // =========================================================================
   // ATIVIDADES DE PRODUÇÃO — Pesca, Plantação e Galinheiro
   // =========================================================================
-  { itemId: 'vara_pesca', name: 'Vara de Pesca', icon: '🎣', category: 'accessories', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'accessory_1', maxDurability: 150, durability: 150, description: 'Vara artesanal de bambu com linha e anzol. Necessária para pescar.' },
-  { itemId: 'enxada', name: 'Enxada', icon: '⛏️', category: 'accessories', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'accessory_1', maxDurability: 120, durability: 120, description: 'Ferramenta agrícola para cavar solo e plantar sementes.' },
+  { itemId: 'vara_pesca', name: 'Vara de Pesca', icon: '🎣', category: 'accessories', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'accessory', maxDurability: 150, durability: 150, description: 'Vara artesanal de bambu com linha e anzol. Necessária para pescar.' },
+  { itemId: 'enxada', name: 'Enxada', icon: '⛏️', category: 'accessories', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'accessory', maxDurability: 120, durability: 120, description: 'Ferramenta agrícola para cavar solo e plantar sementes.' },
   { itemId: 'minhoca', name: 'Minhoca', icon: '🪱', category: 'general', rarity: 'common', consumable: false, isQuestItem: false, description: 'Isca para pesca. Encontrada ao preparar e cuidar da horta.' },
   { itemId: 'peixe_pequeno', name: 'Peixe Pequeno', icon: '🐟', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 15, blood: 5 }, isQuestItem: false, description: 'Peixe pequeno capturado na pesca. Alivia a fome.' },
   { itemId: 'peixe_medio', name: 'Peixe Médio', icon: '🐠', category: 'supplies', rarity: 'uncommon', consumable: true, consumeEffect: { hunger: 25, blood: 8 }, isQuestItem: false, description: 'Peixe de bom porte. Nutritivo e suficiente para uma refeição.' },
@@ -159,10 +159,10 @@ export const DEFAULT_PRESET_ITEMS = [
   // =========================================================================
   // MOCHILAS & EQUIPAMENTOS DE TRANSPORTE
   // =========================================================================
-  { itemId: 'mochila_pequena', name: 'Mochila Pequena', icon: '🎒', category: 'accessories', rarity: 'common', equipSlot: 'accessory_1', weight: 1.0, storageBonusSlots: 4, storageBonusWeight: 5.0, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila leve de passeio com costura simples. Concede +4 slots e suporta +5 kg adicionais.' },
-  { itemId: 'mochila_media', name: 'Mochila Média', icon: '🎒', category: 'accessories', rarity: 'uncommon', equipSlot: 'accessory_1', weight: 2.0, storageBonusSlots: 8, storageBonusWeight: 10.0, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila de trekking reforçada com bolsos laterais. Concede +8 slots e suporta +10 kg adicionais.' },
-  { itemId: 'mochila_grande', name: 'Mochila Grande', icon: '🎒', category: 'accessories', rarity: 'rare', equipSlot: 'accessory_1', weight: 2.5, storageBonusSlots: 12, storageBonusWeight: 17.5, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila cargueira de alta capacidade com suporte lombar. Concede +12 slots e suporta +17.5 kg adicionais.' },
-  { itemId: 'mochila_militar', name: 'Mochila Militar', icon: '🎒', category: 'accessories', rarity: 'epic', equipSlot: 'accessory_1', weight: 3.0, storageBonusSlots: 16, storageBonusWeight: 25.0, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila tática camuflada com sistema MOLLE e nylon balístico. Concede +16 slots e suporta +25 kg adicionais.' },
+  { itemId: 'mochila_pequena', name: 'Mochila Pequena', icon: '🎒', category: 'accessories', rarity: 'common', equipSlot: 'accessory', weight: 1.0, storageBonusSlots: 4, storageBonusWeight: 5.0, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila leve de passeio com costura simples. Concede +4 slots e suporta +5 kg adicionais.' },
+  { itemId: 'mochila_media', name: 'Mochila Média', icon: '🎒', category: 'accessories', rarity: 'uncommon', equipSlot: 'accessory', weight: 2.0, storageBonusSlots: 8, storageBonusWeight: 10.0, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila de trekking reforçada com bolsos laterais. Concede +8 slots e suporta +10 kg adicionais.' },
+  { itemId: 'mochila_grande', name: 'Mochila Grande', icon: '🎒', category: 'accessories', rarity: 'rare', equipSlot: 'accessory', weight: 2.5, storageBonusSlots: 12, storageBonusWeight: 17.5, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila cargueira de alta capacidade com suporte lombar. Concede +12 slots e suporta +17.5 kg adicionais.' },
+  { itemId: 'mochila_militar', name: 'Mochila Militar', icon: '🎒', category: 'accessories', rarity: 'epic', equipSlot: 'accessory', weight: 3.0, storageBonusSlots: 16, storageBonusWeight: 25.0, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila tática camuflada com sistema MOLLE e nylon balístico. Concede +16 slots e suporta +25 kg adicionais.' },
 
   // =========================================================================
   // COMUNICAÇÃO & RÁDIO
@@ -536,34 +536,85 @@ export function calculateCharacterEquipmentStats(inventory = []) {
     accessory_6: null,
   }
 
+  const ACCESSORY_SLOTS = [
+    'accessory_1',
+    'accessory_2',
+    'accessory_3',
+    'accessory_4',
+    'accessory_5',
+    'accessory_6',
+  ]
+
   let totalInsulation = 0
   let totalDamageReduction = 0
   let weapon = null
 
   if (Array.isArray(inventory)) {
+    const accessoriesToAssign = []
+
+    // 1. Processa primeiro os itens equipados normais (corpo) e acessório usado como arma (hands_weapon)
     inventory.forEach(item => {
       if (!item || !item.equipped) return
 
-      // Determina slot de equipamento do item (ou fallback)
-      // equippedAsSlot tem prioridade: permite que um acessório ocupe hands_weapon
-      const slot = item.equippedAsSlot || item.equipSlot || (item.equippedSlot || null)
-      if (slot && equippedMap[slot] === null) {
-        equippedMap[slot] = item
+      const isAccessory =
+        item.category === 'accessories' ||
+        item.category === 'accessory' ||
+        (item.equipSlot && String(item.equipSlot).startsWith('accessory')) ||
+        (item.equippedAsSlot && String(item.equippedAsSlot).startsWith('accessory'))
 
-        const isBroken = (item.durability !== undefined && Number(item.durability) <= 0)
-
-        // Itens não quebrados concedem isolamento e redução de dano
-        if (!isBroken) {
-          if (item.insulation) {
-            totalInsulation += Number(item.insulation) || 0
+      // Se foi equipado especificamente como arma (slotOverride: hands_weapon)
+      if (item.equippedAsSlot === 'hands_weapon') {
+        if (equippedMap.hands_weapon === null) {
+          equippedMap.hands_weapon = item
+          const isBroken = (item.durability !== undefined && Number(item.durability) <= 0)
+          if (!isBroken) {
+            if (item.insulation) totalInsulation += Number(item.insulation) || 0
+            if (item.damageReduction) totalDamageReduction += Number(item.damageReduction) || 0
           }
-          if (item.damageReduction) {
-            totalDamageReduction += Number(item.damageReduction) || 0
+          weapon = item
+        }
+        return
+      }
+
+      if (isAccessory) {
+        accessoriesToAssign.push(item)
+      } else {
+        const slot = item.equippedAsSlot || item.equipSlot || (item.equippedSlot || null)
+        if (slot && equippedMap[slot] === null) {
+          equippedMap[slot] = item
+
+          const isBroken = (item.durability !== undefined && Number(item.durability) <= 0)
+          if (!isBroken) {
+            if (item.insulation) totalInsulation += Number(item.insulation) || 0
+            if (item.damageReduction) totalDamageReduction += Number(item.damageReduction) || 0
+          }
+
+          if (slot === 'hands_weapon') {
+            weapon = item
           }
         }
+      }
+    })
 
-        if (slot === 'hands_weapon') {
-          weapon = item
+    // 2. Aloca os acessórios equipados dinamicamente nos slots livres (accessory_1 .. accessory_6)
+    accessoriesToAssign.forEach(item => {
+      const explicitSlot = item.equippedAsSlot || item.equipSlot
+      let assignedSlot = null
+
+      if (explicitSlot && ACCESSORY_SLOTS.includes(explicitSlot) && equippedMap[explicitSlot] === null) {
+        assignedSlot = explicitSlot
+      } else {
+        // Busca o próximo slot de acessório livre
+        assignedSlot = ACCESSORY_SLOTS.find(s => equippedMap[s] === null)
+      }
+
+      if (assignedSlot) {
+        equippedMap[assignedSlot] = item
+
+        const isBroken = (item.durability !== undefined && Number(item.durability) <= 0)
+        if (!isBroken) {
+          if (item.insulation) totalInsulation += Number(item.insulation) || 0
+          if (item.damageReduction) totalDamageReduction += Number(item.damageReduction) || 0
         }
       }
     })
