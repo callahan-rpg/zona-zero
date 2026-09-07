@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
-import { doc, onSnapshot } from 'firebase/firestore'
+import { doc, onSnapshot, collection } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { RARITY_META } from '../utils/itemSystem.js'
+import { RARITY_META, DEFAULT_PRESET_ITEMS } from '../utils/itemSystem.js'
 import { STORAGE_TYPES, depositToStorage, withdrawFromStorage } from '../utils/storageSystem.js'
 import { getItemCategory } from '../pages/Character.jsx'
 import GameIcon from './GameIcon.jsx'
@@ -18,6 +18,7 @@ export default function StorageModal({
 
   const [storageData, setStorageData] = useState(initialStorageData)
   const [baseDefenseConfig, setBaseDefenseConfig] = useState(null)
+  const [catalogMap, setCatalogMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -44,6 +45,20 @@ export default function StorageModal({
       if (snap.exists()) {
         setBaseDefenseConfig(snap.data())
       }
+    })
+    return unsub
+  }, [isOpen])
+
+  // Escuta o catálogo de itens (items_db) para hidratar nomes e imagens
+  useEffect(() => {
+    if (!isOpen) return
+    const unsub = onSnapshot(collection(db, 'items_db'), (snap) => {
+      const map = {}
+      snap.docs.forEach(d => {
+        const data = d.data()
+        map[data.itemId || d.id] = data
+      })
+      setCatalogMap(map)
     })
     return unsub
   }, [isOpen])
@@ -95,30 +110,48 @@ export default function StorageModal({
   const slotsUsed = itemsInStorage.length
   const slotsPercentage = isInfiniteSlots ? 0 : Math.min(100, Math.round((slotsUsed / maxSlots) * 100))
 
-  // Inventário do jogador filtrado
+  // Hidrata um item com nome, ícone e imagem vindos do catálogo (items_db > presets > dados originais)
+  function hydrateItem(item) {
+    if (!item) return item
+    const catData = catalogMap[item.itemId]
+    const presetData = DEFAULT_PRESET_ITEMS.find(p => p.itemId === item.itemId)
+    return {
+      ...item,
+      name:     catData?.name     || item.name     || presetData?.name     || item.itemId || 'Item',
+      icon:     catData?.icon     || item.icon     || presetData?.icon     || '📦',
+      imageUrl: catData?.imageUrl || item.imageUrl || presetData?.imageUrl || '',
+      rarity:   catData?.rarity   || item.rarity   || presetData?.rarity   || 'common',
+    }
+  }
+
+  // Inventário do jogador filtrado (com hidratação do catálogo)
   const playerInventory = useMemo(() => {
     const inv = character?.inventory || []
-    return inv.filter(item => {
-      if (!item) return false
-      const itemCat = getItemCategory(item)
-      const matchCat = activeCategoryFilter === 'all' || itemCat === activeCategoryFilter
-      const q = searchQuery.toLowerCase().trim()
-      const matchQuery = !q || (item.name || '').toLowerCase().includes(q) || (item.itemId || '').toLowerCase().includes(q)
-      return matchCat && matchQuery
-    })
-  }, [character?.inventory, activeCategoryFilter, searchQuery])
+    return inv
+      .filter(item => {
+        if (!item) return false
+        const itemCat = getItemCategory(item)
+        const matchCat = activeCategoryFilter === 'all' || itemCat === activeCategoryFilter
+        const q = searchQuery.toLowerCase().trim()
+        const matchQuery = !q || (item.name || '').toLowerCase().includes(q) || (item.itemId || '').toLowerCase().includes(q)
+        return matchCat && matchQuery
+      })
+      .map(hydrateItem)
+  }, [character?.inventory, activeCategoryFilter, searchQuery, catalogMap])
 
-  // Itens do storage filtrados por busca e categoria
+  // Itens do storage filtrados por busca e categoria (com hidratação do catálogo)
   const filteredStorageItems = useMemo(() => {
     const q = searchQuery.toLowerCase().trim()
-    return itemsInStorage.filter(item => {
-      if (!item) return false
-      const itemCat = getItemCategory(item)
-      const matchCat = activeCategoryFilter === 'all' || itemCat === activeCategoryFilter
-      const matchQuery = !q || (item.name || '').toLowerCase().includes(q) || (item.itemId || '').toLowerCase().includes(q)
-      return matchCat && matchQuery
-    })
-  }, [itemsInStorage, activeCategoryFilter, searchQuery])
+    return itemsInStorage
+      .filter(item => {
+        if (!item) return false
+        const itemCat = getItemCategory(item)
+        const matchCat = activeCategoryFilter === 'all' || itemCat === activeCategoryFilter
+        const matchQuery = !q || (item.name || '').toLowerCase().includes(q) || (item.itemId || '').toLowerCase().includes(q)
+        return matchCat && matchQuery
+      })
+      .map(hydrateItem)
+  }, [itemsInStorage, activeCategoryFilter, searchQuery, catalogMap])
 
   // Verifica se este Storage é um Ponto de Exibição da Defesa da Base
   const isDefenseDisplayPoint = useMemo(() => {
@@ -505,8 +538,18 @@ export default function StorageModal({
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                              <div style={{ width: 34, height: 34, borderRadius: 6, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                <GameIcon src={item.imageUrl} emoji={item.icon} size={20} />
+                              <div style={{ width: 40, height: 40, borderRadius: 6, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                                {item.imageUrl ? (
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.name}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 5 }}
+                                    onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex' }}
+                                  />
+                                ) : null}
+                                <div style={{ display: item.imageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                                  <GameIcon src={''} emoji={item.icon} size={22} />
+                                </div>
                               </div>
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -581,8 +624,18 @@ export default function StorageModal({
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                              <div style={{ width: 34, height: 34, borderRadius: 6, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                <GameIcon src={item.imageUrl} emoji={item.icon} size={20} />
+                              <div style={{ width: 40, height: 40, borderRadius: 6, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                                {item.imageUrl ? (
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.name}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 5 }}
+                                    onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex' }}
+                                  />
+                                ) : null}
+                                <div style={{ display: item.imageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                                  <GameIcon src={''} emoji={item.icon} size={22} />
+                                </div>
                               </div>
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
