@@ -393,7 +393,14 @@ export default function AdminStorageEditor({ locations = [], catalogItems = [] }
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
                   {selectedStorageObj.items.map(item => {
-                    const rMeta = RARITY_META[item.rarity] || RARITY_META.common
+                    const idKey = item.itemId || item.id || ''
+                    const catData = catalogItems.find(c => (idKey && (c.itemId === idKey || c.id === idKey)) || (item.name && c.name?.toLowerCase().trim() === item.name?.toLowerCase().trim()))
+                    const itemName = catData?.name || item.name || item.itemId || 'Item'
+                    const itemIcon = catData?.icon || item.icon || '📦'
+                    const itemImageUrl = catData?.imageUrl || item.imageUrl || ''
+                    const itemRarity = catData?.rarity || item.rarity || 'common'
+                    const rMeta = RARITY_META[itemRarity] || RARITY_META.common
+
                     return (
                       <div
                         key={item.instanceId}
@@ -409,10 +416,16 @@ export default function AdminStorageEditor({ locations = [], catalogItems = [] }
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                          <GameIcon src={item.imageUrl} emoji={item.icon} size={18} />
+                          <div style={{ width: 28, height: 28, borderRadius: 4, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                            {itemImageUrl ? (
+                              <img src={itemImageUrl} alt={itemName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }} />
+                            ) : (
+                              <GameIcon emoji={itemIcon} size={16} />
+                            )}
+                          </div>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {item.name || item.itemId}
+                              {itemName}
                             </div>
                             <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                               Qtd: <strong>{item.quantity || 1}</strong>

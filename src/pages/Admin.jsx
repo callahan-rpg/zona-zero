@@ -73,6 +73,7 @@ export default function Admin() {
   })
   const [tempMaintenance, setTempMaintenance] = useState(false)
   const [globalMsg, setGlobalMsg] = useState('')
+  const [tempDefaultSpawnLocation, setTempDefaultSpawnLocation] = useState('acampamento')
 
   // ==========================================
   // TAB HOME: PAINEL DE CUSTOMIZAÇÃO DA HOME
@@ -148,6 +149,7 @@ export default function Admin() {
         })
         setTempMaintenance(!!data.maintenance)
         setGlobalMsg(data.global_message || '')
+        setTempDefaultSpawnLocation(data.defaultSpawnLocation || 'acampamento')
       }
     })
     return unsub
@@ -163,8 +165,9 @@ export default function Admin() {
         time: tempTime,
         maintenance: tempMaintenance,
         global_message: globalMsg,
-      })
-      alert('Configuração global salva!')
+        defaultSpawnLocation: tempDefaultSpawnLocation || 'acampamento',
+      }, { merge: true })
+      alert('Configuração global salva com sucesso!')
     } catch (err) {
       console.error(err)
       alert('Erro ao salvar configuração: ' + err.message)
@@ -312,6 +315,8 @@ export default function Admin() {
       description: catalogForm.description.trim(),
       consumable: !!catalogForm.consumable,
       consumeEffect: Object.keys(consumeEffect).length > 0 ? consumeEffect : null,
+      maxUses: catalogForm.maxUses !== '' && Number(catalogForm.maxUses) > 1 ? Number(catalogForm.maxUses) : null,
+      canTargetOther: !!catalogForm.canTargetOther,
       isQuestItem: !!catalogForm.isQuestItem,
       equipSlot: catalogForm.equipSlot || null,
       weight: catalogForm.weight !== '' ? Number(catalogForm.weight) : 0.5,
@@ -342,6 +347,8 @@ export default function Admin() {
         hungerEffect: 0,
         thirstEffect: 0,
         bloodEffect: 0,
+        maxUses: '',
+        canTargetOther: false,
         isQuestItem: false,
         equipSlot: '',
         weight: 0.5,
@@ -384,6 +391,8 @@ export default function Admin() {
       hungerEffect: item.consumeEffect?.hunger || 0,
       thirstEffect: item.consumeEffect?.thirst || 0,
       bloodEffect: item.consumeEffect?.blood || 0,
+      maxUses: item.maxUses !== undefined && item.maxUses !== null ? item.maxUses : '',
+      canTargetOther: !!item.canTargetOther,
       isQuestItem: !!item.isQuestItem,
       equipSlot: item.equipSlot || '',
       weight: item.weight !== undefined && item.weight !== null ? item.weight : 0.5,
@@ -419,6 +428,8 @@ export default function Admin() {
     hungerEffect: 0,
     thirstEffect: 0,
     bloodEffect: 0,
+    maxUses: '',
+    canTargetOther: false,
     isQuestItem: false,
     equipSlot: '',
     weight: 0.5,
@@ -699,6 +710,8 @@ export default function Admin() {
         category: newLootItem.category || catItem?.category || 'general',
         consumable: newLootItem.consumable !== undefined ? newLootItem.consumable : (catItem?.consumable || false),
         consumeEffect: newLootItem.consumeEffect || catItem?.consumeEffect || null,
+        maxUses: newLootItem.maxUses !== undefined ? newLootItem.maxUses : (catItem?.maxUses || null),
+        canTargetOther: newLootItem.canTargetOther !== undefined ? newLootItem.canTargetOther : (catItem?.canTargetOther || false),
         description: newLootItem.description || catItem?.description || '',
         unlocks: newLootItem.unlocks || catItem?.unlocks || []
       }]
@@ -730,6 +743,8 @@ export default function Admin() {
         category: newUniqueItem.category || catItem?.category || 'general',
         consumable: newUniqueItem.consumable !== undefined ? newUniqueItem.consumable : (catItem?.consumable || false),
         consumeEffect: newUniqueItem.consumeEffect || catItem?.consumeEffect || null,
+        maxUses: newUniqueItem.maxUses !== undefined ? newUniqueItem.maxUses : (catItem?.maxUses || null),
+        canTargetOther: newUniqueItem.canTargetOther !== undefined ? newUniqueItem.canTargetOther : (catItem?.canTargetOther || false),
         description: newUniqueItem.description || catItem?.description || '',
         unlocks: newUniqueItem.unlocks || catItem?.unlocks || []
       }]
@@ -900,6 +915,54 @@ export default function Admin() {
       })
     } catch (err) {
       alert('Erro ao atualizar vital: ' + err.message)
+    }
+  }
+
+  async function updatePlayerRole(playerUid, newRole) {
+    try {
+      const docRef = doc(db, 'users', playerUid)
+      const updates = { role: newRole }
+      if (newRole === 'admin') {
+        // Admins não fazem parte de nenhuma profissão para não ocupar vagas
+        updates['character.profession'] = null
+        updates['character.specialty'] = null
+      }
+      await updateDoc(docRef, updates)
+      setSelectedPlayer(prev => {
+        if (prev?.uid === playerUid) {
+          return {
+            ...prev,
+            role: newRole,
+            character: newRole === 'admin' ? { ...prev.character, profession: null, specialty: null } : prev.character
+          }
+        }
+        return prev
+      })
+      alert(`Cargo alterado para: ${newRole === 'admin' ? '🛡️ Administrador (Sem Profissão / Isento de Vagas)' : '👤 Jogador'}`)
+    } catch (err) {
+      alert('Erro ao alterar cargo: ' + err.message)
+    }
+  }
+
+  async function clearPlayerProfession(playerUid) {
+    try {
+      const docRef = doc(db, 'users', playerUid)
+      await updateDoc(docRef, {
+        'character.profession': null,
+        'character.specialty': null
+      })
+      setSelectedPlayer(prev => {
+        if (prev?.uid === playerUid) {
+          return {
+            ...prev,
+            character: { ...prev.character, profession: null, specialty: null }
+          }
+        }
+        return prev
+      })
+      alert('Profissão removida com sucesso! Esta conta não ocupa nenhuma vaga de jogador.')
+    } catch (err) {
+      alert('Erro ao remover profissão: ' + err.message)
     }
   }
 
@@ -2265,8 +2328,18 @@ export default function Admin() {
                                   🍽️ {Object.entries(item.consumeEffect).map(([k, v]) => `+${v} ${k}`).join(' · ')}
                                 </div>
                               )}
-                              {/* Badges de Peso, Equipamento, Dano e Isolamento */}
+                              {/* Badges de Peso, Equipamento, Dano, Isolamento e Usos */}
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                                {Number(item.maxUses) > 1 && (
+                                  <span style={{ fontSize: 9, background: 'rgba(168, 85, 247, 0.18)', color: '#c084fc', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(168, 85, 247, 0.35)', fontWeight: 'bold' }}>
+                                    🩺 {item.maxUses} Doses/Usos
+                                  </span>
+                                )}
+                                {item.canTargetOther && (
+                                  <span style={{ fontSize: 9, background: 'rgba(52, 211, 153, 0.18)', color: '#34d399', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(52, 211, 153, 0.35)', fontWeight: 'bold' }}>
+                                    🤝 Aplicação em Outros
+                                  </span>
+                                )}
                                 <span style={{ fontSize: 9, background: 'rgba(59, 130, 246, 0.15)', color: '#93c5fd', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(59, 130, 246, 0.3)' }}>
                                   ⚖️ {item.weight !== undefined ? item.weight : 0.5} kg
                                 </span>
@@ -2466,20 +2539,48 @@ export default function Admin() {
                     <label htmlFor="catConsumable" style={{ fontSize: 11, margin: 0, cursor: 'pointer' }}>Item Consumível / Usável</label>
                   </div>
                   {catalogForm.consumable && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label style={{ fontSize: 9 }}>🍖 +Fome</label>
-                        <input type="number" value={catalogForm.hungerEffect} onChange={e => setCatalogForm(prev => ({ ...prev, hungerEffect: Number(e.target.value) }))} />
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 9 }}>🍖 +Fome</label>
+                          <input type="number" value={catalogForm.hungerEffect} onChange={e => setCatalogForm(prev => ({ ...prev, hungerEffect: Number(e.target.value) }))} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 9 }}>💧 +Sede</label>
+                          <input type="number" value={catalogForm.thirstEffect} onChange={e => setCatalogForm(prev => ({ ...prev, thirstEffect: Number(e.target.value) }))} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 9 }}>🩸 +Sangue/HP</label>
+                          <input type="number" value={catalogForm.bloodEffect} onChange={e => setCatalogForm(prev => ({ ...prev, bloodEffect: Number(e.target.value) }))} />
+                        </div>
                       </div>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label style={{ fontSize: 9 }}>💧 +Sede</label>
-                        <input type="number" value={catalogForm.thirstEffect} onChange={e => setCatalogForm(prev => ({ ...prev, thirstEffect: Number(e.target.value) }))} />
+
+                      {/* Configurações de Usos Múltiplos e Aplicação em Outros */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8, paddingTop: 6, borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 9, color: '#c084fc', fontWeight: 'bold' }}>🩺 Quantidade de Usos/Doses</label>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="1 (Uso único)"
+                            value={catalogForm.maxUses}
+                            onChange={e => setCatalogForm(prev => ({ ...prev, maxUses: e.target.value }))}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 14 }}>
+                          <input
+                            type="checkbox"
+                            id="catCanTargetOther"
+                            checked={catalogForm.canTargetOther}
+                            onChange={e => setCatalogForm(prev => ({ ...prev, canTargetOther: e.target.checked }))}
+                            style={{ width: 'auto' }}
+                          />
+                          <label htmlFor="catCanTargetOther" style={{ fontSize: 9.5, margin: 0, cursor: 'pointer', color: '#34d399', fontWeight: 600 }}>
+                            🤝 Pode aplicar em outros
+                          </label>
+                        </div>
                       </div>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label style={{ fontSize: 9 }}>🩸 +Sangue/HP</label>
-                        <input type="number" value={catalogForm.bloodEffect} onChange={e => setCatalogForm(prev => ({ ...prev, bloodEffect: Number(e.target.value) }))} />
-                      </div>
-                    </div>
+                    </>
                   )}
                 </div>
 
@@ -2956,6 +3057,58 @@ export default function Admin() {
                       </div>
                     )
                   })}
+                </div>
+              </div>
+
+              {/* SEÇÃO 5: LOCAL DE NASCIMENTO PADRÃO / REDIRECIONAMENTO DE NOVOS JOGADORES */}
+              <div style={{ padding: '16px', background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+                  <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: '#38bdf8', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>📍</span> Local de Nascimento / Ponto de Redirecionamento Inicial
+                  </h4>
+                  <span style={{ fontSize: 10.5, color: '#4ade80', background: 'rgba(74,222,128,0.15)', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
+                    Redirecionamento Automático
+                  </span>
+                </div>
+                <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', margin: '0 0 12px', lineHeight: 1.4 }}>
+                  Defina o local onde todos os novos sobreviventes serão automaticamente posicionados e redirecionados ao finalizarem a criação da ficha de personagem. Por padrão, é o <strong>Acampamento</strong> (slug: <code>acampamento</code>).
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: '#38bdf8' }}>Selecionar Sala Cadastrada</label>
+                    <select
+                      value={tempDefaultSpawnLocation}
+                      onChange={(e) => setTempDefaultSpawnLocation(e.target.value)}
+                    >
+                      {locations.map(loc => (
+                        <option key={loc.slug || loc.id} value={loc.slug || loc.id}>
+                          {loc.name} ({loc.slug || loc.id})
+                        </option>
+                      ))}
+                      {!locations.some(l => (l.slug || l.id) === tempDefaultSpawnLocation) && (
+                        <option value={tempDefaultSpawnLocation}>
+                          {tempDefaultSpawnLocation} (Customizado / Não listado)
+                        </option>
+                      )}
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: '#38bdf8' }}>Slug da Locação</label>
+                    <input
+                      type="text"
+                      value={tempDefaultSpawnLocation}
+                      onChange={(e) => setTempDefaultSpawnLocation(e.target.value.trim().toLowerCase())}
+                      placeholder="Ex: acampamento"
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 8, fontSize: 11, color: '#94a3b8' }}>
+                  ℹ️ Sala ativa no momento: <strong style={{ color: '#fff' }}>
+                    {locations.find(l => (l.slug || l.id) === tempDefaultSpawnLocation)?.name || tempDefaultSpawnLocation}
+                  </strong> (<code>{tempDefaultSpawnLocation}</code>)
                 </div>
               </div>
 
@@ -3536,9 +3689,9 @@ export default function Admin() {
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
                                       <strong style={{ fontSize: 11.5, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{loc.name}</strong>
-                                      {loc.isSpawnPoint && (
-                                        <span style={{ fontSize: 8.5, background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 4px', borderRadius: 4, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                          📍 Spawn
+                                      {loc.slug === tempDefaultSpawnLocation && (
+                                        <span style={{ fontSize: 8.5, background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)', padding: '1px 4px', borderRadius: 4, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                          📍 Spawn Padrão
                                         </span>
                                       )}
                                     </div>
@@ -3657,9 +3810,9 @@ export default function Admin() {
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
                                                 <strong style={{ fontSize: 11, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{loc.name}</strong>
-                                                {loc.isSpawnPoint && (
-                                                  <span style={{ fontSize: 8, background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 3px', borderRadius: 3, fontWeight: 700 }}>
-                                                    📍 Spawn
+                                                {loc.slug === tempDefaultSpawnLocation && (
+                                                  <span style={{ fontSize: 8, background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)', padding: '1px 3px', borderRadius: 3, fontWeight: 700 }}>
+                                                    📍 Spawn Padrão
                                                   </span>
                                                 )}
                                               </div>
@@ -4080,20 +4233,41 @@ export default function Admin() {
                     </label>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
-                    <input
-                      type="checkbox"
-                      id="isSpawnPoint"
-                      checked={locForm.isSpawnPoint || false}
-                      onChange={(e) => setLocForm(prev => ({ ...prev, isSpawnPoint: e.target.checked }))}
-                      style={{ width: 'auto', cursor: 'pointer' }}
-                    />
-                    <label htmlFor="isSpawnPoint" style={{ margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontWeight: 600, color: '#38bdf8' }}>📍 Ponto de Nascimento (Spawn de Novos Sobreviventes)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: 600, color: '#38bdf8' }}>📍 Ponto de Nascimento Inicial de Novos Jogadores</span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        Se marcado, esta locação ficará disponível para os jogadores escolherem como ponto de início/nascimento no formulário de registro.
+                        Local padrão ativo no servidor: <strong>{tempDefaultSpawnLocation || 'acampamento'}</strong>
                       </span>
-                    </label>
+                    </div>
+                    {locForm.slug && (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{
+                          background: (locForm.slug === tempDefaultSpawnLocation) ? 'rgba(38,200,143,0.2)' : 'rgba(56,189,248,0.15)',
+                          borderColor: (locForm.slug === tempDefaultSpawnLocation) ? 'var(--accent)' : '#38bdf8',
+                          color: (locForm.slug === tempDefaultSpawnLocation) ? '#4ade80' : '#38bdf8',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '4px 10px',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onClick={async () => {
+                          setTempDefaultSpawnLocation(locForm.slug)
+                          try {
+                            await setDoc(doc(db, 'game_config', 'global'), {
+                              defaultSpawnLocation: locForm.slug
+                            }, { merge: true })
+                            alert(`Esta sala (${locForm.name || locForm.slug}) foi definida como o local de nascimento padrão para novos jogadores!`)
+                          } catch (err) {
+                            alert('Erro ao salvar local padrão: ' + err.message)
+                          }
+                        }}
+                      >
+                        {locForm.slug === tempDefaultSpawnLocation ? '✓ Spawn Padrão Ativo' : 'Definir como Spawn Padrão'}
+                      </button>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
@@ -4641,7 +4815,9 @@ export default function Admin() {
                       )}
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.character?.name || 'Incompleto'}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Nível {p.character?.level || 1} · {p.role}</div>
+                        <div style={{ fontSize: 11, color: p.role === 'admin' ? '#38bdf8' : 'var(--text-muted)', fontWeight: p.role === 'admin' ? 700 : 400 }}>
+                          Nível {p.character?.level || 1} · {p.role === 'admin' ? '🛡️ Admin (Sem Vaga)' : '👤 Jogador'}
+                        </div>
                       </div>
                       <button
                         type="button"
@@ -4665,9 +4841,16 @@ export default function Admin() {
               {selectedPlayer ? (
                 <div className="glass-light" style={{ padding: '20px', borderRadius: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-                    <h3 style={{ fontSize: 15, textTransform: 'uppercase', color: 'var(--accent)', margin: 0 }}>
-                      Ficha de: {selectedPlayer.character?.name || 'Sem Nome'}
-                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <h3 style={{ fontSize: 15, textTransform: 'uppercase', color: 'var(--accent)', margin: 0 }}>
+                        Ficha de: {selectedPlayer.character?.name || 'Sem Nome'}
+                      </h3>
+                      {selectedPlayer.role === 'admin' && (
+                        <span style={{ fontSize: 10, background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
+                          🛡️ Administrador (Isento de Vagas)
+                        </span>
+                      )}
+                    </div>
                     <button
                       type="button"
                       className="btn"
@@ -4689,12 +4872,13 @@ export default function Admin() {
                     </button>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16, padding: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid var(--glass-border)' }}>
+                  {/* Informações Básicas + Cargo */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 180px', gap: 12, marginBottom: 16, padding: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid var(--glass-border)' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label>Nome do Sobrevivente</label>
                       <input
                         type="text"
-                        value={selectedPlayer.character.name || ''}
+                        value={selectedPlayer.character?.name || ''}
                         onChange={(e) => updatePlayerStats(selectedPlayer.uid, 'name', e.target.value)}
                         placeholder="Nome do personagem"
                       />
@@ -4702,7 +4886,7 @@ export default function Admin() {
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label>Link da Foto/Avatar (URL)</label>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        {selectedPlayer.character.avatarUrl ? (
+                        {selectedPlayer.character?.avatarUrl ? (
                           <img
                             src={selectedPlayer.character.avatarUrl}
                             alt="Avatar"
@@ -4716,14 +4900,49 @@ export default function Admin() {
                         )}
                         <input
                           type="url"
-                          value={selectedPlayer.character.avatarUrl || ''}
+                          value={selectedPlayer.character?.avatarUrl || ''}
                           onChange={(e) => updatePlayerStats(selectedPlayer.uid, 'avatarUrl', e.target.value)}
                           placeholder="https://... foto do personagem"
                           style={{ flex: 1 }}
                         />
                       </div>
                     </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ color: selectedPlayer.role === 'admin' ? '#38bdf8' : 'var(--text-secondary)' }}>Cargo da Conta</label>
+                      <select
+                        value={selectedPlayer.role || 'player'}
+                        onChange={(e) => updatePlayerRole(selectedPlayer.uid, e.target.value)}
+                        style={{
+                          fontWeight: 'bold',
+                          color: selectedPlayer.role === 'admin' ? '#38bdf8' : '#fff',
+                          borderColor: selectedPlayer.role === 'admin' ? '#38bdf8' : 'var(--glass-border)',
+                          background: selectedPlayer.role === 'admin' ? 'rgba(56, 189, 248, 0.1)' : 'transparent'
+                        }}
+                      >
+                        <option value="player">👤 Jogador</option>
+                        <option value="admin">🛡️ Administrador</option>
+                      </select>
+                    </div>
                   </div>
+
+                  {/* Banner Explicativo de Conta Admin */}
+                  {selectedPlayer.role === 'admin' && (
+                    <div style={{ padding: '10px 14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: 8, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: 11.5, color: '#e0f2fe' }}>
+                        🛡️ <strong>Conta de Administrador:</strong> Esta conta possui acesso irrestrito e <strong>não ocupa nenhuma vaga de profissão</strong> dos jogadores.
+                      </div>
+                      {selectedPlayer.character?.profession && (
+                        <button
+                          type="button"
+                          onClick={() => clearPlayerProfession(selectedPlayer.uid)}
+                          style={{ fontSize: 11, background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap' }}
+                          title="Remove a profissão desta conta admin para não ter nenhum vínculo profissional"
+                        >
+                          ❌ Desvincular Profissão
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {/* História do Sobrevivente */}
                   <div style={{ marginBottom: 16, padding: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid var(--glass-border)' }}>
@@ -4833,12 +5052,16 @@ export default function Admin() {
                   {/* Gerenciamento de Profissão & Especialização */}
                   {(() => {
                     const char = selectedPlayer.character || {}
-                    const currentProfId = char.profession?.id || (typeof char.profession === 'string' ? char.profession : 'militar')
+                    const currentProfId = char.profession?.id || (typeof char.profession === 'string' ? char.profession : null)
                     const currentSpecId = char.specialty?.id || (typeof char.specialty === 'string' ? char.specialty : '')
-                    const profData = getProfessionData(currentProfId) || PROFESSIONS.militar
-                    const specData = getSpecialtyData(currentProfId, currentSpecId)
+                    const profData = currentProfId ? (getProfessionData(currentProfId) || PROFESSIONS.militar) : null
+                    const specData = currentProfId ? getSpecialtyData(currentProfId, currentSpecId) : null
 
                     const handleProfChange = async (newProfId) => {
+                      if (!newProfId) {
+                        await clearPlayerProfession(selectedPlayer.uid)
+                        return
+                      }
                       const newProf = PROFESSIONS[newProfId]
                       if (!newProf) return
                       const firstSpecId = Object.keys(newProf.specialties || {})[0] || ''
@@ -4879,6 +5102,7 @@ export default function Admin() {
                     }
 
                     const handleSpecChange = async (newSpecId) => {
+                      if (!profData) return
                       const spec = profData?.specialties?.[newSpecId]
                       if (!spec) return
 
@@ -4909,6 +5133,7 @@ export default function Admin() {
                     }
 
                     const handleGiveStarterKit = async () => {
+                      if (!currentProfId) return alert('Selecione uma profissão primeiro.')
                       const starters = getStarterItems(currentProfId, currentSpecId)
                       if (starters.length === 0) return alert('Nenhum item inicial encontrado para esta combinação.')
                       if (!confirm(`Deseja entregar os ${starters.length} itens iniciais da especialidade "${specData?.name || currentSpecId}" para o jogador?`)) return
@@ -4939,12 +5164,12 @@ export default function Admin() {
                     }
 
                     const handleRecalcAttrs = async () => {
-                      const base = selectedPlayer.character.baseAttributes || selectedPlayer.character.attributes || {}
+                      const base = selectedPlayer.character?.baseAttributes || selectedPlayer.character?.attributes || {}
                       const bonuses = calculateProfessionBonuses(currentProfId, currentSpecId)
                       const newAttrs = {}
 
                       ATTRIBUTE_LIST.forEach(({ key }) => {
-                        const baseVal = Number(base[key] || 1)
+                        const baseVal = Number(base[key] || 0)
                         const bonusVal = Number(bonuses[key] || 0)
                         newAttrs[key] = baseVal + bonusVal
                       })
@@ -4958,7 +5183,7 @@ export default function Admin() {
                           ...prev,
                           character: { ...prev.character, attributes: newAttrs }
                         }))
-                        alert('Atributos recalculados com os bônus da profissão!')
+                        alert('Atributos recalculados!')
                       } catch (err) {
                         alert('Erro ao recalcular atributos: ' + err.message)
                       }
@@ -4968,17 +5193,19 @@ export default function Admin() {
                       <div style={{ padding: 14, background: 'rgba(38,200,143,0.04)', borderRadius: 8, border: '1px solid rgba(38,200,143,0.2)', marginBottom: 16 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                           <label style={{ fontSize: 11, color: 'var(--accent)', textTransform: 'uppercase', fontWeight: 700, margin: 0 }}>
-                            🪖 Profissão & Especialização
+                            🪖 Profissão & Especialização {selectedPlayer.role === 'admin' && '(Opcional para Admin)'}
                           </label>
                           <div style={{ display: 'flex', gap: 6 }}>
-                            <button
-                              type="button"
-                              onClick={handleGiveStarterKit}
-                              style={{ fontSize: 10.5, background: 'rgba(234,179,8,0.2)', border: '1px solid rgba(234,179,8,0.4)', color: '#facc15', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}
-                              title="Adiciona os itens iniciais desta especialidade no inventário do jogador"
-                            >
-                              🎒 Dar Itens Iniciais
-                            </button>
+                            {currentProfId && (
+                              <button
+                                type="button"
+                                onClick={handleGiveStarterKit}
+                                style={{ fontSize: 10.5, background: 'rgba(234,179,8,0.2)', border: '1px solid rgba(234,179,8,0.4)', color: '#facc15', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}
+                                title="Adiciona os itens iniciais desta especialidade no inventário do jogador"
+                              >
+                                🎒 Dar Itens Iniciais
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={handleRecalcAttrs}
@@ -4994,9 +5221,10 @@ export default function Admin() {
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: 10 }}>Profissão (Bônus Geral)</label>
                             <select
-                              value={currentProfId}
+                              value={currentProfId || ''}
                               onChange={(e) => handleProfChange(e.target.value)}
                             >
+                              <option value="">— Nenhuma (Admin / Staff / Sem Profissão) —</option>
                               {Object.values(PROFESSIONS).map((prof) => (
                                 <option key={prof.id} value={prof.id}>
                                   {prof.icon} {prof.name} ({prof.bonusSummary})
@@ -5008,23 +5236,32 @@ export default function Admin() {
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: 10 }}>Especialização</label>
                             <select
-                              value={currentSpecId}
+                              value={currentSpecId || ''}
                               onChange={(e) => handleSpecChange(e.target.value)}
+                              disabled={!currentProfId}
                             >
-                              {profData?.specialties && Object.values(profData.specialties).map((spec) => (
-                                <option key={spec.id} value={spec.id}>
-                                  {spec.icon} {spec.name} ({spec.bonusSummary})
-                                </option>
-                              ))}
+                              {!currentProfId ? (
+                                <option value="">— Sem especialização —</option>
+                              ) : (
+                                profData?.specialties && Object.values(profData.specialties).map((spec) => (
+                                  <option key={spec.id} value={spec.id}>
+                                    {spec.icon} {spec.name} ({spec.bonusSummary})
+                                  </option>
+                                ))
+                              )}
                             </select>
                           </div>
                         </div>
 
-                        {specData && (
+                        {specData ? (
                           <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-secondary)' }}>
                             <strong style={{ color: 'var(--accent-yellow)' }}>Proficiência:</strong> {specData.proficiency}
                           </div>
-                        )}
+                        ) : !currentProfId ? (
+                          <div style={{ marginTop: 8, fontSize: 11, color: '#38bdf8' }}>
+                            ℹ️ Esta conta está sem profissão vinculada. Se for Administrador, não consumirá vagas de nenhum jogador.
+                          </div>
+                        ) : null}
                       </div>
                     )
                   })()}

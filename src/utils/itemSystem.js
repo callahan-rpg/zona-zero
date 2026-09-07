@@ -59,8 +59,8 @@ export const DEFAULT_PRESET_ITEMS = [
   { itemId: 'roupas_comuns', name: 'Roupas Comuns', icon: '👕', category: 'clothing', rarity: 'common', consumable: false, isQuestItem: false, equipSlot: 'torso_inner', insulation: 6, damageReduction: 0, maxDurability: 100, durability: 100, description: 'Camisa e calça em bom estado.' },
   { itemId: 'meias', name: 'Par de Meias', icon: '🧦', category: 'clothing', rarity: 'common', consumable: false, isQuestItem: false, equipSlot: 'feet', insulation: 2, damageReduction: 0, maxDurability: 80, durability: 80, description: 'Mantém os pés secos e protegidos.' },
   { itemId: 'calcados_tenis', name: 'Tênis Resistente', icon: '👟', category: 'clothing', rarity: 'common', consumable: false, isQuestItem: false, equipSlot: 'feet', insulation: 3, damageReduction: 1, maxDurability: 150, durability: 150, description: 'Calçado confortável para caminhadas longas.' },
-  { itemId: 'bandagem', name: 'Bandagem Estéril', icon: '🩹', category: 'medical', rarity: 'common', consumable: true, consumeEffect: { blood: 25 }, isQuestItem: false, description: 'Estanca sangramentos leves e protege feridas.' },
-  { itemId: 'remedio_basico', name: 'Remédios Básicos', icon: '💊', category: 'medical', rarity: 'common', consumable: true, consumeEffect: { blood: 15, hunger: -5 }, isQuestItem: false, description: 'Analgésicos e anti-inflamatórios.' },
+  { itemId: 'bandagem', name: 'Bandagem Estéril', icon: '🩹', category: 'medical', rarity: 'common', consumable: true, maxUses: 1, canTargetOther: true, consumeEffect: { blood: 25 }, isQuestItem: false, description: 'Estanca sangramentos leves e protege feridas.' },
+  { itemId: 'remedio_basico', name: 'Remédios Básicos', icon: '💊', category: 'medical', rarity: 'common', consumable: true, maxUses: 1, canTargetOther: true, consumeEffect: { blood: 15, hunger: -5 }, isQuestItem: false, description: 'Analgésicos e anti-inflamatórios.' },
   { itemId: 'perfume', name: 'Vidro de Perfume', icon: '✨', category: 'general', rarity: 'common', consumable: false, isQuestItem: false, description: 'Fragrância ainda preservada.' },
   { itemId: 'carregador_cabos', name: 'Carregador e Cabos', icon: '🔌', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Cabos elétricos diversos.' },
   { itemId: 'mochila_pequena', name: 'Mochila Pequena', icon: '🎒', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Espaço extra de transporte.' },
@@ -75,7 +75,7 @@ export const DEFAULT_PRESET_ITEMS = [
   { itemId: 'pasta_escova', name: 'Pasta e Escova de Dentes', icon: '🪥', category: 'general', rarity: 'common', consumable: false, isQuestItem: false, description: 'Higiene bucal.' },
   { itemId: 'desodorante', name: 'Desodorante', icon: '🫧', category: 'general', rarity: 'common', consumable: false, isQuestItem: false, description: 'Aerossol para proteção contra odores.' },
   { itemId: 'lamina_barbear', name: 'Lâminas de Barbear', icon: '🪒', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Lâminas finas e afiadas.' },
-  { itemId: 'alcool_antisseptico', name: 'Álcool 70%', icon: '🧪', category: 'medical', rarity: 'uncommon', consumable: true, consumeEffect: { blood: 10 }, isQuestItem: false, description: 'Desinfeta ferimentos e esteriliza ferramentas.' },
+  { itemId: 'alcool_antisseptico', name: 'Álcool 70%', icon: '🧪', category: 'medical', rarity: 'uncommon', consumable: true, maxUses: 2, canTargetOther: true, consumeEffect: { blood: 10 }, isQuestItem: false, description: 'Desinfeta ferimentos e esteriliza ferramentas (2 usos).' },
 
   // GARAGEM / ÁREA DE SERVIÇO
   { itemId: 'pregos_parafusos', name: 'Caixa de Pregos e Parafusos', icon: '🔩', category: 'general', rarity: 'junk', consumable: false, isQuestItem: false, description: 'Peças metálicas para carpintaria.' },
@@ -97,7 +97,7 @@ export const DEFAULT_PRESET_ITEMS = [
   { itemId: 'celular_funcional', name: 'Smartphone Operacional', icon: '📱', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Aparelho desbloqueado com dados armazenados.' },
   { itemId: 'pistola_glock', name: 'Pistola 9mm', icon: '🔫', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 22, damageMax: 28, maxDurability: 200, durability: 200, description: 'Arma de fogo semi-automática confiável.' },
   { itemId: 'municao_9mm', name: 'Caixa de Munição 9mm', icon: '📦', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Cartuchos para armas curtas.' },
-  { itemId: 'kit_cirurgico', name: 'Kit Médico Avançado', icon: '🩺', category: 'medical', rarity: 'rare', consumable: true, consumeEffect: { blood: 60, thirst: 10 }, isQuestItem: false, description: 'Suturas estéreis, tesouras e analgésicos fortes.' },
+  { itemId: 'kit_cirurgico', name: 'Kit Médico Avançado (Cirurgia)', icon: '🩺', category: 'medical', rarity: 'rare', consumable: true, maxUses: 3, canTargetOther: true, consumeEffect: { blood: 60, thirst: 10 }, isQuestItem: false, description: 'Kit cirúrgico de campo com suturas estéreis, analgésicos fortes e instrumental médico avançado (3 usos).' },
   { itemId: 'ferramentas_pro', name: 'Maleta de Ferramentas Pro', icon: '🧰', category: 'melee', rarity: 'rare', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 10, damageMax: 16, maxDurability: 200, durability: 200, description: 'Conjunto completo de ferramentas pesadas.' },
   { itemId: 'fuzil_militar', name: 'Fuzil Militar Tático', icon: '🎖️', category: 'firearms', rarity: 'very_rare', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 35, damageMax: 45, maxDurability: 250, durability: 250, description: 'Armamento de ponta das forças armadas.' },
   { itemId: 'colete_balistico', name: 'Colete Balístico Kevlar', icon: '🛡️', category: 'clothing', rarity: 'very_rare', consumable: false, isQuestItem: false, equipSlot: 'torso_outer', damageReduction: 8, insulation: 2, maxDurability: 250, durability: 250, description: 'Proteção blindada contra tiros e mordidas (Redução fixa de dano).' },
@@ -111,7 +111,7 @@ export const DEFAULT_PRESET_ITEMS = [
   { itemId: 'municao_militar', name: 'Munição Militar 5.56mm', icon: '📦', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Pente de alta perfuração para fuzis táticos.' },
   { itemId: 'traje_militar', name: 'Traje Militar Camuflado', icon: '🪖', category: 'clothing', rarity: 'rare', consumable: false, isQuestItem: false, equipSlot: 'torso_inner', damageReduction: 3, insulation: 8, maxDurability: 180, durability: 180, description: 'Uniforme de combate reforçado com camuflagem urbana.' },
   { itemId: 'faca_tatica', name: 'Faca de Combate Militar', icon: '🗡️', category: 'melee', rarity: 'uncommon', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 15, damageMax: 22, maxDurability: 140, durability: 140, description: 'Lâmina serrilhada de aço forjado para combate tático.' },
-  { itemId: 'kit_primeiros_socorros', name: 'Kit de Primeiros Socorros', icon: '🚑', category: 'medical', rarity: 'uncommon', consumable: true, consumeEffect: { blood: 40 }, isQuestItem: false, description: 'Kit compacto para estancar sangramentos emergenciais.' },
+  { itemId: 'kit_primeiros_socorros', name: 'Kit de Primeiros Socorros', icon: '🚑', category: 'medical', rarity: 'uncommon', consumable: true, maxUses: 2, canTargetOther: true, consumeEffect: { blood: 40 }, isQuestItem: false, description: 'Kit compacto para estancar sangramentos emergenciais e primeiros socorros (2 usos).' },
   { itemId: 'bolsa_farmaceutica', name: 'Bolsa Farmacêutica', icon: '🧰', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Mala com compartimentos térmicos e frascos de ensaio.' },
   { itemId: 'ferramentas_tecnicas', name: 'Estojo de Ferramentas Técnicas', icon: '🔬', category: 'general', rarity: 'rare', consumable: false, isQuestItem: false, description: 'Multímetro, chave de precisão e solda rápida.' },
   { itemId: 'rifle_caca', name: 'Rifle de Caça com Luneta', icon: '🎯', category: 'firearms', rarity: 'rare', consumable: false, isQuestItem: false, equipSlot: 'hands_weapon', damageMin: 45, damageMax: 60, maxDurability: 200, durability: 200, description: 'Rifle de ferrolho com mira telescópica para disparos precisos.' },
@@ -698,5 +698,34 @@ export function rollWeaponDamage(weaponStats = UNARMED_ATTACK) {
   const rolled = Math.floor(Math.random() * (max - min + 1)) + min
   return rolled
 }
+
+/**
+ * Retorna as informações de usos/cargas e permissão de alvo de um item consumível ou médico
+ */
+export function getItemUses(item, catalogMap = {}) {
+  if (!item) return { maxUses: 1, currentUses: 1, hasMultipleUses: false, canTargetOther: false }
+  const idKey = item.itemId || item.id || ''
+  const catData = (idKey ? catalogMap[idKey] : null) || (item.name ? catalogMap[item.name.toLowerCase().trim()] : null)
+  const presetData = DEFAULT_PRESET_ITEMS.find(p => (idKey && p.itemId === idKey) || (item.name && p.name === item.name))
+
+  const maxUses = Math.max(1, Number(catData?.maxUses ?? item.maxUses ?? presetData?.maxUses ?? 1))
+  const currentUses = item.currentUses !== undefined ? Math.max(0, Math.min(maxUses, Number(item.currentUses))) : maxUses
+  const isMedicalCategory = item.category === 'medical' || catData?.category === 'medical' || presetData?.category === 'medical'
+  const canTargetOther = catData?.canTargetOther !== undefined
+    ? !!catData.canTargetOther
+    : item.canTargetOther !== undefined
+    ? !!item.canTargetOther
+    : presetData?.canTargetOther !== undefined
+    ? !!presetData.canTargetOther
+    : isMedicalCategory
+
+  return {
+    maxUses,
+    currentUses,
+    hasMultipleUses: maxUses > 1,
+    canTargetOther
+  }
+}
+
 
 

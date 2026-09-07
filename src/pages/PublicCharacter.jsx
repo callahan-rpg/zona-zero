@@ -5,11 +5,13 @@ import { db } from '../firebase/config'
 import HUD from '../components/HUD.jsx'
 import GameIcon from '../components/GameIcon.jsx'
 import EquipmentPaperdoll from '../components/EquipmentPaperdoll.jsx'
+import { useAuth } from '../contexts/AuthContext.jsx'
 import {
   RARITY_META,
   DEFAULT_PRESET_ITEMS,
   calculateCharacterEquipmentStats,
-  calculateBodyTemperature
+  calculateBodyTemperature,
+  getItemUses
 } from '../utils/itemSystem'
 import { getItemCategory, INVENTORY_CATEGORIES } from './Character.jsx'
 import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
@@ -32,12 +34,21 @@ function xpForNextLevel(level) {
 export default function PublicCharacter() {
   const { uid } = useParams()
   const navigate = useNavigate()
+  const { user, character: myChar, useItemOnTarget } = useAuth()
 
   const [character, setCharacter] = useState(null)
+  const [targetRole, setTargetRole] = useState('player')
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [activeCategory, setActiveCategory] = useState('all')
   const [catalogMap, setCatalogMap] = useState({})
+
+  // Modal de socorro médico
+  const [showMedicalModal, setShowMedicalModal] = useState(false)
+  const [selectedMedicalItem, setSelectedMedicalItem] = useState(null)
+  const [medicalLoading, setMedicalLoading] = useState(false)
+  const [medicalError, setMedicalError] = useState('')
+  const [medicalSuccess, setMedicalSuccess] = useState('')
 
   // Escuta o catálogo global para manter nomes, imagens e raridades atualizados
   useEffect(() => {
@@ -61,6 +72,7 @@ export default function PublicCharacter() {
         const docSnap = await getDoc(docRef)
         if (docSnap.exists() && docSnap.data().character?.name) {
           setCharacter(docSnap.data().character)
+          setTargetRole(docSnap.data().role || 'player')
         } else {
           setNotFound(true)
         }
@@ -164,18 +176,19 @@ export default function PublicCharacter() {
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       <HUD />
 
-      <div className="character-page">
-        {/* Botão Voltar */}
-        <div style={{ maxWidth: 1200, margin: '0 auto 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className="character-page-container">
+        {/* Topo / Voltar */}
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button
-            className="btn"
-            onClick={() => navigate('/characters')}
-            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+            type="button"
+            className="btn btn-sm"
+            onClick={() => navigate(-1)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            ← Voltar
+            <span>←</span> Voltar
           </button>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)', letterSpacing: 1 }}>
-            Visualizando ficha de sobrevivente
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            Ficha Pública de Sobrevivente
           </span>
         </div>
 
@@ -199,7 +212,7 @@ export default function PublicCharacter() {
               <div className="character-info">
                 <div className="character-name">{character.name}</div>
                 <div className="character-age">
-                  {character.age || '??'} anos · {character.profession?.name || 'Sobrevivente'}
+                  {character.age || '??'} anos · {character.profession?.name || (targetRole === 'admin' ? '🛡️ Administrador' : 'Sobrevivente')}
                 </div>
 
                 <div className="xp-bar-container">
@@ -214,14 +227,61 @@ export default function PublicCharacter() {
               </div>
             </div>
 
+            {/* Ação rápida de Socorro Médico (se o usuário logado estiver vendo outro sobrevivente) */}
+            {user && user.uid !== uid && (
+              <div style={{ marginBottom: 18 }}>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.25) 0%, rgba(20, 83, 45, 0.35) 100%)',
+                    borderColor: '#22c55e',
+                    color: '#86efac',
+                    fontWeight: 700,
+                    padding: '8px 12px',
+                    fontSize: 12,
+                    boxShadow: '0 0 12px rgba(34, 197, 94, 0.25)'
+                  }}
+                  onClick={() => {
+                    setMedicalError('')
+                    setMedicalSuccess('')
+                    if (myMedicalItems.length > 0) {
+                      setSelectedMedicalItem(myMedicalItems[0])
+                    } else {
+                      setSelectedMedicalItem(null)
+                    }
+                    setShowMedicalModal(true)
+                  }}
+                >
+                  <span>🩺</span> Prestar Socorro / Tratar Sobrevivente
+                </button>
+              </div>
+            )}
+
             {/* Banner / Card de Profissão & Especialização */}
             {(() => {
               const profId = character.profession?.id || (typeof character.profession === 'string' ? character.profession : null)
               const specId = character.specialty?.id || (typeof character.specialty === 'string' ? character.specialty : null)
-              const profData = getProfessionData(profId) || character.profession
-              const specData = getSpecialtyData(profId, specId) || character.specialty
+              const profData = profId ? (getProfessionData(profId) || character.profession) : null
+              const specData = profId ? (getSpecialtyData(profId, specId) || character.specialty) : null
 
-              if (!profData && !specData) return null
+              if (!profData && !specData) {
+                if (targetRole === 'admin') {
+                  return (
+                    <div style={{ marginBottom: 18, background: 'rgba(56, 189, 248, 0.08)', padding: 12, borderRadius: 8, border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 18 }}>🛡️</span>
+                        <div>
+                          <strong style={{ fontSize: 13, color: '#38bdf8' }}>Administrador do Sistema</strong>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>· Staff / Isento de Profissão</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+                return null
+              }
 
               return (
                 <div style={{ marginBottom: 18, background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 8, border: '1px solid var(--glass-border)' }}>
@@ -459,8 +519,21 @@ export default function PublicCharacter() {
                         <div className="inventory-item-card-name" title={item.name} style={{ color: rMeta.color || 'inherit' }}>
                           {item.name}
                         </div>
-                        <div className="inventory-item-card-qty">
-                          Quantidade: <span>×{item.quantity}</span>
+                        <div className="inventory-item-card-qty" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>Quantidade: <strong>×{item.quantity}</strong></span>
+                          {Number(item.maxUses) > 1 && (
+                            <span style={{
+                              fontSize: 9,
+                              background: (item.currentUses ?? item.maxUses) <= 1 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(92, 255, 122, 0.15)',
+                              color: (item.currentUses ?? item.maxUses) <= 1 ? '#f87171' : '#5cff7a',
+                              padding: '1px 5px',
+                              borderRadius: 3,
+                              border: `1px solid ${(item.currentUses ?? item.maxUses) <= 1 ? 'rgba(239, 68, 68, 0.35)' : 'rgba(92, 255, 122, 0.3)'}`,
+                              fontWeight: 700
+                            }}>
+                              🩺 {item.currentUses ?? item.maxUses}/{item.maxUses} doses
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -471,6 +544,102 @@ export default function PublicCharacter() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Prestar Socorro Médico */}
+      {showMedicalModal && (
+        <div className="loot-modal-overlay" onClick={() => !medicalLoading && setShowMedicalModal(false)}>
+          <div className="loot-modal" onClick={(e) => e.stopPropagation()} style={{ width: '400px', textAlign: 'left' }}>
+            <h3 style={{ color: '#5cff7a', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>🩺</span> Prestar Atendimento Médico
+            </h3>
+
+            {medicalError && <div className="form-error">{medicalError}</div>}
+            {medicalSuccess && <div className="form-error" style={{ color: '#5cff7a', borderColor: 'rgba(92, 255, 122, 0.3)', background: 'rgba(92, 255, 122, 0.1)' }}>{medicalSuccess}</div>}
+
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
+              Paciente: <strong style={{ color: '#fff' }}>{character?.name}</strong> (Nv {character?.level || 1})
+            </p>
+
+            {myMedicalItems.length === 0 ? (
+              <div style={{ padding: 16, textAlign: 'center', color: 'var(--accent-red)', fontSize: 12, background: 'rgba(239,68,68,0.08)', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)' }}>
+                Você não possui nenhum item médico ou curativo disponível na sua mochila.
+              </div>
+            ) : (
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                if (!selectedMedicalItem) return
+                setMedicalError('')
+                setMedicalSuccess('')
+                setMedicalLoading(true)
+                try {
+                  const res = await useItemOnTarget({
+                    itemInstanceId: selectedMedicalItem.instanceId,
+                    targetUid: uid,
+                    consumeEffect: selectedMedicalItem.consumeEffect
+                  })
+                  const usesText = res?.maxUses > 1 ? ` (Restam ${res.remainingUses}/${res.maxUses} doses)` : ''
+                  setMedicalSuccess(`Tratamento aplicado com sucesso em ${character.name}!${usesText}`)
+                  setTimeout(() => {
+                    setShowMedicalModal(false)
+                  }, 1500)
+                } catch (err) {
+                  setMedicalError(err.message || 'Erro ao aplicar tratamento.')
+                } finally {
+                  setMedicalLoading(false)
+                }
+              }}>
+                <div className="form-group" style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 11 }}>Selecione o Item Médico da Sua Mochila</label>
+                  <select
+                    value={selectedMedicalItem?.instanceId || ''}
+                    onChange={(e) => {
+                      const found = myMedicalItems.find(i => i.instanceId === e.target.value)
+                      setSelectedMedicalItem(found || null)
+                    }}
+                    required
+                    style={{ fontSize: 12 }}
+                  >
+                    {myMedicalItems.map(item => (
+                      <option key={item.instanceId} value={item.instanceId}>
+                        {item.icon} {item.name} (Qtd: {item.quantity}{Number(item.maxUses) > 1 ? ` · Doses: ${item.currentUses ?? item.maxUses}/${item.maxUses}` : ''})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedMedicalItem?.consumeEffect && (
+                  <div style={{ fontSize: 11, background: 'rgba(92, 255, 122, 0.08)', padding: '8px 10px', borderRadius: 6, marginBottom: 14, border: '1px solid rgba(92, 255, 122, 0.2)' }}>
+                    <strong>Efeito que será aplicado:</strong>
+                    {Boolean(selectedMedicalItem.consumeEffect.blood)  && <div style={{ color: '#f87171', fontWeight: 600 }}>🩸 Sangue/HP: +{selectedMedicalItem.consumeEffect.blood}</div>}
+                    {Boolean(selectedMedicalItem.consumeEffect.hunger) && <div>🍗 Fome: +{selectedMedicalItem.consumeEffect.hunger}%</div>}
+                    {Boolean(selectedMedicalItem.consumeEffect.thirst) && <div>💧 Sede: +{selectedMedicalItem.consumeEffect.thirst}%</div>}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ flex: 1 }}
+                    onClick={() => setShowMedicalModal(false)}
+                    disabled={medicalLoading}
+                  >
+                    Fechar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    style={{ flex: 2, background: '#1d4ed8', borderColor: '#3b82f6' }}
+                    disabled={medicalLoading || !selectedMedicalItem}
+                  >
+                    {medicalLoading ? 'Aplicando...' : '💉 Aplicar Socorro'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

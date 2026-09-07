@@ -120,6 +120,7 @@ export default function Character() {
     updateCharacter,
     transferItem,
     consumeItem,
+    useItemOnTarget,
     discardItem,
     equipItem,
     unequipItem
@@ -160,15 +161,18 @@ export default function Character() {
   const [showConsumeModal, setShowConsumeModal] = useState(false)
   const [consumeItemTarget, setConsumeItemTarget] = useState(null)
   const [consumeQty, setConsumeQty] = useState(1)
+  const [consumeTargetType, setConsumeTargetType] = useState('self') // 'self' | 'other'
+  const [consumeTargetUid, setConsumeTargetUid] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
 
   const [showDiscardModal, setShowDiscardModal] = useState(false)
   const [discardItemTarget, setDiscardItemTarget] = useState(null)
   const [discardQty, setDiscardQty] = useState(1)
 
-  // Carrega lista de outros sobreviventes para transferência
+  // Carrega lista de outros sobreviventes para transferência e atendimento médico
   useEffect(() => {
-    if (!showTransfer || !user) return
+    if (!showTransfer && !showConsumeModal) return
+    if (!user) return
 
     async function loadSurvivors() {
       setLoadingSurvivors(true)
@@ -228,6 +232,16 @@ export default function Character() {
       const storageBonusWeight = catData?.storageBonusWeight !== undefined ? Number(catData.storageBonusWeight) : item.storageBonusWeight !== undefined ? Number(item.storageBonusWeight) : (presetData?.storageBonusWeight ?? 0)
       const isBackpack = catData?.isBackpack !== undefined ? catData.isBackpack : item.isBackpack !== undefined ? item.isBackpack : (presetData?.isBackpack ?? false)
 
+      const maxUses = catData?.maxUses !== undefined ? Number(catData.maxUses) : item.maxUses !== undefined ? Number(item.maxUses) : (presetData?.maxUses ?? 1)
+      const currentUses = item.currentUses !== undefined ? Number(item.currentUses) : maxUses
+      const canTargetOther = catData?.canTargetOther !== undefined
+        ? !!catData.canTargetOther
+        : item.canTargetOther !== undefined
+        ? !!item.canTargetOther
+        : presetData?.canTargetOther !== undefined
+        ? !!presetData.canTargetOther
+        : (catData?.category === 'medical' || item.category === 'medical' || presetData?.category === 'medical')
+
       return {
         ...item,
         name: catData?.name || item.name || presetData?.name || 'Item',
@@ -249,6 +263,9 @@ export default function Character() {
         storageBonusSlots,
         storageBonusWeight,
         isBackpack,
+        maxUses,
+        currentUses,
+        canTargetOther,
         equipped: item.equipped === true,
       }
     })
@@ -360,10 +377,14 @@ export default function Character() {
     }
   }
 
-  // Modal Consumo
+  // Modal Consumo / Tratamento
   function openConsume(item) {
     setConsumeItemTarget(item)
     setConsumeQty(1)
+    setConsumeTargetType('self')
+    if (survivors.length > 0 && !consumeTargetUid) {
+      setConsumeTargetUid(survivors[0].uid)
+    }
     setError('')
     setSuccess('')
     setShowConsumeModal(true)
@@ -377,14 +398,24 @@ export default function Character() {
     setActionLoading(true)
 
     try {
-      await consumeItem(consumeItemTarget.instanceId, Number(consumeQty), consumeItemTarget.consumeEffect)
-      setSuccess('Item consumido com sucesso!')
+      if (consumeTargetType === 'other' && consumeTargetUid) {
+        const res = await useItemOnTarget({
+          itemInstanceId: consumeItemTarget.instanceId,
+          targetUid: consumeTargetUid,
+          consumeEffect: consumeItemTarget.consumeEffect
+        })
+        const usesText = res?.maxUses > 1 ? ` (Restam ${res.remainingUses}/${res.maxUses} doses)` : ''
+        setSuccess(`Tratamento aplicado em ${res?.targetName || 'sobrevivente'} com sucesso!${usesText}`)
+      } else {
+        await consumeItem(consumeItemTarget.instanceId, Number(consumeQty), consumeItemTarget.consumeEffect)
+        setSuccess('Item consumido/utilizado com sucesso!')
+      }
       setTimeout(() => {
         setShowConsumeModal(false)
         setConsumeItemTarget(null)
-      }, 1200)
+      }, 1400)
     } catch (err) {
-      setError(err.message || 'Erro ao consumir item.')
+      setError(err.message || 'Erro ao utilizar item.')
     } finally {
       setActionLoading(false)
     }
@@ -502,7 +533,7 @@ export default function Character() {
               <div className="character-info">
                 <div className="character-name">{character.name}</div>
                 <div className="character-age">
-                  {character.age || '??'} anos · {character.profession?.name || 'Sobrevivente'}
+                  {character.age || '??'} anos · {character.profession?.name || (role === 'admin' ? '🛡️ Administrador' : 'Sobrevivente')}
                 </div>
 
                 <div className="xp-bar-container">
@@ -521,10 +552,25 @@ export default function Character() {
             {(() => {
               const profId = character.profession?.id || (typeof character.profession === 'string' ? character.profession : null)
               const specId = character.specialty?.id || (typeof character.specialty === 'string' ? character.specialty : null)
-              const profData = getProfessionData(profId) || character.profession
-              const specData = getSpecialtyData(profId, specId) || character.specialty
+              const profData = profId ? (getProfessionData(profId) || character.profession) : null
+              const specData = profId ? (getSpecialtyData(profId, specId) || character.specialty) : null
 
-              if (!profData && !specData) return null
+              if (!profData && !specData) {
+                if (role === 'admin') {
+                  return (
+                    <div style={{ marginBottom: 18, background: 'rgba(56, 189, 248, 0.08)', padding: 12, borderRadius: 8, border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 18 }}>🛡️</span>
+                        <div>
+                          <strong style={{ fontSize: 13, color: '#38bdf8' }}>Administrador do Sistema</strong>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>· Conta de Staff (Isento de Profissão / Vagas de Jogador)</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+                return null
+              }
 
               return (
                 <div style={{ marginBottom: 18, background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 8, border: '1px solid var(--glass-border)' }}>
@@ -1045,6 +1091,19 @@ export default function Character() {
                               ⚔️ {item.damageMin}–{item.damageMax}
                             </span>
                           ) : null}
+                          {Number(item.maxUses) > 1 && (
+                            <span style={{
+                              fontSize: 9,
+                              background: (item.currentUses ?? item.maxUses) <= 1 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(92, 255, 122, 0.15)',
+                              color: (item.currentUses ?? item.maxUses) <= 1 ? '#f87171' : '#5cff7a',
+                              padding: '1px 5px',
+                              borderRadius: 3,
+                              border: `1px solid ${(item.currentUses ?? item.maxUses) <= 1 ? 'rgba(239, 68, 68, 0.35)' : 'rgba(92, 255, 122, 0.3)'}`,
+                              fontWeight: 700
+                            }}>
+                              🩺 {item.currentUses ?? item.maxUses}/{item.maxUses} doses
+                            </span>
+                          )}
                         </div>
 
                         {/* Barra de Durabilidade */}
@@ -1280,46 +1339,151 @@ export default function Character() {
         </div>
       )}
 
-      {/* Modal de Consumir / Usar Item */}
+      {/* Modal de Consumir / Usar Item / Prestar Socorro */}
       {showConsumeModal && consumeItemTarget && (
         <div className="loot-modal-overlay" onClick={() => !actionLoading && setShowConsumeModal(false)}>
-          <div className="loot-modal" onClick={(e) => e.stopPropagation()} style={{ width: '360px', textAlign: 'left' }}>
-            <h3 style={{ color: '#5cff7a', marginBottom: 14 }}>🍽️ Usar / Consumir Item</h3>
+          <div className="loot-modal" onClick={(e) => e.stopPropagation()} style={{ width: '400px', textAlign: 'left' }}>
+            <h3 style={{ color: '#5cff7a', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>{consumeItemTarget.category === 'medical' ? '🩺' : '🍽️'}</span>
+              {consumeItemTarget.category === 'medical' ? 'Aplicar Tratamento Médico' : 'Usar / Consumir Item'}
+            </h3>
 
             {error && <div className="form-error">{error}</div>}
             {success && <div className="form-error" style={{ color: '#5cff7a', borderColor: 'rgba(92, 255, 122, 0.3)', background: 'rgba(92, 255, 122, 0.1)' }}>{success}</div>}
 
             <form onSubmit={handleConsumeSubmit}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', marginBottom: 14 }}>
-                <span style={{ fontSize: 24 }}>{consumeItemTarget.icon}</span>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 'bold' }}>{consumeItemTarget.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Disponível: {consumeItemTarget.quantity}</div>
+                <div style={{ width: 36, height: 36, borderRadius: 6, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                  <GameIcon src={consumeItemTarget.imageUrl} emoji={consumeItemTarget.icon} size={22} />
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{consumeItemTarget.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 8 }}>
+                    <span>Qtd: <strong>{consumeItemTarget.quantity}</strong></span>
+                    {Number(consumeItemTarget.maxUses) > 1 && (
+                      <span style={{ color: '#5cff7a', fontWeight: 600 }}>
+                        Doses: {consumeItemTarget.currentUses ?? consumeItemTarget.maxUses}/{consumeItemTarget.maxUses}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {consumeItemTarget.consumeEffect && (
-                <div style={{ fontSize: 12, background: 'rgba(92, 255, 122, 0.08)', padding: '8px 10px', borderRadius: 6, marginBottom: 14, border: '1px solid rgba(92, 255, 122, 0.2)' }}>
-                  <strong>Efeito por unidade:</strong>
-                  {Boolean(consumeItemTarget.consumeEffect.hunger) && <div>🍗 Fome: +{consumeItemTarget.consumeEffect.hunger}%</div>}
-                  {Boolean(consumeItemTarget.consumeEffect.thirst) && <div>💧 Sede: +{consumeItemTarget.consumeEffect.thirst}%</div>}
-                  {Boolean(consumeItemTarget.consumeEffect.blood)  && <div>🩸 Sangue/HP: +{consumeItemTarget.consumeEffect.blood}%</div>}
+              {/* SELETOR DE ALVO: EM MIM MESMO OU EM OUTRO SOBREVIVENTE */}
+              {(consumeItemTarget.canTargetOther || consumeItemTarget.category === 'medical') && (
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+                    🎯 Selecione o Alvo do Tratamento:
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => setConsumeTargetType('self')}
+                      style={{
+                        padding: '8px',
+                        borderRadius: '6px',
+                        border: `1px solid ${consumeTargetType === 'self' ? '#22c55e' : 'rgba(255,255,255,0.1)'}`,
+                        background: consumeTargetType === 'self' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255,255,255,0.03)',
+                        color: consumeTargetType === 'self' ? '#86efac' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6
+                      }}
+                    >
+                      <span>👤</span> Em Mim Mesmo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConsumeTargetType('other')
+                        if (survivors.length > 0 && !consumeTargetUid) {
+                          setConsumeTargetUid(survivors[0].uid)
+                        }
+                      }}
+                      style={{
+                        padding: '8px',
+                        borderRadius: '6px',
+                        border: `1px solid ${consumeTargetType === 'other' ? '#3b82f6' : 'rgba(255,255,255,0.1)'}`,
+                        background: consumeTargetType === 'other' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.03)',
+                        color: consumeTargetType === 'other' ? '#93c5fd' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6
+                      }}
+                    >
+                      <span>🤝</span> Outro Sobrevivente
+                    </button>
+                  </div>
                 </div>
               )}
 
-              <div className="form-group">
-                <label>Quantidade a consumir</label>
-                <input
-                  type="number"
-                  min="1"
-                  max={consumeItemTarget.quantity}
-                  value={consumeQty}
-                  onChange={(e) => setConsumeQty(Math.min(consumeItemTarget.quantity, Math.max(1, Number(e.target.value))))}
-                  required
-                />
-              </div>
+              {/* LISTA DE OUTROS SOBREVIVENTES */}
+              {consumeTargetType === 'other' && (
+                <div className="form-group" style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 11 }}>Paciente / Destinatário</label>
+                  {loadingSurvivors ? (
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Buscando sobreviventes...</p>
+                  ) : survivors.length === 0 ? (
+                    <p style={{ fontSize: 11, color: 'var(--accent-red)' }}>Nenhum outro sobrevivente registrado.</p>
+                  ) : (
+                    <select
+                      value={consumeTargetUid}
+                      onChange={(e) => setConsumeTargetUid(e.target.value)}
+                      required
+                      style={{ fontSize: 12 }}
+                    >
+                      {survivors.map((s) => (
+                        <option key={s.uid} value={s.uid}>
+                          {s.name} (Nv {s.level || 1})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <div style={{ fontSize: 10, color: '#93c5fd', marginTop: 4 }}>
+                    ℹ️ O paciente receberá a recuperação de vitais instantaneamente e será notificado.
+                  </div>
+                </div>
+              )}
 
-              <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+              {consumeItemTarget.consumeEffect && (
+                <div style={{ fontSize: 11, background: 'rgba(92, 255, 122, 0.08)', padding: '8px 10px', borderRadius: 6, marginBottom: 14, border: '1px solid rgba(92, 255, 122, 0.2)' }}>
+                  <strong>Efeito aplicado por dose:</strong>
+                  {Boolean(consumeItemTarget.consumeEffect.blood)  && <div style={{ color: '#f87171', fontWeight: 600 }}>🩸 Sangue/HP: +{consumeItemTarget.consumeEffect.blood}</div>}
+                  {Boolean(consumeItemTarget.consumeEffect.hunger) && <div>🍗 Fome: +{consumeItemTarget.consumeEffect.hunger}%</div>}
+                  {Boolean(consumeItemTarget.consumeEffect.thirst) && <div>💧 Sede: +{consumeItemTarget.consumeEffect.thirst}%</div>}
+                </div>
+              )}
+
+              {/* Quantidade a consumir (apenas se for uso em si mesmo E item de uso único) */}
+              {Number(consumeItemTarget.maxUses) <= 1 && consumeTargetType === 'self' && (
+                <div className="form-group" style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 11 }}>Quantidade a consumir</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={consumeItemTarget.quantity}
+                    value={consumeQty}
+                    onChange={(e) => setConsumeQty(Math.min(consumeItemTarget.quantity, Math.max(1, Number(e.target.value))))}
+                    required
+                  />
+                </div>
+              )}
+
+              {Number(consumeItemTarget.maxUses) > 1 && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 4 }}>
+                  ℹ️ Será consumida <strong>1 dose</strong> deste item.
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                 <button
                   type="button"
                   className="btn"
@@ -1332,10 +1496,18 @@ export default function Character() {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  style={{ flex: 2, background: '#2e7d32', borderColor: '#4caf50' }}
-                  disabled={actionLoading}
+                  style={{
+                    flex: 2,
+                    background: consumeTargetType === 'other' ? '#1d4ed8' : '#2e7d32',
+                    borderColor: consumeTargetType === 'other' ? '#3b82f6' : '#4caf50'
+                  }}
+                  disabled={actionLoading || (consumeTargetType === 'other' && (!consumeTargetUid || survivors.length === 0))}
                 >
-                  {actionLoading ? 'Consumindo...' : 'Consumir Agora'}
+                  {actionLoading
+                    ? 'Aplicando...'
+                    : consumeTargetType === 'other'
+                    ? '💉 Aplicar no Paciente'
+                    : 'Consumir / Usar'}
                 </button>
               </div>
             </form>

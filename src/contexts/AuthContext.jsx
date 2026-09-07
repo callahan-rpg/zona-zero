@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
-import { getMaxHp, DEFAULT_PRESET_ITEMS } from '../utils/itemSystem'
+import { getMaxHp, DEFAULT_PRESET_ITEMS, getItemUses } from '../utils/itemSystem'
 import { addItemToInventory } from '../utils/activitySystem'
 import { canUnequipBackpack } from '../utils/weightSystem'
 
@@ -248,7 +248,7 @@ export function AuthProvider({ children }) {
       attributes: characterData.attributes || baseAttrs,
       inventory: Array.isArray(characterData.inventory) ? characterData.inventory : [],
       rublos: Number(characterData.rublos ?? 200), // Novos personagens começam com 200 Rublos
-      currentLocation: characterData.currentLocation || 'sala-hospital',
+      currentLocation: characterData.currentLocation || 'acampamento',
       lastLootByLocation: {},
       uniqueSearchesDone: {},
       vitals: {
@@ -330,45 +330,96 @@ export function AuthProvider({ children }) {
       if (itemIndex === -1) throw new Error('Item não encontrado no inventário.')
 
       const item = inventory[itemIndex]
-      if (item.quantity < quantityToConsume) {
-        throw new Error('Quantidade insuficiente para consumir.')
-      }
+      const usesInfo = getItemUses(item)
+      const maxUses = usesInfo.maxUses
 
-      if (item.quantity === quantityToConsume) {
-        inventory.splice(itemIndex, 1)
+      if (maxUses > 1) {
+        // Item com múltiplas doses/usos (ex: Kit de Cirurgia 3x, Álcool 2x)
+        const currentUses = item.currentUses !== undefined ? Number(item.currentUses) : maxUses
+        const newUses = currentUses - 1
+
+        if (newUses > 0) {
+          inventory[itemIndex] = {
+            ...item,
+            currentUses: newUses,
+            maxUses: maxUses
+          }
+        } else {
+          // Esgotou todos os usos desta unidade
+          if (item.quantity > 1) {
+            inventory[itemIndex] = {
+              ...item,
+              quantity: item.quantity - 1,
+              currentUses: maxUses,
+              maxUses: maxUses
+            }
+          } else {
+            inventory.splice(itemIndex, 1)
+          }
+
+          // Se o item gera subproduto ao ser consumido por completo
+          const returnItemId = item.returnItemOnConsume || (item.itemId === 'garrafa_agua' ? 'garrafa_vazia' : null)
+          if (returnItemId) {
+            const returnPreset = DEFAULT_PRESET_ITEMS.find(p => p.itemId === returnItemId)
+            const returnItemData = {
+              itemId: returnItemId,
+              name: returnPreset?.name || 'Garrafa de Água Vazia',
+              icon: returnPreset?.icon || '🍾',
+              quantity: 1,
+              category: returnPreset?.category || 'supplies',
+              rarity: returnPreset?.rarity || 'common',
+              consumable: false,
+              isQuestItem: false,
+              description: returnPreset?.description || 'Recipiente vazio restante após o consumo.',
+              obtainedFrom: `Consumo de ${item.name || 'Item'}`
+            }
+            inventory = addItemToInventory(inventory, returnItemData)
+          }
+        }
       } else {
-        inventory[itemIndex] = {
-          ...item,
-          quantity: item.quantity - quantityToConsume,
+        // Item de uso único padrão
+        if (item.quantity < quantityToConsume) {
+          throw new Error('Quantidade insuficiente para consumir.')
+        }
+
+        if (item.quantity === quantityToConsume) {
+          inventory.splice(itemIndex, 1)
+        } else {
+          inventory[itemIndex] = {
+            ...item,
+            quantity: item.quantity - quantityToConsume,
+          }
+        }
+
+        // Se o item gera um recipiente/subproduto ao ser consumido (ex: Garrafa de Água -> Garrafa Vazia)
+        const returnItemId = item.returnItemOnConsume || (item.itemId === 'garrafa_agua' ? 'garrafa_vazia' : null)
+        if (returnItemId) {
+          const returnPreset = DEFAULT_PRESET_ITEMS.find(p => p.itemId === returnItemId)
+          const returnItemData = {
+            itemId: returnItemId,
+            name: returnPreset?.name || 'Garrafa de Água Vazia',
+            icon: returnPreset?.icon || '🍾',
+            quantity: quantityToConsume,
+            category: returnPreset?.category || 'supplies',
+            rarity: returnPreset?.rarity || 'common',
+            consumable: false,
+            isQuestItem: false,
+            description: returnPreset?.description || 'Recipiente vazio restante após o consumo.',
+            obtainedFrom: `Consumo de ${item.name || 'Água'}`
+          }
+          inventory = addItemToInventory(inventory, returnItemData)
         }
       }
 
-      // Se o item gera um recipiente/subproduto ao ser consumido (ex: Garrafa de Água -> Garrafa Vazia)
-      const returnItemId = item.returnItemOnConsume || (item.itemId === 'garrafa_agua' ? 'garrafa_vazia' : null)
-      if (returnItemId) {
-        const returnPreset = DEFAULT_PRESET_ITEMS.find(p => p.itemId === returnItemId)
-        const returnItemData = {
-          itemId: returnItemId,
-          name: returnPreset?.name || 'Garrafa de Água Vazia',
-          icon: returnPreset?.icon || '🍾',
-          quantity: quantityToConsume,
-          category: returnPreset?.category || 'supplies',
-          rarity: returnPreset?.rarity || 'common',
-          consumable: false,
-          isQuestItem: false,
-          description: returnPreset?.description || 'Recipiente vazio restante após o consumo.',
-          obtainedFrom: `Consumo de ${item.name || 'Água'}`
-        }
-        inventory = addItemToInventory(inventory, returnItemData)
-      }
-
-      // Aplica efeitos nos vitais
+      // Aplica efeitos nos vitais do próprio usuário
       const currentVitals = charData.vitals || { hunger: 100, thirst: 100, blood: 100 }
       let updatedVitals = { ...currentVitals }
-      if (consumeEffect) {
-        const hAdd = (consumeEffect.hunger || 0) * quantityToConsume
-        const tAdd = (consumeEffect.thirst || 0) * quantityToConsume
-        const bAdd = (consumeEffect.blood  || 0) * quantityToConsume
+      const effect = consumeEffect || item.consumeEffect
+      if (effect) {
+        const multiplier = maxUses > 1 ? 1 : quantityToConsume
+        const hAdd = (effect.hunger || 0) * multiplier
+        const tAdd = (effect.thirst || 0) * multiplier
+        const bAdd = (effect.blood  || 0) * multiplier
 
         const charMaxHp = getMaxHp(charData)
         updatedVitals = {
@@ -385,6 +436,151 @@ export function AuthProvider({ children }) {
     })
 
     await refreshCharacter()
+  }
+
+  // Usar item médico ou consumível em outro sobrevivente
+  async function useItemOnTarget({ itemInstanceId, targetUid, consumeEffect = null }) {
+    if (!user) return
+    if (!targetUid || targetUid === user.uid) {
+      return await consumeItem(itemInstanceId, 1, consumeEffect)
+    }
+
+    const senderRef = doc(db, 'users', user.uid)
+    const targetRef = doc(db, 'users', targetUid)
+
+    let resultSummary = null
+
+    await runTransaction(db, async (transaction) => {
+      const [senderSnap, targetSnap] = await Promise.all([
+        transaction.get(senderRef),
+        transaction.get(targetRef)
+      ])
+
+      if (!senderSnap.exists() || !targetSnap.exists()) {
+        throw new Error('Jogador remetente ou paciente não encontrado.')
+      }
+
+      const senderData = senderSnap.data()
+      const targetData = targetSnap.data()
+
+      const senderChar = senderData.character || {}
+      const targetChar = targetData.character || {}
+
+      let senderInventory = [...(senderChar.inventory || [])]
+      const itemIndex = senderInventory.findIndex((i) => i.instanceId === itemInstanceId)
+
+      if (itemIndex === -1) {
+        throw new Error('Item não encontrado na sua mochila.')
+      }
+
+      const item = senderInventory[itemIndex]
+      const usesInfo = getItemUses(item)
+      const maxUses = usesInfo.maxUses
+
+      let remainingUses = 0
+
+      if (maxUses > 1) {
+        const currentUses = item.currentUses !== undefined ? Number(item.currentUses) : maxUses
+        const newUses = currentUses - 1
+        remainingUses = newUses
+
+        if (newUses > 0) {
+          senderInventory[itemIndex] = {
+            ...item,
+            currentUses: newUses,
+            maxUses: maxUses
+          }
+        } else {
+          if (item.quantity > 1) {
+            senderInventory[itemIndex] = {
+              ...item,
+              quantity: item.quantity - 1,
+              currentUses: maxUses,
+              maxUses: maxUses
+            }
+            remainingUses = maxUses
+          } else {
+            senderInventory.splice(itemIndex, 1)
+            remainingUses = 0
+          }
+        }
+      } else {
+        if (item.quantity > 1) {
+          senderInventory[itemIndex] = {
+            ...item,
+            quantity: item.quantity - 1
+          }
+        } else {
+          senderInventory.splice(itemIndex, 1)
+        }
+      }
+
+      // Aplica efeitos nos vitais do paciente alvo
+      const currentVitals = targetChar.vitals || { hunger: 100, thirst: 100, blood: 100 }
+      let updatedVitals = { ...currentVitals }
+      const effect = consumeEffect || item.consumeEffect || null
+
+      if (effect) {
+        const hAdd = Number(effect.hunger || 0)
+        const tAdd = Number(effect.thirst || 0)
+        const bAdd = Number(effect.blood  || 0)
+
+        const targetMaxHp = getMaxHp(targetChar)
+        updatedVitals = {
+          hunger: Math.max(0, Math.min(100, (updatedVitals.hunger ?? 100) + hAdd)),
+          thirst: Math.max(0, Math.min(100, (updatedVitals.thirst ?? 100) + tAdd)),
+          blood:  Math.max(0, Math.min(targetMaxHp, (updatedVitals.blood  ?? targetMaxHp) + bAdd)),
+        }
+      }
+
+      // Cria a notificação de tratamento para o paciente
+      const effectDesc = []
+      if (effect?.blood) effectDesc.push(`+${effect.blood} HP/Sangue`)
+      if (effect?.hunger) effectDesc.push(`+${effect.hunger} Fome`)
+      if (effect?.thirst) effectDesc.push(`+${effect.thirst} Sede`)
+      const effectText = effectDesc.length > 0 ? ` (${effectDesc.join(', ')})` : ''
+
+      const notification = {
+        id: 'notif_med_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
+        type: 'medical_treatment',
+        senderUid: user.uid,
+        senderName: senderChar.name || 'Médico / Sobrevivente',
+        senderAvatar: senderChar.avatarUrl || null,
+        item: {
+          itemId: item.itemId,
+          name: item.name || 'Item Médico',
+          icon: item.icon || '🩺',
+          rarity: item.rarity || 'common'
+        },
+        message: `${senderChar.name || 'Um sobrevivente'} prestou socorro e aplicou ${item.name || 'um item médico'} em você!${effectText}`,
+        read: false,
+        createdAt: new Date().toISOString()
+      }
+
+      const recipientNotifications = [
+        notification,
+        ...(targetChar.notifications || []).slice(0, 49)
+      ]
+
+      transaction.update(senderRef, {
+        'character.inventory': senderInventory
+      })
+
+      transaction.update(targetRef, {
+        'character.vitals': updatedVitals,
+        'character.notifications': recipientNotifications
+      })
+
+      resultSummary = {
+        itemName: item.name || 'Item Médico',
+        targetName: targetChar.name || 'Sobrevivente',
+        maxUses,
+        remainingUses
+      }
+    })
+
+    await refreshCharacter()
+    return resultSummary
   }
 
   // Descartar item do inventário
@@ -848,6 +1044,7 @@ export function AuthProvider({ children }) {
     transferItem,
     transferMoney,
     consumeItem,
+    useItemOnTarget,
     discardItem,
     equipItem,
     unequipItem,

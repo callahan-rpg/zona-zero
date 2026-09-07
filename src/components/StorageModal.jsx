@@ -8,6 +8,26 @@ import { getItemCategory } from '../pages/Character.jsx'
 import GameIcon from './GameIcon.jsx'
 import BaseDefenseBanner from './BaseDefenseBanner.jsx'
 
+// Mini-componente: thumbnail do item com fallback seguro
+function ItemThumb({ imageUrl, icon, name }) {
+  const [imgError, setImgError] = useState(false)
+  const showImg = imageUrl && !imgError
+  return (
+    <div style={{ width: 40, height: 40, borderRadius: 6, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+      {showImg ? (
+        <img
+          src={imageUrl}
+          alt={name || 'item'}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 5 }}
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <GameIcon src={''} emoji={icon || '📦'} size={22} />
+      )}
+    </div>
+  )
+}
+
 export default function StorageModal({
   isOpen,
   onClose,
@@ -56,7 +76,9 @@ export default function StorageModal({
       const map = {}
       snap.docs.forEach(d => {
         const data = d.data()
-        map[data.itemId || d.id] = data
+        if (d.id) map[d.id] = data
+        if (data.itemId) map[data.itemId] = data
+        if (data.name) map[data.name.toLowerCase().trim()] = data
       })
       setCatalogMap(map)
     })
@@ -100,7 +122,7 @@ export default function StorageModal({
   const playerHasKey = useMemo(() => {
     const keyId = storageData?.access?.keyItemId
     if (!keyId || !character?.inventory) return false
-    return character.inventory.some(i => i.itemId === keyId && (i.quantity || 0) > 0)
+    return character.inventory.some(i => (i.itemId === keyId || i.id === keyId) && (i.quantity || 0) > 0)
   }, [storageData, character?.inventory])
 
   // Capacidade e slots
@@ -113,11 +135,13 @@ export default function StorageModal({
   // Hidrata um item com nome, ícone e imagem vindos do catálogo (items_db > presets > dados originais)
   function hydrateItem(item) {
     if (!item) return item
-    const catData = catalogMap[item.itemId]
-    const presetData = DEFAULT_PRESET_ITEMS.find(p => p.itemId === item.itemId)
+    const idKey = item.itemId || item.id || ''
+    const nameKey = (item.name || '').toLowerCase().trim()
+    const catData = (idKey ? catalogMap[idKey] : null) || (nameKey ? catalogMap[nameKey] : null)
+    const presetData = DEFAULT_PRESET_ITEMS.find(p => (idKey && p.itemId === idKey) || (item.name && p.name === item.name))
     return {
       ...item,
-      name:     catData?.name     || item.name     || presetData?.name     || item.itemId || 'Item',
+      name:     catData?.name     || item.name     || presetData?.name     || item.itemId || item.id || 'Item',
       icon:     catData?.icon     || item.icon     || presetData?.icon     || '📦',
       imageUrl: catData?.imageUrl || item.imageUrl || presetData?.imageUrl || '',
       rarity:   catData?.rarity   || item.rarity   || presetData?.rarity   || 'common',
@@ -538,19 +562,7 @@ export default function StorageModal({
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                              <div style={{ width: 40, height: 40, borderRadius: 6, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                                {item.imageUrl ? (
-                                  <img
-                                    src={item.imageUrl}
-                                    alt={item.name}
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 5 }}
-                                    onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex' }}
-                                  />
-                                ) : null}
-                                <div style={{ display: item.imageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-                                  <GameIcon src={''} emoji={item.icon} size={22} />
-                                </div>
-                              </div>
+                              <ItemThumb imageUrl={item.imageUrl} icon={item.icon} name={item.name} />
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {item.name || item.itemId}
@@ -624,19 +636,7 @@ export default function StorageModal({
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                              <div style={{ width: 40, height: 40, borderRadius: 6, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                                {item.imageUrl ? (
-                                  <img
-                                    src={item.imageUrl}
-                                    alt={item.name}
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 5 }}
-                                    onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex' }}
-                                  />
-                                ) : null}
-                                <div style={{ display: item.imageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-                                  <GameIcon src={''} emoji={item.icon} size={22} />
-                                </div>
-                              </div>
+                              <ItemThumb imageUrl={item.imageUrl} icon={item.icon} name={item.name} />
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {item.name || item.itemId}

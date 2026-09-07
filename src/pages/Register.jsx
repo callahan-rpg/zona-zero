@@ -467,6 +467,7 @@ export default function Register() {
   const [registeredUsers, setRegisteredUsers] = useState([])
   const [preMadeSheets, setPreMadeSheets] = useState([])
   const [locations, setLocations] = useState([])
+  const [globalConfig, setGlobalConfig] = useState(null)
   const [customStarterConfig, setCustomStarterConfig] = useState({})
 
   useEffect(() => {
@@ -482,19 +483,27 @@ export default function Register() {
       setLocations(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     }, (err) => console.warn('Aviso ao consultar locações:', err))
 
+    const unsubConfig = onSnapshot(doc(db, 'game_config', 'global'), (snap) => {
+      if (snap.exists()) setGlobalConfig(snap.data())
+    }, (err) => console.warn('Aviso ao consultar game_config global:', err))
+
     const unsubStarters = onSnapshot(doc(db, 'game_config', 'starter_items'), (snap) => {
       if (snap.exists()) setCustomStarterConfig(snap.data().config || {})
     }, (err) => console.warn('Aviso ao consultar itens iniciais:', err))
 
-    return () => { unsubUsers(); unsubSheets(); unsubLocs(); unsubStarters() }
+    return () => { unsubUsers(); unsubSheets(); unsubLocs(); unsubConfig(); unsubStarters() }
   }, [])
 
-  const spawnPoints = locations.filter(l => l.isSpawnPoint)
-  const availableSpawnLocations = spawnPoints.length > 0 ? spawnPoints : locations
+  // Local padrão de nascimento configurado pelo Admin (padrão: acampamento)
+  const defaultSpawnSlug = globalConfig?.defaultSpawnLocation || 'acampamento'
+  const defaultSpawnLocObj = locations.find(l => (l.slug || l.id) === defaultSpawnSlug)
+  const defaultSpawnName = defaultSpawnLocObj ? defaultSpawnLocObj.name : 'Acampamento'
 
+  // Contagem de vagas ocupadas: contas ADMIN NÃO ocupam vagas de jogadores
   const professionCounts = {}
   Object.keys(PROFESSIONS).forEach(pId => { professionCounts[pId] = 0 })
   registeredUsers.forEach(u => {
+    if (u.role === 'admin' || u.isAdmin) return // Ignora staff/admins
     const pId = u.character?.profession?.id || (typeof u.character?.profession === 'string' ? u.character.profession : null)
     if (pId && professionCounts[pId] !== undefined) professionCounts[pId] += 1
   })
@@ -524,13 +533,6 @@ export default function Register() {
   const [backstory, setBackstory] = useState('')
   const [selectedProfId, setSelectedProfId] = useState(() => Object.keys(PROFESSIONS)[0] || 'militar')
   const [selectedSpecId, setSelectedSpecId] = useState('policial')
-  const [selectedSpawnLocation, setSelectedSpawnLocation] = useState('')
-
-  useEffect(() => {
-    if (!selectedSpawnLocation && availableSpawnLocations.length > 0) {
-      setSelectedSpawnLocation(availableSpawnLocations[0].slug || availableSpawnLocations[0].id)
-    }
-  }, [availableSpawnLocations, selectedSpawnLocation])
 
   // ─── Derivados: Modo Custom ────────────────────────────────────────────────
   const usedPoints = Object.values(attrs).reduce((a, b) => a + Number(b), 0)
@@ -561,12 +563,6 @@ export default function Register() {
   const preMadeBaseConFromSheet = Number(selectedSheet?.baseAttributes?.constituicao ?? selectedSheet?.attributes?.constituicao ?? 1)
   const totalConstitutionPreMade = Number(attrs.constituicao || 0) + Number(preMadeProfBonuses?.constituicao || 0) + Number(traitModifiers.constituicao || 0)
   const calculatedMaxHpPreMade = 100 + (totalConstitutionPreMade * 5)
-
-  // Nome legível dos locais
-  const preMadeSpawnLocObj = locations.find(l => (l.slug || l.id) === (selectedSheet?.startingLocation || 'sala-hospital'))
-  const preMadeSpawnName = preMadeSpawnLocObj ? preMadeSpawnLocObj.name : 'Hospital Central de Varezhia'
-  const customSpawnLocObj = locations.find(l => (l.slug || l.id) === selectedSpawnLocation)
-  const customSpawnName = customSpawnLocObj ? customSpawnLocObj.name : (selectedSpawnLocation || 'Hospital Central de Varezhia')
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   function changeAttr(key, delta) {
@@ -701,7 +697,7 @@ export default function Register() {
   async function handleRegisterPreMadeFinal() {
     setError('')
     setLoading(true)
-    const spawnLoc = selectedSheet.startingLocation || 'sala-hospital'
+    const spawnLoc = defaultSpawnSlug
 
     // Calcula atributos finais = pontos distribuídos pelo jogador + bônus da profissão da ficha + traços
     const finalAttributes = {}
@@ -757,7 +753,7 @@ export default function Register() {
       finalAttributes[key] = baseVal + profBonusVal + traitBonusVal
     })
 
-    const spawnLoc = selectedSpawnLocation || (availableSpawnLocations[0]?.slug || 'sala-hospital')
+    const spawnLoc = defaultSpawnSlug
 
     try {
       await register(email, password, {
@@ -796,7 +792,7 @@ export default function Register() {
   const previewSpecData = isPreMade ? preMadeSpecData : selectedSpecData
   const previewProfBonuses = isPreMade ? preMadeProfBonuses : profBonuses
   const previewSpecBonuses = {}
-  const previewSpawnName = isPreMade ? preMadeSpawnName : customSpawnName
+  const previewSpawnName = defaultSpawnName
   const previewBackstory = isPreMade ? (selectedSheet?.backstory || '') : backstory
   const previewItems = isPreMade ? preMadeStarterItems : starterEquipment
   const previewMaxHp = isPreMade ? calculatedMaxHpPreMade : calculatedMaxHpCustom
@@ -1188,36 +1184,7 @@ export default function Register() {
                   style={{ width: '100%', minHeight: '130px', padding: '12px 14px', fontSize: 12.5, lineHeight: 1.5, background: 'rgba(0,0,0,0.4)', border: '1px solid var(--glass-border)', borderRadius: 8, color: '#fff', resize: 'vertical', fontFamily: 'inherit' }} />
               </div>
 
-              {/* Ponto de Spawn */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <label style={{ fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: '#38bdf8', margin: 0, fontWeight: 700 }}>4. Local de Nascimento / Ponto de Partida</label>
-                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Onde sua jornada se inicia</span>
-                </div>
-                {availableSpawnLocations.length === 0 ? (
-                  <div style={{ background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 8, border: '1px solid var(--glass-border)', fontSize: 12, color: 'var(--text-secondary)' }}>
-                    📍 <strong>Hospital Central de Varezhia</strong> — Ponto de partida padrão.
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
-                    {availableSpawnLocations.map(loc => {
-                      const locKey = loc.slug || loc.id
-                      const isSelected = selectedSpawnLocation === locKey
-                      return (
-                        <div key={locKey} onClick={() => setSelectedSpawnLocation(locKey)}
-                          style={{ background: isSelected ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255,255,255,0.02)', border: isSelected ? '2px solid #38bdf8' : '1px solid var(--glass-border)', borderRadius: 8, padding: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4, transition: 'all 0.15s ease' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 18 }}>📍</span>
-                            <strong style={{ fontSize: 13, color: isSelected ? '#38bdf8' : '#fff' }}>{loc.name}</strong>
-                          </div>
-                          {loc.description && <p style={{ fontSize: 10.5, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{loc.description}</p>}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-
+              {/* Botões de Ação */}
               <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
                 <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setStep(2)}>← Voltar</button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 2, padding: '12px' }}>Avançar para Traços & Atributos →</button>
