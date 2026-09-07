@@ -18,6 +18,8 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
 import { getMaxHp, DEFAULT_PRESET_ITEMS } from '../utils/itemSystem'
+import { addItemToInventory } from '../utils/activitySystem'
+import { canUnequipBackpack } from '../utils/weightSystem'
 
 const AuthContext = createContext(null)
 
@@ -322,7 +324,7 @@ export function AuthProvider({ children }) {
       if (!snap.exists()) throw new Error('Personagem não encontrado.')
 
       const charData = snap.data().character || {}
-      const inventory = [...(charData.inventory || [])]
+      let inventory = [...(charData.inventory || [])]
       const itemIndex = inventory.findIndex((i) => i.instanceId === instanceId)
 
       if (itemIndex === -1) throw new Error('Item não encontrado no inventário.')
@@ -339,6 +341,25 @@ export function AuthProvider({ children }) {
           ...item,
           quantity: item.quantity - quantityToConsume,
         }
+      }
+
+      // Se o item gera um recipiente/subproduto ao ser consumido (ex: Garrafa de Água -> Garrafa Vazia)
+      const returnItemId = item.returnItemOnConsume || (item.itemId === 'garrafa_agua' ? 'garrafa_vazia' : null)
+      if (returnItemId) {
+        const returnPreset = DEFAULT_PRESET_ITEMS.find(p => p.itemId === returnItemId)
+        const returnItemData = {
+          itemId: returnItemId,
+          name: returnPreset?.name || 'Garrafa de Água Vazia',
+          icon: returnPreset?.icon || '🍾',
+          quantity: quantityToConsume,
+          category: returnPreset?.category || 'supplies',
+          rarity: returnPreset?.rarity || 'common',
+          consumable: false,
+          isQuestItem: false,
+          description: returnPreset?.description || 'Recipiente vazio restante após o consumo.',
+          obtainedFrom: `Consumo de ${item.name || 'Água'}`
+        }
+        inventory = addItemToInventory(inventory, returnItemData)
       }
 
       // Aplica efeitos nos vitais
@@ -497,6 +518,13 @@ export function AuthProvider({ children }) {
       const targetItem = inventory.find((i) => i.instanceId === instanceId)
 
       if (!targetItem) throw new Error('Item não encontrado.')
+
+      // Validação estrutural de slots para mochilas / expansores de inventário
+      const unequipCheck = canUnequipBackpack(inventory, targetItem, charData)
+      if (!unequipCheck.ok) {
+        throw new Error(unequipCheck.error)
+      }
+
       targetItem.equipped = false
       // Limpa slot forçado (ex: acessório usado como arma)
       if (targetItem.equippedAsSlot) delete targetItem.equippedAsSlot

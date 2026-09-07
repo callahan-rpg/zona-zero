@@ -12,6 +12,7 @@ import ActivityButton from '../components/ActivityButton.jsx'
 import RadioHistoryModal from '../components/RadioHistoryModal.jsx'
 import BaseDefenseBanner from '../components/BaseDefenseBanner.jsx'
 import CookingModal from '../components/CookingModal.jsx'
+import WaterSourceModal from '../components/WaterSourceModal.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
 
@@ -115,6 +116,10 @@ export default function Location() {
   // Estados de Cozinha / Culinária
   const [showCookingModal, setShowCookingModal] = useState(false)
 
+  // Estados de Coleta de Água
+  const [activeWaterSource, setActiveWaterSource] = useState(null)
+  const [showWaterModal, setShowWaterModal] = useState(false)
+
   const showToast = (msg) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
@@ -166,6 +171,17 @@ export default function Location() {
       } else {
         setShopInfo(null)
       }
+    })
+    return unsub
+  }, [slug])
+
+  // Escuta Fontes de Água vinculadas a esta locação
+  useEffect(() => {
+    if (!slug) return
+    const unsub = onSnapshot(collection(db, 'water_sources'), (snap) => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      const matched = docs.find(s => s.enabled !== false && s.locationSlug === slug)
+      setActiveWaterSource(matched || null)
     })
     return unsub
   }, [slug])
@@ -613,6 +629,25 @@ export default function Location() {
                 </button>
               )}
 
+              {/* Botão de Coleta de Água Natural / Poço / Rio */}
+              {activeWaterSource && (
+                <button
+                  className="loot-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.25) 0%, rgba(14, 116, 144, 0.35) 100%)',
+                    borderColor: '#06b6d4',
+                    color: '#67e8f9',
+                    fontWeight: 700,
+                    boxShadow: '0 0 12px rgba(6, 182, 212, 0.25)'
+                  }}
+                  onClick={() => setShowWaterModal(true)}
+                  title={`Coletar água em ${activeWaterSource.name || 'Fonte de Água'}`}
+                >
+                  <span>{activeWaterSource.icon || '💧'}</span>
+                  {activeWaterSource.name ? `Coletar Água (${activeWaterSource.name})` : 'Coletar Água'}
+                </button>
+              )}
+
               {/* Atividades de Produção Locais (Pesca, Plantação, Galinheiro, etc.) */}
               {locationActivities.map(act => (
                 <ActivityButton
@@ -813,6 +848,15 @@ export default function Location() {
         <CookingModal
           locationSlug={slug}
           onClose={() => setShowCookingModal(false)}
+        />
+      )}
+
+      {/* Modal de Coleta de Água */}
+      {showWaterModal && activeWaterSource && (
+        <WaterSourceModal
+          waterSource={activeWaterSource}
+          locationSlug={slug}
+          onClose={() => setShowWaterModal(false)}
         />
       )}
     </div>

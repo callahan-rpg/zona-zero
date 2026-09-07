@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { collection, onSnapshot } from 'firebase/firestore'
+import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { getVitalsDebuffs, getMaxHp } from '../utils/itemSystem'
+import { calculateCharacterCarryStats } from '../utils/weightSystem'
 import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
 import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
 
@@ -10,6 +13,20 @@ function xpForNextLevel(level) {
 
 export default function CharacterPopup({ onClose }) {
   const { character } = useAuth()
+  const [catalogMap, setCatalogMap] = useState({})
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'items_db'), (snap) => {
+      const map = {}
+      snap.docs.forEach(d => {
+        const data = d.data()
+        const key = data.itemId || d.id
+        map[key] = data
+      })
+      setCatalogMap(map)
+    })
+    return unsub
+  }, [])
 
   // Inicia posicionado no canto superior direito abaixo da HUD (ao lado de onde o dados abre ou centralizado à direita)
   const [pos, setPos] = useState({ x: Math.max(20, window.innerWidth - 380), y: 80 })
@@ -47,12 +64,25 @@ export default function CharacterPopup({ onClose }) {
     }
   }, [])
 
-  if (!character) return null
+  const carryStats = useMemo(() => {
+    if (!character) return null
+    return calculateCharacterCarryStats(character, null, catalogMap)
+  }, [character, catalogMap])
+
+  if (!character || !carryStats) return null
 
   const xpMax = xpForNextLevel(character.level)
   const xpCurrent = character.xp || 0
   const xpProgress = Math.min((xpCurrent / xpMax) * 100, 100)
   const debuffInfo = getVitalsDebuffs(character.vitals || {})
+
+  // Combina penalidades de vitais com penalidades de sobrecarga
+  const combinedPenalties = { ...debuffInfo.penalties }
+  if (carryStats.isOverweight) {
+    if (carryStats.penalties.destreza) combinedPenalties.destreza = (combinedPenalties.destreza || 0) + carryStats.penalties.destreza
+    if (carryStats.penalties.agilidade) combinedPenalties.agilidade = (combinedPenalties.agilidade || 0) + carryStats.penalties.agilidade
+  }
+  const hasCombinedDebuff = debuffInfo.hasDebuff || carryStats.isOverweight
 
   const handleOpenFullInventory = () => {
     onClose?.()
@@ -229,7 +259,7 @@ export default function CharacterPopup({ onClose }) {
         <div className="character-float-attr-section">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <div className="character-float-section-title" style={{ margin: 0 }}>Atributos Principais (8)</div>
-            {debuffInfo.hasDebuff && (
+            {hasCombinedDebuff && (
               <span style={{ fontSize: 9, color: '#f87171', fontWeight: 'bold', background: 'rgba(239, 68, 68, 0.15)', padding: '1px 5px', borderRadius: 4 }}>
                 ⚠️ Debuff
               </span>
@@ -240,7 +270,7 @@ export default function CharacterPopup({ onClose }) {
             const specId = character.specialty?.id || (typeof character.specialty === 'string' ? character.specialty : null)
             const baseAttrs = character.baseAttributes || character.attributes || {}
             const traitModifiers = calculateTraitModifiers(character.traits || [])
-            const detailedAttrs = getDetailedAttributes(baseAttrs, profId, specId, debuffInfo.penalties, traitModifiers)
+            const detailedAttrs = getDetailedAttributes(baseAttrs, profId, specId, combinedPenalties, traitModifiers)
 
             return (
               <div className="character-float-attributes-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>

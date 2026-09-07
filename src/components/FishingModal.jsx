@@ -29,6 +29,7 @@ export default function FishingModal({ activity, character, locationSlug, onClos
   const [phase, setPhase] = useState('idle') // idle | fishing | result | error
   const [errors, setErrors] = useState([])
   const [timeLeft, setTimeLeft] = useState(0)
+  const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const [result, setResult] = useState(null)
   const [toolResult, setToolResult] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -43,6 +44,38 @@ export default function FishingModal({ activity, character, locationSlug, onClos
   const toolCheck = validateToolForActivity(activity, inventory)
   const reqErrors = validateActivityRequirements(activity, inventory)
   const { found: minhocas } = checkInventoryItem(inventory, 'minhoca', 1)
+
+  // Cooldown calculado em tempo real
+  const cooldownMs = activity.cooldownMs !== undefined
+    ? Number(activity.cooldownMs)
+    : (activity.cooldownMinutes !== undefined ? Number(activity.cooldownMinutes) * 60000 : 30 * 60 * 1000)
+
+  useEffect(() => {
+    const checkCooldown = () => {
+      if (cooldownMs <= 0) {
+        setCooldownRemaining(0)
+        return
+      }
+
+      const lastAttempt = character?.lastFishingAttempt?.[locationSlug] ||
+                          character?.lastActivityReward?.[`fishing_${locationSlug}`] ||
+                          character?.lastActivityAttempt?.[`fishing_${locationSlug}`]
+
+      if (!lastAttempt) {
+        setCooldownRemaining(0)
+        return
+      }
+
+      const lastDate = lastAttempt.toDate ? lastAttempt.toDate() : new Date(lastAttempt)
+      const elapsed = Date.now() - lastDate.getTime()
+      const remaining = Math.max(0, cooldownMs - elapsed)
+      setCooldownRemaining(remaining)
+    }
+
+    checkCooldown()
+    const cdInterval = setInterval(checkCooldown, 1000)
+    return () => clearInterval(cdInterval)
+  }, [character, cooldownMs, locationSlug])
 
   // Verifica se já tem pesca ativa ao abrir o modal
   useEffect(() => {
@@ -90,6 +123,10 @@ export default function FishingModal({ activity, character, locationSlug, onClos
 
   async function handleStartFishing() {
     if (loading || phase !== 'idle') return
+    if (cooldownRemaining > 0) {
+      setErrorMsg(`Aguarde ${formatDuration(cooldownRemaining)} de cooldown antes de pescar novamente neste local.`)
+      return
+    }
     if (reqErrors.length > 0) {
       setErrors(reqErrors)
       return
@@ -97,6 +134,7 @@ export default function FishingModal({ activity, character, locationSlug, onClos
 
     setLoading(true)
     setErrors([])
+    setErrorMsg('')
 
     const durationMs = Number(activity.durationMs) || 10 * 60 * 1000 // 10 min padrão
     const startedAt = new Date().toISOString()
@@ -126,23 +164,31 @@ export default function FishingModal({ activity, character, locationSlug, onClos
         const minhocaItem = inv.find(i => i && isItemMatching(i, 'minhoca') && (i.quantity || 1) >= 1)
         if (!minhocaItem) throw new Error('Você não possui minhocas para usar como isca.')
 
-        // Cooldown de recompensa
-        const lastReward = charData.lastActivityReward?.[`fishing_${locationSlug}`]
-        if (lastReward) {
-          const cooldownMs = Number(activity.cooldownMs) || 30 * 60 * 1000
-          const timeSince = Date.now() - new Date(lastReward).getTime()
+        // Validação estrita de Cooldown na tentativa
+        const lastAttempt = charData.lastFishingAttempt?.[locationSlug] ||
+                            charData.lastActivityReward?.[`fishing_${locationSlug}`] ||
+                            charData.lastActivityAttempt?.[`fishing_${locationSlug}`]
+        if (lastAttempt && cooldownMs > 0) {
+          const lastDate = lastAttempt.toDate ? lastAttempt.toDate() : new Date(lastAttempt)
+          const timeSince = Date.now() - lastDate.getTime()
           if (timeSince < cooldownMs) {
-            const waitMin = Math.ceil((cooldownMs - timeSince) / 60000)
-            throw new Error(`Aguarde ${waitMin} minuto(s) antes de pescar novamente aqui.`)
+            const waitFormatted = formatDuration(cooldownMs - timeSince)
+            throw new Error(`Cooldown ativo. Aguarde ${waitFormatted} antes de pescar novamente aqui.`)
           }
         }
 
         // Consome 1 minhoca ATOMICAMENTE no início da pescaria
         inv = consumeItemFromInventory(inv, 'minhoca', 1, 'Minhoca')
 
+        const nowIso = new Date().toISOString()
+
+        // Ativa o cooldown IMEDIATAMENTE a cada tentativa de pesca (pegando peixe ou não)
         tx.update(userRef, {
           'character.inventory': inv,
-          'character.activeActivities.fishing': fishingInfo
+          'character.activeActivities.fishing': fishingInfo,
+          [`character.lastActivityReward.fishing_${locationSlug}`]: nowIso,
+          [`character.lastFishingAttempt.${locationSlug}`]: nowIso,
+          [`character.lastActivityAttempt.fishing_${locationSlug}`]: nowIso,
         })
       })
 
@@ -209,46 +255,6 @@ export default function FishingModal({ activity, character, locationSlug, onClos
           })
         }
 
-        // 3. Notificações do resultado e durabilidade
-        const newNotifs = []
-        if (rewardItem) {
-          const fishIcon = rewardItem.icon || FISH_META[rewardItem.itemId]?.icon || '🐟'
-          const fishName = rewardItem.name || FISH_META[rewardItem.itemId]?.name || 'Peixe'
-          newNotifs.push({
-            id: Math.random().toString(36).substring(2),
-            type: 'activity_reward',
-            title: '🎣 Você pescou um peixe!',
-            message: `Você capturou 1x ${fishIcon} ${fishName}!`,
-            timestamp: new Date().toISOString(),
-            read: false,
-          })
-        } else {
-          newNotifs.push({
-            id: Math.random().toString(36).substring(2),
-            type: 'activity_reward',
-            title: '🎣 Pescaria Concluída',
-            message: 'Os peixes não morderam a isca desta vez...',
-            timestamp: new Date().toISOString(),
-            read: false,
-          })
-        }
-
-        if (toolLossInfo?.isBroken) {
-          newNotifs.push({
-            id: Math.random().toString(36).substring(2),
-            type: 'tool_break',
-            title: '⚠️ Ferramenta Quebrada',
-            message: `Sua ${toolLossInfo.tool.name || 'Vara de Pesca'} perdeu toda a durabilidade e está muito danificada para ser usada (0/${toolLossInfo.tool.maxDurability || 100}).`,
-            timestamp: new Date().toISOString(),
-            read: false,
-          })
-        }
-
-        const notifications = [
-          ...newNotifs,
-          ...(charData.notifications || []).slice(0, 28),
-        ]
-
         tx.update(userRef, {
           'character.inventory': inv,
           'character.activeActivities.fishing': {
@@ -256,7 +262,6 @@ export default function FishingModal({ activity, character, locationSlug, onClos
             completedAt: new Date().toISOString(),
           },
           [`character.lastActivityReward.fishing_${locationSlug}`]: new Date().toISOString(),
-          'character.notifications': notifications,
         })
       })
 
@@ -351,6 +356,31 @@ export default function FishingModal({ activity, character, locationSlug, onClos
               ⏱️ Duração: <strong style={{ color: '#fff' }}>{formatDuration(activity.durationMs || 600000)}</strong>
             </div>
 
+            {/* Aviso de Cooldown Ativo */}
+            {cooldownRemaining > 0 && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15) 0%, rgba(202, 138, 4, 0.2) 100%)',
+                border: '1px solid rgba(234, 179, 8, 0.4)',
+                borderRadius: 8,
+                padding: '12px 14px',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                boxShadow: '0 0 15px rgba(234, 179, 8, 0.15)'
+              }}>
+                <span style={{ fontSize: 24, animation: 'pulse 1.8s infinite' }}>⏳</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#facc15' }}>
+                    Margem em Cooldown ({formatDuration(cooldownRemaining)})
+                  </div>
+                  <div style={{ fontSize: 11, color: '#fef08a', marginTop: 2, lineHeight: 1.3 }}>
+                    Os peixes estão agitados e espantados nesta área. Aguarde o tempo terminar antes de tentar pescar novamente aqui.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Erros */}
             {errors.length > 0 && (
               <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: 10, marginBottom: 14 }}>
@@ -372,10 +402,16 @@ export default function FishingModal({ activity, character, locationSlug, onClos
               <button
                 className="btn btn-primary"
                 onClick={handleStartFishing}
-                disabled={loading || !toolCheck.ok || reqErrors.length > 0 || minhocas < 1}
-                style={{ flex: 1 }}
+                disabled={loading || !toolCheck.ok || reqErrors.length > 0 || minhocas < 1 || cooldownRemaining > 0}
+                style={{
+                  flex: 1,
+                  background: cooldownRemaining > 0 ? 'rgba(255,255,255,0.06)' : undefined,
+                  borderColor: cooldownRemaining > 0 ? 'rgba(255,255,255,0.15)' : undefined,
+                  color: cooldownRemaining > 0 ? 'var(--text-muted)' : undefined,
+                  cursor: cooldownRemaining > 0 ? 'not-allowed' : 'pointer'
+                }}
               >
-                {loading ? 'Iniciando...' : '🎣 Iniciar Pescaria'}
+                {loading ? 'Iniciando...' : cooldownRemaining > 0 ? `⏳ Cooldown (${formatDuration(cooldownRemaining)})` : '🎣 Iniciar Pescaria'}
               </button>
               <button className="btn btn-sm" onClick={onClose} style={{ padding: '8px 16px' }}>Fechar</button>
             </div>

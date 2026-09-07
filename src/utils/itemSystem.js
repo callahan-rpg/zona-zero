@@ -42,9 +42,9 @@ export const DEFAULT_PRESET_ITEMS = [
   { itemId: 'talheres_pratos', name: 'Pratos e Talheres', icon: '🍽️', category: 'general', rarity: 'junk', consumable: false, isQuestItem: false, description: 'Utensílios de cozinha comuns.' },
   { itemId: 'alimento_perecivel', name: 'Restos de Alimentos', icon: '🍞', category: 'general', rarity: 'junk', consumable: true, consumeEffect: { hunger: 5, thirst: -5 }, isQuestItem: false, description: 'Comida já passada, use com cuidado.' },
   { itemId: 'comida_enlatada', name: 'Comida Enlatada', icon: '🥫', category: 'general', rarity: 'common', consumable: true, consumeEffect: { hunger: 30 }, isQuestItem: false, description: 'Alimento preservado de longa duração.' },
-  { itemId: 'mantimentos_secos', name: 'Pacote de Mantimentos', icon: '🌾', category: 'general', rarity: 'common', consumable: true, consumeEffect: { hunger: 20 }, isQuestItem: false, description: 'Macarrão, arroz ou farinha.' },
-  { itemId: 'garrafa_agua', name: 'Garrafa de Água', icon: '💧', category: 'general', rarity: 'common', consumable: true, consumeEffect: { thirst: 35 }, isQuestItem: false, description: 'Água mineral potável e limpa.' },
-  { itemId: 'cereais', name: 'Caixa de Cereais', icon: '🥣', category: 'general', rarity: 'common', consumable: true, consumeEffect: { hunger: 15 }, isQuestItem: false, description: 'Cereais crocantes açucarados.' },
+  { itemId: 'garrafa_agua', name: 'Garrafa de Água', icon: '💧', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { thirst: 35 }, returnItemOnConsume: 'garrafa_vazia', isQuestItem: false, description: 'Água mineral potável e limpa. Ao beber, restaura a sede e deixa a garrafa vazia.' },
+  { itemId: 'garrafa_vazia', name: 'Garrafa de Água Vazia', icon: '🍾', category: 'supplies', rarity: 'common', consumable: false, isQuestItem: false, description: 'Garrafa plástica/vidro vazia. Pode ser usada para coletar água em fontes naturais como lagos, rios e poços.' },
+  { itemId: 'garrafa_agua_impura', name: 'Garrafa de Água Impura', icon: '🧪', category: 'supplies', rarity: 'common', consumable: false, isQuestItem: false, description: 'Água turva coletada de fonte natural. Não deve ser bebida crua. Ferva em uma panela na cozinha ou fogueira para purificar.' },
   { itemId: 'cafe_cha', name: 'Café e Chá', icon: '☕', category: 'general', rarity: 'common', consumable: true, consumeEffect: { thirst: 10, hunger: 5 }, isQuestItem: false, description: 'Pó de café e sachês de infusão.' },
   { itemId: 'produto_limpeza', name: 'Produto de Limpeza', icon: '🧴', category: 'general', rarity: 'common', consumable: false, isQuestItem: false, description: 'Detergente e desinfetante.' },
   { itemId: 'abridor_latas', name: 'Abridor de Latas', icon: '🧰', category: 'general', rarity: 'uncommon', consumable: false, isQuestItem: false, description: 'Ferramenta compacta para abrir conservas.' },
@@ -155,6 +155,14 @@ export const DEFAULT_PRESET_ITEMS = [
   { itemId: 'ensopado_carne', name: 'Ensopado de Carne e Batata', icon: '🍲', category: 'supplies', rarity: 'rare', consumable: true, consumeEffect: { hunger: 65, thirst: 25, blood: 25 }, isQuestItem: false, description: 'Guisado encorpado com carne macia e batatas cozidas em fogo brando.' },
   { itemId: 'batata_assada', name: 'Batata Dourada na Frigideira', icon: '🥔', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 30, blood: 5 }, isQuestItem: false, description: 'Batatas fatiadas e tostadas na frigideira de ferro.' },
   { itemId: 'milho_cozido', name: 'Milho Cozido na Panela', icon: '🌽', category: 'supplies', rarity: 'common', consumable: true, consumeEffect: { hunger: 30, thirst: 10 }, isQuestItem: false, description: 'Espiga de milho fervida em água límpida.' },
+
+  // =========================================================================
+  // MOCHILAS & EQUIPAMENTOS DE TRANSPORTE
+  // =========================================================================
+  { itemId: 'mochila_pequena', name: 'Mochila Pequena', icon: '🎒', category: 'accessories', rarity: 'common', equipSlot: 'accessory_1', weight: 1.0, storageBonusSlots: 4, storageBonusWeight: 5.0, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila leve de passeio com costura simples. Concede +4 slots e suporta +5 kg adicionais.' },
+  { itemId: 'mochila_media', name: 'Mochila Média', icon: '🎒', category: 'accessories', rarity: 'uncommon', equipSlot: 'accessory_1', weight: 2.0, storageBonusSlots: 8, storageBonusWeight: 10.0, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila de trekking reforçada com bolsos laterais. Concede +8 slots e suporta +10 kg adicionais.' },
+  { itemId: 'mochila_grande', name: 'Mochila Grande', icon: '🎒', category: 'accessories', rarity: 'rare', equipSlot: 'accessory_1', weight: 2.5, storageBonusSlots: 12, storageBonusWeight: 17.5, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila cargueira de alta capacidade com suporte lombar. Concede +12 slots e suporta +17.5 kg adicionais.' },
+  { itemId: 'mochila_militar', name: 'Mochila Militar', icon: '🎒', category: 'accessories', rarity: 'epic', equipSlot: 'accessory_1', weight: 3.0, storageBonusSlots: 16, storageBonusWeight: 25.0, isBackpack: true, consumable: false, isQuestItem: false, description: 'Mochila tática camuflada com sistema MOLLE e nylon balístico. Concede +16 slots e suporta +25 kg adicionais.' },
 
   // =========================================================================
   // COMUNICAÇÃO & RÁDIO

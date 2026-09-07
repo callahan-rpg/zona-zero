@@ -14,6 +14,11 @@ import {
   calculateCharacterEquipmentStats,
   calculateBodyTemperature
 } from '../utils/itemSystem'
+import {
+  calculateCharacterCarryStats,
+  calculateItemStackWeight,
+  getItemUnitWeight
+} from '../utils/weightSystem'
 import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
 import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
 
@@ -120,8 +125,6 @@ export default function Character() {
     unequipItem
   } = useAuth()
 
-  const debuffInfo = getVitalsDebuffs(character?.vitals || {})
-
   // Filtro de aba ativo
   const [activeCategory, setActiveCategory] = useState('all')
 
@@ -206,7 +209,7 @@ export default function Character() {
 
   const rawInventory = character?.inventory || []
 
-  // Hidrata itens do inventário com os dados mais recentes do catálogo (imagem, raridade, equipSlot, dano, durabilidade, etc)
+  // Hidrata itens do inventário com os dados mais recentes do catálogo (imagem, raridade, equipSlot, dano, durabilidade, peso, slots, etc)
   const inventory = useMemo(() => {
     return rawInventory.map(item => {
       const catData = catalogMap[item.itemId]
@@ -219,6 +222,11 @@ export default function Character() {
       const damageMax = catData?.damageMax !== undefined ? Number(catData.damageMax) : item.damageMax !== undefined ? Number(item.damageMax) : (presetData?.damageMax ?? null)
       const maxDurability = catData?.maxDurability !== undefined ? Number(catData.maxDurability) : item.maxDurability !== undefined ? Number(item.maxDurability) : (presetData?.maxDurability ?? null)
       const durability = item.durability !== undefined ? Number(item.durability) : (maxDurability ?? null)
+
+      const weight = catData?.weight !== undefined ? Number(catData.weight) : item.weight !== undefined ? Number(item.weight) : (presetData?.weight ?? 0.5)
+      const storageBonusSlots = catData?.storageBonusSlots !== undefined ? Number(catData.storageBonusSlots) : item.storageBonusSlots !== undefined ? Number(item.storageBonusSlots) : (presetData?.storageBonusSlots ?? 0)
+      const storageBonusWeight = catData?.storageBonusWeight !== undefined ? Number(catData.storageBonusWeight) : item.storageBonusWeight !== undefined ? Number(item.storageBonusWeight) : (presetData?.storageBonusWeight ?? 0)
+      const isBackpack = catData?.isBackpack !== undefined ? catData.isBackpack : item.isBackpack !== undefined ? item.isBackpack : (presetData?.isBackpack ?? false)
 
       return {
         ...item,
@@ -237,10 +245,42 @@ export default function Character() {
         damageMax,
         maxDurability,
         durability,
+        weight,
+        storageBonusSlots,
+        storageBonusWeight,
+        isBackpack,
         equipped: item.equipped === true,
       }
     })
   }, [rawInventory, catalogMap])
+
+  // Cálculo de Capacidade de Carga, Peso e Slots
+  const carryStats = useMemo(() => {
+    return calculateCharacterCarryStats({ ...character, inventory }, null, catalogMap)
+  }, [character, inventory, catalogMap])
+
+  const debuffInfo = useMemo(() => {
+    return getVitalsDebuffs(character?.vitals || {})
+  }, [character?.vitals])
+
+  // Combina penalidades de vitais com penalidades de sobrecarga de peso
+  const combinedPenalties = useMemo(() => {
+    const penalties = { ...debuffInfo.penalties }
+    if (carryStats.isOverweight) {
+      if (carryStats.penalties.destreza) penalties.destreza = (penalties.destreza || 0) + carryStats.penalties.destreza
+      if (carryStats.penalties.agilidade) penalties.agilidade = (penalties.agilidade || 0) + carryStats.penalties.agilidade
+    }
+    return penalties
+  }, [debuffInfo, carryStats])
+
+  const hasCombinedDebuffs = debuffInfo.hasDebuff || carryStats.isOverweight
+  const debuffReasons = useMemo(() => {
+    const reasons = [...debuffInfo.reasons]
+    if (carryStats.isOverweight && carryStats.activeTier) {
+      reasons.push(`⚖️ ${carryStats.activeTier.label} (+${carryStats.excessPercent}% sobrecarga: DES ${carryStats.penalties.destreza}, AGI ${carryStats.penalties.agilidade})`)
+    }
+    return reasons
+  }, [debuffInfo, carryStats])
 
   // Estatísticas de Equipamento e Térmica
   const equipmentStats = useMemo(() => {
@@ -576,18 +616,18 @@ export default function Character() {
             <div className="character-attributes">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <p className="section-title" style={{ margin: 0 }}>Atributos de Sobrevivência (8)</p>
-                {debuffInfo.hasDebuff && (
+                {hasCombinedDebuffs && (
                   <span style={{ fontSize: 10, color: '#f87171', fontWeight: 'bold', background: 'rgba(239, 68, 68, 0.15)', padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(239, 68, 68, 0.3)' }}>
                     ⚠️ Debuff Ativo
                   </span>
                 )}
               </div>
 
-              {debuffInfo.hasDebuff && (
+              {hasCombinedDebuffs && (
                 <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: 6, padding: '8px 10px', marginBottom: 12, fontSize: 11, color: '#fca5a5' }}>
                   <div style={{ fontWeight: 'bold', marginBottom: 2 }}>Impacto nos Atributos:</div>
                   <ul style={{ margin: 0, paddingLeft: 16, lineHeight: 1.4 }}>
-                    {debuffInfo.reasons.map((r, idx) => (
+                    {debuffReasons.map((r, idx) => (
                       <li key={idx}>{r}</li>
                     ))}
                   </ul>
@@ -599,7 +639,7 @@ export default function Character() {
                 const specId = character.specialty?.id || (typeof character.specialty === 'string' ? character.specialty : null)
                 const baseAttrs = character.baseAttributes || character.attributes || {}
                 const traitModifiers = calculateTraitModifiers(character.traits || [])
-                const detailedAttrs = getDetailedAttributes(baseAttrs, profId, specId, debuffInfo.penalties, traitModifiers)
+                const detailedAttrs = getDetailedAttributes(baseAttrs, profId, specId, combinedPenalties, traitModifiers)
 
                 return (
                   <div>
@@ -738,11 +778,127 @@ export default function Character() {
               </div>
             </div>
 
+            {/* Painel de Medidores: PESO & ESPAÇO / SLOTS */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginTop: 12, marginBottom: 16 }}>
+              {/* 1. Medidor de Peso */}
+              {(() => {
+                const weightPct = carryStats.maxWeight > 0 ? Math.min(100, Math.round((carryStats.totalWeight / carryStats.maxWeight) * 100)) : 0
+                const isOver = carryStats.isOverweight
+                let barColor = '#38bdf8'
+                if (isOver) barColor = '#ef4444'
+                else if (weightPct >= 80) barColor = '#f59e0b'
+
+                return (
+                  <div style={{
+                    background: isOver ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0, 0, 0, 0.25)',
+                    border: `1px solid ${isOver ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                    borderRadius: 8,
+                    padding: '10px 14px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 16 }}>⚖️</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: isOver ? '#f87171' : '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          Peso Transportado
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: isOver ? '#f87171' : '#fff' }}>
+                        {carryStats.totalWeight} / {carryStats.maxWeight} kg
+                      </div>
+                    </div>
+                    <div style={{ height: 6, width: '100%', background: 'rgba(255, 255, 255, 0.08)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+                      <div style={{ height: '100%', width: `${weightPct}%`, background: barColor, borderRadius: 3, transition: 'width 0.3s ease' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)' }}>
+                      <span>Base Força: {carryStats.naturalMaxWeight} kg{carryStats.bonusWeight > 0 ? ` (+${carryStats.bonusWeight} kg mochila)` : ''}</span>
+                      {isOver ? (
+                        <strong style={{ color: '#ef4444' }}>⚠️ +{carryStats.excessPercent}% SOBREPESO</strong>
+                      ) : (
+                        <span>{weightPct}% ocupado</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* 2. Medidor de Espaço / Slots */}
+              {(() => {
+                const slotsPct = carryStats.maxSlots > 0 ? Math.min(100, Math.round((carryStats.usedSlots / carryStats.maxSlots) * 100)) : 0
+                const isFull = carryStats.isSlotsFull
+                let barColor = '#4ade80'
+                if (carryStats.isSlotsOverflown) barColor = '#ef4444'
+                else if (isFull) barColor = '#f59e0b'
+
+                return (
+                  <div style={{
+                    background: carryStats.isSlotsOverflown ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0, 0, 0, 0.25)',
+                    border: `1px solid ${carryStats.isSlotsOverflown ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                    borderRadius: 8,
+                    padding: '10px 14px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 16 }}>🎒</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: carryStats.isSlotsOverflown ? '#f87171' : '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          Espaço / Slots
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: carryStats.isSlotsOverflown ? '#f87171' : '#fff' }}>
+                        {carryStats.usedSlots} / {carryStats.maxSlots} slots
+                      </div>
+                    </div>
+                    <div style={{ height: 6, width: '100%', background: 'rgba(255, 255, 255, 0.08)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+                      <div style={{ height: '100%', width: `${slotsPct}%`, background: barColor, borderRadius: 3, transition: 'width 0.3s ease' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)' }}>
+                      <span>Base: {carryStats.naturalBaseSlots} slots{carryStats.bonusSlots > 0 ? ` (+${carryStats.bonusSlots} mochila)` : ''}</span>
+                      <span>{carryStats.availableSlots} livre(s)</span>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* Aviso Flutuante de Sobrecarga / Penalidade Ativa */}
+            {carryStats.isOverweight && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(185, 28, 28, 0.25) 100%)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: 8,
+                padding: '10px 14px',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                boxShadow: '0 0 15px rgba(239, 68, 68, 0.15)'
+              }}>
+                <span style={{ fontSize: 24, animation: 'pulse 1.8s infinite' }}>⚠️</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fca5a5' }}>
+                    Sobrecarga de Peso: {carryStats.activeTier?.label || 'Carga Excessiva'} (+{carryStats.excessPercent}% acima do limite)
+                  </div>
+                  <div style={{ fontSize: 11, color: '#fecaca', marginTop: 2 }}>
+                    Seu sobrevivente está sobrecarregado ({carryStats.totalWeight} kg / {carryStats.maxWeight} kg). Penalidades ativas: <strong>DES {carryStats.penalties.destreza}</strong> e <strong>AGI {carryStats.penalties.agilidade}</strong>.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Painel do Esqueleto de Equipamento & Traje */}
             <EquipmentPaperdoll
               equipmentStats={equipmentStats}
               thermalInfo={thermalInfo}
-              onUnequipItem={(item) => unequipItem(item.instanceId)}
+              onUnequipItem={async (item) => {
+                try {
+                  setActionLoading(true)
+                  await unequipItem(item.instanceId)
+                } catch (err) {
+                  console.error(err)
+                  alert(err.message || 'Erro ao desequipar item.')
+                } finally {
+                  setActionLoading(false)
+                }
+              }}
               disabled={actionLoading}
             />
 
@@ -856,9 +1012,21 @@ export default function Character() {
                         <div className="inventory-item-card-name" title={item.name} style={{ color: rMeta.color || 'inherit' }}>
                           {item.name}
                         </div>
-                        <div className="inventory-item-card-qty">
-                          Quantidade: <span>×{item.quantity}</span>
+                        <div className="inventory-item-card-qty" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>Quantidade: <strong style={{ color: '#fff' }}>×{item.quantity}</strong></span>
+                          <span style={{ fontSize: 11, color: '#93c5fd' }}>
+                            ⚖️ {calculateItemStackWeight(item)} kg{item.quantity > 1 ? ` (${getItemUnitWeight(item)} kg/un)` : ''}
+                          </span>
                         </div>
+
+                        {/* Bônus de Mochila / Transporte */}
+                        {(Number(item.storageBonusSlots) > 0 || Number(item.storageBonusWeight) > 0) && (
+                          <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                            <span style={{ fontSize: 9, background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 5px', borderRadius: 4, border: '1px solid rgba(56, 189, 248, 0.3)', fontWeight: 600 }}>
+                              🎒 +{item.storageBonusSlots || 0} slots | +{item.storageBonusWeight || 0} kg
+                            </span>
+                          </div>
+                        )}
 
                         {/* Badges de Atributos (Dano, Isolamento, Redução Fixa) */}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
@@ -1133,9 +1301,9 @@ export default function Character() {
               {consumeItemTarget.consumeEffect && (
                 <div style={{ fontSize: 12, background: 'rgba(92, 255, 122, 0.08)', padding: '8px 10px', borderRadius: 6, marginBottom: 14, border: '1px solid rgba(92, 255, 122, 0.2)' }}>
                   <strong>Efeito por unidade:</strong>
-                  {consumeItemTarget.consumeEffect.hunger && <div>🍗 Fome: +{consumeItemTarget.consumeEffect.hunger}%</div>}
-                  {consumeItemTarget.consumeEffect.thirst && <div>💧 Sede: +{consumeItemTarget.consumeEffect.thirst}%</div>}
-                  {consumeItemTarget.consumeEffect.blood  && <div>🩸 Sangue/HP: +{consumeItemTarget.consumeEffect.blood}%</div>}
+                  {Boolean(consumeItemTarget.consumeEffect.hunger) && <div>🍗 Fome: +{consumeItemTarget.consumeEffect.hunger}%</div>}
+                  {Boolean(consumeItemTarget.consumeEffect.thirst) && <div>💧 Sede: +{consumeItemTarget.consumeEffect.thirst}%</div>}
+                  {Boolean(consumeItemTarget.consumeEffect.blood)  && <div>🩸 Sangue/HP: +{consumeItemTarget.consumeEffect.blood}%</div>}
                 </div>
               )}
 

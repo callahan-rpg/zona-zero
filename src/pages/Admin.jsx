@@ -12,6 +12,7 @@ import { db } from '../firebase/config'
 import HUD from '../components/HUD.jsx'
 import { SEASONS, MOON_PHASES, MONTHS, calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { RARITY_META, DEFAULT_PRESET_ITEMS, SUPPLY_RARITIES, UNIQUE_RARITIES, getMaxHp, EQUIPMENT_SLOTS } from '../utils/itemSystem'
+import { DEFAULT_BACKPACKS } from '../utils/weightSystem'
 import { COMBAT_STATUS_EFFECTS, MONSTER_TEMPLATES, ATTRIBUTE_ICONS } from '../utils/combatSystem'
 import { uploadImageFree } from '../utils/imageUpload'
 import { DEFAULT_WEATHER_SOUNDS, extractYouTubeId } from '../utils/audioSystem'
@@ -26,6 +27,7 @@ import AdminActivitiesEditor from '../components/AdminActivitiesEditor.jsx'
 import AdminRadioEditor from '../components/AdminRadioEditor.jsx'
 import AdminBaseDefenseEditor from '../components/AdminBaseDefenseEditor.jsx'
 import AdminCookingEditor from '../components/AdminCookingEditor.jsx'
+import AdminWaterSourcesEditor from '../components/AdminWaterSourcesEditor.jsx'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -272,6 +274,18 @@ export default function Admin() {
     }
   }
 
+  async function handleSeedBackpacks() {
+    if (!confirm('Deseja cadastrar/atualizar as 4 Mochilas Padrão (Pequena, Média, Grande, Militar) no catálogo de itens?')) return
+    try {
+      for (const item of DEFAULT_BACKPACKS) {
+        await setDoc(doc(db, 'items_db', item.itemId), item)
+      }
+      alert('4 Mochilas cadastradas com sucesso no catálogo!')
+    } catch (err) {
+      alert('Erro ao semear mochilas: ' + err.message)
+    }
+  }
+
   async function handleCatalogSubmit(e) {
     e.preventDefault()
     if (!catalogForm.itemId || !catalogForm.name) return alert('ID do item e Nome são obrigatórios')
@@ -300,6 +314,10 @@ export default function Admin() {
       consumeEffect: Object.keys(consumeEffect).length > 0 ? consumeEffect : null,
       isQuestItem: !!catalogForm.isQuestItem,
       equipSlot: catalogForm.equipSlot || null,
+      weight: catalogForm.weight !== '' ? Number(catalogForm.weight) : 0.5,
+      storageBonusSlots: Number(catalogForm.storageBonusSlots) || 0,
+      storageBonusWeight: Number(catalogForm.storageBonusWeight) || 0,
+      isBackpack: !!catalogForm.isBackpack,
       insulation: Number(catalogForm.insulation) || 0,
       damageReduction: Number(catalogForm.damageReduction) || 0,
       damageMin: catalogForm.damageMin !== '' ? Number(catalogForm.damageMin) : null,
@@ -326,6 +344,10 @@ export default function Admin() {
         bloodEffect: 0,
         isQuestItem: false,
         equipSlot: '',
+        weight: 0.5,
+        storageBonusSlots: 0,
+        storageBonusWeight: 0,
+        isBackpack: false,
         insulation: 0,
         damageReduction: 0,
         damageMin: '',
@@ -364,6 +386,10 @@ export default function Admin() {
       bloodEffect: item.consumeEffect?.blood || 0,
       isQuestItem: !!item.isQuestItem,
       equipSlot: item.equipSlot || '',
+      weight: item.weight !== undefined && item.weight !== null ? item.weight : 0.5,
+      storageBonusSlots: item.storageBonusSlots || 0,
+      storageBonusWeight: item.storageBonusWeight || 0,
+      isBackpack: !!item.isBackpack,
       insulation: item.insulation !== undefined ? item.insulation : 0,
       damageReduction: item.damageReduction !== undefined ? item.damageReduction : 0,
       damageMin: item.damageMin !== undefined && item.damageMin !== null ? item.damageMin : '',
@@ -395,6 +421,10 @@ export default function Admin() {
     bloodEffect: 0,
     isQuestItem: false,
     equipSlot: '',
+    weight: 0.5,
+    storageBonusSlots: 0,
+    storageBonusWeight: 0,
+    isBackpack: false,
     insulation: 0,
     damageReduction: 0,
     damageMin: '',
@@ -1722,6 +1752,9 @@ export default function Admin() {
             <button className={`btn btn-sm ${activeTab === 'cooking' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('cooking')} style={{ borderColor: 'rgba(245, 158, 11, 0.4)', color: activeTab === 'cooking' ? '#000' : '#fbbf24', background: activeTab === 'cooking' ? '#f59e0b' : 'transparent', fontWeight: 'bold' }}>
               🍳 Cozinha & Receitas
             </button>
+            <button className={`btn btn-sm ${activeTab === 'water_sources' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('water_sources')} style={{ borderColor: 'rgba(56, 189, 248, 0.4)', color: activeTab === 'water_sources' ? '#fff' : '#7dd3fc', background: activeTab === 'water_sources' ? '#0284c7' : 'transparent', fontWeight: 'bold' }}>
+              💧 Fontes de Água
+            </button>
           </div>
 
           {/* CONTEÚDO DA TAB RADIO: SISTEMA DE RÁDIO E TRANSMISSÕES */}
@@ -1732,6 +1765,11 @@ export default function Admin() {
           {/* CONTEÚDO DA TAB COOKING: SISTEMA DE COZINHA & RECEITAS */}
           {activeTab === 'cooking' && (
             <AdminCookingEditor catalogItems={catalogItems} />
+          )}
+
+          {/* CONTEÚDO DA TAB WATER SOURCES: SISTEMA DE FONTES DE ÁGUA */}
+          {activeTab === 'water_sources' && (
+            <AdminWaterSourcesEditor locations={locations} />
           )}
 
           {/* CONTEÚDO DA TAB BASE DEFENSE: SISTEMA DE DEFESA DA BASE */}
@@ -2148,9 +2186,14 @@ export default function Admin() {
                   <h3 style={{ fontSize: 14, textTransform: 'uppercase', color: 'var(--accent-yellow)', margin: 0 }}>
                     Catálogo ({catalogItems.length})
                   </h3>
-                  <button type="button" className="btn btn-sm" onClick={handlePopulatePresets} style={{ fontSize: 11, background: 'rgba(245, 158, 11, 0.15)', borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' }}>
-                    ⚡ Popular Itens Padrão
-                  </button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className="btn btn-sm" onClick={handleSeedBackpacks} style={{ fontSize: 11, background: 'rgba(56, 189, 248, 0.15)', borderColor: '#38bdf8', color: '#38bdf8' }}>
+                      🎒 Semear 4 Mochilas
+                    </button>
+                    <button type="button" className="btn btn-sm" onClick={handlePopulatePresets} style={{ fontSize: 11, background: 'rgba(245, 158, 11, 0.15)', borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' }}>
+                      ⚡ Popular Itens Padrão
+                    </button>
+                  </div>
                 </div>
 
                 {/* Barra de busca + filtro de categoria */}
@@ -2222,8 +2265,16 @@ export default function Admin() {
                                   🍽️ {Object.entries(item.consumeEffect).map(([k, v]) => `+${v} ${k}`).join(' · ')}
                                 </div>
                               )}
-                              {/* Badges de Equipamento, Dano e Isolamento */}
+                              {/* Badges de Peso, Equipamento, Dano e Isolamento */}
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                                <span style={{ fontSize: 9, background: 'rgba(59, 130, 246, 0.15)', color: '#93c5fd', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                                  ⚖️ {item.weight !== undefined ? item.weight : 0.5} kg
+                                </span>
+                                {(Number(item.storageBonusSlots) > 0 || Number(item.storageBonusWeight) > 0) && (
+                                  <span style={{ fontSize: 9, background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(56, 189, 248, 0.4)', fontWeight: 'bold' }}>
+                                    🎒 +{item.storageBonusSlots || 0} slots | +{item.storageBonusWeight || 0} kg
+                                  </span>
+                                )}
                                 {item.equipSlot && (
                                   <span style={{ fontSize: 9, background: 'rgba(56,189,248,0.12)', color: '#38bdf8', padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(56,189,248,0.25)' }}>
                                     🎽 {item.equipSlot}
@@ -2483,6 +2534,33 @@ export default function Admin() {
                       <label style={{ fontSize: 9 }}>🛡️ Redução Fixa Dano</label>
                       <input type="number" placeholder="0" value={catalogForm.damageReduction} onChange={e => setCatalogForm(prev => ({ ...prev, damageReduction: e.target.value }))} />
                     </div>
+                  </div>
+
+                  {/* Configurações de Peso Próprio e Capacidade de Armazenamento / Mochila */}
+                  <div style={{ padding: '6px 8px', background: 'rgba(56, 189, 248, 0.05)', borderRadius: 6, border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: 9, fontWeight: 'bold', color: '#93c5fd' }}>⚖️ Peso do Item (kg)</label>
+                        <input type="number" step="0.1" placeholder="Ex: 0.5" value={catalogForm.weight} onChange={e => setCatalogForm(prev => ({ ...prev, weight: e.target.value }))} />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 14 }}>
+                        <input type="checkbox" id="isBackpackChk" checked={catalogForm.isBackpack} onChange={e => setCatalogForm(prev => ({ ...prev, isBackpack: e.target.checked }))} style={{ width: 'auto' }} />
+                        <label htmlFor="isBackpackChk" style={{ fontSize: 9.5, margin: 0, cursor: 'pointer', color: '#38bdf8' }}>É Mochila / Equipamento de Carga</label>
+                      </div>
+                    </div>
+
+                    {(catalogForm.isBackpack || Number(catalogForm.storageBonusSlots) > 0 || Number(catalogForm.storageBonusWeight) > 0) && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, paddingTop: 4, borderTop: '1px dashed rgba(56, 189, 248, 0.2)' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 9 }}>🎒 Slots Adicionais (+)</label>
+                          <input type="number" placeholder="Ex: 8" value={catalogForm.storageBonusSlots} onChange={e => setCatalogForm(prev => ({ ...prev, storageBonusSlots: e.target.value }))} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 9 }}>🎒 Peso Suportado (+kg)</label>
+                          <input type="number" step="0.5" placeholder="Ex: 10.0" value={catalogForm.storageBonusWeight} onChange={e => setCatalogForm(prev => ({ ...prev, storageBonusWeight: e.target.value }))} />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Configurações de Dano e Ataque (Armas ou Acessórios que funcionam como Armas) */}

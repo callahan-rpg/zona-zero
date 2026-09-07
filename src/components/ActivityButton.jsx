@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { validateActivityRequirements } from '../utils/activitySystem'
+import { useState, useEffect } from 'react'
+import { validateActivityRequirements, formatDuration } from '../utils/activitySystem'
 import FishingModal from './FishingModal.jsx'
 import FarmingModal from './FarmingModal.jsx'
 import AnimalCareModal from './AnimalCareModal.jsx'
@@ -11,6 +11,43 @@ import AnimalCareModal from './AnimalCareModal.jsx'
  */
 export default function ActivityButton({ activity, character, locationSlug }) {
   const [showModal, setShowModal] = useState(false)
+  const [cooldownRemaining, setCooldownRemaining] = useState(0)
+
+  // Observa cooldown em tempo real para pesca
+  useEffect(() => {
+    if (!activity || activity.type !== 'fishing') {
+      setCooldownRemaining(0)
+      return
+    }
+
+    const checkCd = () => {
+      const cooldownMs = activity.cooldownMs !== undefined
+        ? Number(activity.cooldownMs)
+        : (activity.cooldownMinutes !== undefined ? Number(activity.cooldownMinutes) * 60000 : 30 * 60 * 1000)
+
+      if (cooldownMs <= 0) {
+        setCooldownRemaining(0)
+        return
+      }
+
+      const lastAttempt = character?.lastFishingAttempt?.[locationSlug] ||
+                          character?.lastActivityReward?.[`fishing_${locationSlug}`] ||
+                          character?.lastActivityAttempt?.[`fishing_${locationSlug}`]
+
+      if (!lastAttempt) {
+        setCooldownRemaining(0)
+        return
+      }
+
+      const lastDate = lastAttempt.toDate ? lastAttempt.toDate() : new Date(lastAttempt)
+      const elapsed = Date.now() - lastDate.getTime()
+      setCooldownRemaining(Math.max(0, cooldownMs - elapsed))
+    }
+
+    checkCd()
+    const timer = setInterval(checkCd, 1000)
+    return () => clearInterval(timer)
+  }, [activity, character, locationSlug])
 
   if (!activity || !activity.enabled) return null
 
@@ -40,11 +77,11 @@ export default function ActivityButton({ activity, character, locationSlug }) {
           position: 'relative',
         }}
         onClick={() => setShowModal(true)}
-        title={hasErrors ? errors.join('\n') : activity.name}
+        title={cooldownRemaining > 0 ? `Margem em cooldown (${formatDuration(cooldownRemaining)})` : hasErrors ? errors.join('\n') : activity.name}
       >
-        <span>{activity.icon || '⚙️'}</span>
-        {activity.name}
-        {hasErrors && (
+        <span>{cooldownRemaining > 0 ? '⏳' : (activity.icon || '⚙️')}</span>
+        {activity.name} {cooldownRemaining > 0 && `(${formatDuration(cooldownRemaining)})`}
+        {hasErrors && cooldownRemaining <= 0 && (
           <span style={{
             position: 'absolute', top: -4, right: -4,
             background: '#ef4444', color: '#fff',

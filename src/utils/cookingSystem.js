@@ -21,6 +21,30 @@ export const COOKING_UTENSILS = [
 
 export const DEFAULT_RECIPES = [
   {
+    id: 'rec_purificar_agua',
+    name: 'Purificar Água (Ferver na Panela)',
+    icon: '💧',
+    description: 'Ferva a garrafa de água impura na panela para eliminar bactérias, impurezas e torná-la potável para hidratação.',
+    enabled: true,
+    requiredTool: 'panela_frigideira',
+    cookDurationSec: 4,
+    ingredients: [
+      { itemId: 'garrafa_agua_impura', name: 'Garrafa de Água Impura', icon: '🧪', quantity: 1 }
+    ],
+    result: {
+      itemId: 'garrafa_agua',
+      name: 'Garrafa de Água',
+      icon: '💧',
+      quantity: 1,
+      rarity: 'common',
+      category: 'supplies',
+      consumable: true,
+      consumeEffect: { thirst: 35 },
+      returnItemOnConsume: 'garrafa_vazia',
+      description: 'Água mineral potável e limpa. Ao beber, restaura a sede e deixa a garrafa vazia.'
+    }
+  },
+  {
     id: 'rec_bacon_ovos',
     name: 'Bacon com Ovos',
     icon: '🍳',

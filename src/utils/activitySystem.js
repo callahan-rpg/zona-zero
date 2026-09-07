@@ -108,6 +108,24 @@ export function isItemMatching(item, targetId) {
     if (name.includes('milho') || name.includes('espiga de milho')) return true
   }
 
+  // Garrafa de Água Vazia
+  if (cleanTarget === 'garrafa_vazia' || cleanTarget === 'garrafa_de_agua_vazia' || cleanTarget === 'garrafavazia') {
+    if (itemId.includes('garrafa') && itemId.includes('vazia')) return true
+    if (name.includes('garrafa') && name.includes('vazia')) return true
+  }
+
+  // Garrafa de Água Impura
+  if (cleanTarget === 'garrafa_agua_impura' || cleanTarget === 'garrafa_de_agua_impura' || cleanTarget === 'agua_impura') {
+    if (itemId.includes('impura') || itemId.includes('suja') || itemId.includes('nao_potavel')) return true
+    if (name.includes('impura') || name.includes('suja') || name.includes('não potável')) return true
+  }
+
+  // Garrafa de Água Potável
+  if (cleanTarget === 'garrafa_agua' || cleanTarget === 'garrafa_de_agua' || cleanTarget === 'agua_potavel') {
+    if (itemId === 'garrafa_agua' || itemId === 'garrafa_de_agua' || itemId === 'agua_limpa') return true
+    if (name.includes('garrafa de água') || name.includes('água potável')) return true
+  }
+
   return false
 }
 

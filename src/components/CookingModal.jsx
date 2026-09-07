@@ -414,17 +414,17 @@ export default function CookingModal({ locationSlug, onClose }) {
               {/* BENEFÍCIOS VITAIS DO PRATO */}
               {cookedItemResult.consumeEffect && (
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {cookedItemResult.consumeEffect.hunger && (
+                  {Boolean(cookedItemResult.consumeEffect.hunger) && (
                     <div style={{ padding: '4px 10px', background: 'rgba(245, 158, 11, 0.2)', border: '1px solid #f59e0b', borderRadius: '6px', fontSize: '11px', color: '#fbbf24', fontWeight: 600 }}>
                       🍖 +{cookedItemResult.consumeEffect.hunger} Fome
                     </div>
                   )}
-                  {cookedItemResult.consumeEffect.thirst && (
+                  {Boolean(cookedItemResult.consumeEffect.thirst) && (
                     <div style={{ padding: '4px 10px', background: 'rgba(56, 189, 248, 0.2)', border: '1px solid #38bdf8', borderRadius: '6px', fontSize: '11px', color: '#7dd3fc', fontWeight: 600 }}>
                       💧 +{cookedItemResult.consumeEffect.thirst} Sede
                     </div>
                   )}
-                  {cookedItemResult.consumeEffect.blood && (
+                  {Boolean(cookedItemResult.consumeEffect.blood) && (
                     <div style={{ padding: '4px 10px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', borderRadius: '6px', fontSize: '11px', color: '#fca5a5', fontWeight: 600 }}>
                       🩸 +{cookedItemResult.consumeEffect.blood} HP / Sangue
                     </div>
@@ -621,13 +621,13 @@ export default function CookingModal({ locationSlug, onClose }) {
                               Efeito ao Consumir
                             </div>
                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                              {selectedRecipe.result.consumeEffect.hunger && (
+                              {Boolean(selectedRecipe.result.consumeEffect.hunger) && (
                                 <span style={{ fontSize: '11px', color: '#fbbf24' }}>🍖 +{selectedRecipe.result.consumeEffect.hunger} Fome</span>
                               )}
-                              {selectedRecipe.result.consumeEffect.thirst && (
+                              {Boolean(selectedRecipe.result.consumeEffect.thirst) && (
                                 <span style={{ fontSize: '11px', color: '#7dd3fc' }}>💧 +{selectedRecipe.result.consumeEffect.thirst} Sede</span>
                               )}
-                              {selectedRecipe.result.consumeEffect.blood && (
+                              {Boolean(selectedRecipe.result.consumeEffect.blood) && (
                                 <span style={{ fontSize: '11px', color: '#fca5a5' }}>🩸 +{selectedRecipe.result.consumeEffect.blood} HP</span>
                               )}
                             </div>
