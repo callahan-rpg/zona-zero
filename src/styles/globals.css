@@ -2,6 +2,10 @@
    ZONA ZERO — Estilos Globais
    =========================== */
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Reset e base */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -66,6 +70,35 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+}
+
+/* ===========================
+   SCROLLBARS GLOBAIS (Survival Dark Theme)
+   =========================== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) rgba(0, 0, 0, 0.35);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
 }
 
 /* ===========================
@@ -965,7 +998,7 @@ body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  filter: brightness(0.99);
+  filter: brightness(0.78);
   transition: opacity 2s ease-in-out;
 }
 
@@ -1006,22 +1039,51 @@ body {
   position: relative;
   z-index: 10;
   height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  padding-top: calc(var(--hud-height) + 24px);
+  padding-top: calc(var(--hud-height) + 16px);
+  padding-bottom: 32px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
 }
 
 .location-main {
-  flex: 1;
+  flex: 1 0 auto;
+  min-height: min-content;
   display: grid;
   grid-template-columns: 1fr 680px 1fr;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 12px 20px 36px;
   gap: 20px;
   width: 100%;
   max-width: 1300px;
-  margin: 0 auto;
+  margin: auto auto;
+}
+
+@media (max-width: 1024px) {
+  .location-main {
+    grid-template-columns: 1fr;
+    max-width: 720px;
+    padding: 12px 16px 36px;
+    gap: 16px;
+    margin: 0 auto;
+  }
+
+  .chat-container {
+    grid-column: 1;
+  }
+
+  .nav-buttons-left,
+  .nav-buttons-right {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+  }
 }
 
 /* Botões de navegação da esquerda colados ao lado do chat */
@@ -2862,7 +2924,8 @@ body {
   padding: 10px 12px;
   flex-wrap: wrap;
   border-top: 1px solid var(--glass-border);
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
 .loot-btn-supply {

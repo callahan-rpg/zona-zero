@@ -7,6 +7,8 @@ import {
   addDoc,
   deleteDoc,
   updateDoc,
+  getDocs,
+  writeBatch,
   query,
   orderBy,
   limit
@@ -65,6 +67,8 @@ export default function AdminRadioEditor({ locations = [] }) {
   // Estados de Histórico
   const [historyList, setHistoryList] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
+  const [deletingId, setDeletingId] = useState(null)
+  const [clearingAll, setClearingAll] = useState(false)
 
   // Escuta contagem de usuários com Rádio
   useEffect(() => {
@@ -266,6 +270,46 @@ export default function AdminRadioEditor({ locations = [] }) {
       await deleteDoc(doc(db, 'radio_points', id))
     } catch (err) {
       alert('Erro: ' + err.message)
+    }
+  }
+
+  // Apagar uma transmissão individual do histórico
+  async function handleDeleteTransmission(id) {
+    if (!confirm('Apagar esta transmissão do histórico permanente?')) return
+    setDeletingId(id)
+    try {
+      await deleteDoc(doc(db, 'radio_transmissions', id))
+    } catch (err) {
+      alert('Erro ao apagar transmissão: ' + err.message)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  // Apagar TODO o histórico de transmissões
+  async function handleClearAllHistory() {
+    if (!confirm(
+      `⚠️ ATENÇÃO: Isso irá apagar PERMANENTEMENTE todas as ${historyList.length} transmissões do histórico.\n\nEsta ação não pode ser desfeita. Confirmar?`
+    )) return
+
+    setClearingAll(true)
+    try {
+      // Busca todos os documentos (não apenas os 50 carregados no listener)
+      const allSnap = await getDocs(collection(db, 'radio_transmissions'))
+      if (allSnap.empty) return
+
+      // Usa batches de 500 (limite do Firestore)
+      const batchSize = 500
+      const docs = allSnap.docs
+      for (let i = 0; i < docs.length; i += batchSize) {
+        const batch = writeBatch(db)
+        docs.slice(i, i + batchSize).forEach(d => batch.delete(d.ref))
+        await batch.commit()
+      }
+    } catch (err) {
+      alert('Erro ao limpar histórico: ' + err.message)
+    } finally {
+      setClearingAll(false)
     }
   }
 
@@ -786,9 +830,37 @@ export default function AdminRadioEditor({ locations = [] }) {
             <h4 style={{ margin: 0, fontSize: 14, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
               Histórico Permanente de Transmissões do Rádio
             </h4>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              Total: {historyList.length} transmissões registradas
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Total: {historyList.length} transmissão(ões) registrada(s)
+              </span>
+              {historyList.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  onClick={handleClearAllHistory}
+                  disabled={clearingAll}
+                  style={{
+                    fontSize: 11,
+                    padding: '5px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    opacity: clearingAll ? 0.6 : 1
+                  }}
+                  title="Apagar todo o histórico de transmissões permanentemente"
+                >
+                  {clearingAll ? (
+                    <>
+                      <span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                      Limpando...
+                    </>
+                  ) : (
+                    <>🗑️ Limpar Tudo</>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
 
           {loadingHistory ? (
@@ -823,8 +895,29 @@ export default function AdminRadioEditor({ locations = [] }) {
                         {t.category || t.type}
                       </span>
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                      {t.gameDateFormatted ? `📅 ${t.gameDateFormatted} — ${t.gameTimeString}` : new Date(t.createdAt).toLocaleString('pt-BR')}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                        {t.gameDateFormatted ? `📅 ${t.gameDateFormatted} — ${t.gameTimeString}` : new Date(t.createdAt).toLocaleString('pt-BR')}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTransmission(t.id)}
+                        disabled={deletingId === t.id}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.35)',
+                          color: '#f87171',
+                          borderRadius: 5,
+                          cursor: deletingId === t.id ? 'wait' : 'pointer',
+                          padding: '2px 8px',
+                          fontSize: 11,
+                          lineHeight: 1.5,
+                          transition: 'background 0.2s'
+                        }}
+                        title="Apagar esta transmissão do histórico"
+                      >
+                        {deletingId === t.id ? '...' : '🗑️'}
+                      </button>
                     </div>
                   </div>
 
