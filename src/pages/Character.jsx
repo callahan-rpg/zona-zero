@@ -116,6 +116,7 @@ function xpForNextLevel(level) {
 export default function Character() {
   const {
     user,
+    role,
     character,
     updateCharacter,
     transferItem,
@@ -336,6 +337,15 @@ export default function Character() {
   }, [inventory, activeCategory])
 
   if (!character) {
+    if (role === 'admin') {
+      return (
+        <div className="loading-screen" style={{ flexDirection: 'column', gap: '16px' }}>
+          <span style={{ fontSize: 48 }}>🛡️</span>
+          <p style={{ color: 'var(--text-muted)', fontSize: 16, margin: 0 }}>Contas de administrador não possuem ficha de personagem.</p>
+          <a href="/admin" style={{ color: 'var(--accent-yellow)', fontWeight: 700, textDecoration: 'underline', fontSize: 14 }}>← Ir para o Painel Admin</a>
+        </div>
+      )
+    }
     return (
       <div className="loading-screen">
         <span className="loading-dot" />

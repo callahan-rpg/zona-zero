@@ -12,7 +12,7 @@ function xpForNextLevel(level) {
 }
 
 export default function CharacterPopup({ onClose }) {
-  const { character } = useAuth()
+  const { character, role } = useAuth()
   const [catalogMap, setCatalogMap] = useState({})
 
   useEffect(() => {
@@ -381,7 +381,7 @@ export default function CharacterPopup({ onClose }) {
             onClick={handleOpenFullInventory}
           >
             <span className="btn-icon-pack">📦</span>
-            <span>Mochila & Inventário</span>
+            <span>Mochila &amp; Inventário</span>
           </button>
         </div>
       </div>
