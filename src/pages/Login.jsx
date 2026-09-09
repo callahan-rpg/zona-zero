@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
 function getErrorMessage(code) {
@@ -38,8 +40,10 @@ export default function Login() {
     setSuccessMsg('')
     setLoading(true)
     try {
-      await login(email, password)
-      navigate('/location/sala-hospital')
+      const cred = await login(email, password)
+      const userDoc = await getDoc(doc(db, 'users', cred.user.uid))
+      const targetLoc = userDoc.data()?.character?.currentLocation || 'acampamento'
+      navigate(`/location/${targetLoc}`)
     } catch (err) {
       setError(getErrorMessage(err.code))
     } finally {

@@ -256,6 +256,7 @@ export function AuthProvider({ children }) {
         thirst: 100,
         blood: getMaxHp({ attributes: characterData.attributes || baseAttrs }),
       },
+      introductionSeen: false, // Abertura narrativa: false = ainda não exibida
       createdAt: serverTimestamp(),
     }
 

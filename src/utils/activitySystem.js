@@ -307,6 +307,7 @@ export function calculateFarmingState(state) {
   const growthMs     = Number(state.growthDurationMs) || (3 * 24 * 60 * 60 * 1000)
 
   const elapsedMs      = now - plantedAt
+  const remainingMs    = Math.max(0, growthMs - elapsedMs)
   const rawGrowthPct   = Math.min(100, (elapsedMs / growthMs) * 100)
   const hoursWithoutCare = (now - lastCaredAt) / (1000 * 60 * 60)
 
@@ -327,6 +328,10 @@ export function calculateFarmingState(state) {
   return {
     health: currentHealth,
     growthPct: Math.round(rawGrowthPct),
+    elapsedMs,
+    growthMs,
+    remainingMs,
+    remainingFormatted: formatRemainingTime(remainingMs),
     hoursWithoutCare: Math.round(hoursWithoutCare * 10) / 10,
     isReady,
     isDead,
@@ -577,6 +582,49 @@ export function formatHoursAgo(hours) {
   if (hours < 1) return `${Math.round(hours * 60)} min atrás`
   if (hours < 24) return `${Math.round(hours)}h atrás`
   return `${Math.round(hours / 24)} dia(s) atrás`
+}
+
+export function formatRemainingTime(ms) {
+  if (ms <= 0) return 'Pronto'
+  const totalMinutes = Math.ceil(ms / (1000 * 60))
+  const days = Math.floor(totalMinutes / (60 * 24))
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
+  const minutes = totalMinutes % 60
+
+  if (days > 0) {
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`
+  }
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`
+  }
+  return `${minutes}min`
+}
+
+export function formatGrowthDuration(seedCfg) {
+  if (!seedCfg) return ''
+  if (seedCfg.growthTimeUnit === 'hours' && seedCfg.growthTimeValue) {
+    return `${seedCfg.growthTimeValue} hora${seedCfg.growthTimeValue > 1 ? 's' : ''}`
+  }
+  if (seedCfg.growthHours && seedCfg.growthHours < 24) {
+    return `${seedCfg.growthHours} hora${seedCfg.growthHours > 1 ? 's' : ''}`
+  }
+  if (seedCfg.growthTimeUnit === 'days' && seedCfg.growthTimeValue) {
+    return `${seedCfg.growthTimeValue} dia${seedCfg.growthTimeValue > 1 ? 's' : ''}`
+  }
+  if (seedCfg.growthDays) {
+    if (seedCfg.growthDays < 1) {
+      const h = Math.round(seedCfg.growthDays * 24)
+      return `${h} hora${h > 1 ? 's' : ''}`
+    }
+    return `${seedCfg.growthDays} dia${seedCfg.growthDays > 1 ? 's' : ''}`
+  }
+  if (seedCfg.growthMs) {
+    const totalHours = Math.round(seedCfg.growthMs / 3600000)
+    if (totalHours < 24) return `${totalHours} hora${totalHours > 1 ? 's' : ''}`
+    const days = Math.round(totalHours / 24)
+    return `${days} dia${days > 1 ? 's' : ''}`
+  }
+  return '3 dias'
 }
 
 /**

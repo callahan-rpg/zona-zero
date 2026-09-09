@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { collection, doc, onSnapshot } from 'firebase/firestore'
-import { db } from '../firebase/config'
+import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { auth, db } from '../firebase/config'
+import NarrativeOpeningModal from '../components/NarrativeOpeningModal.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import {
   PROFESSIONS,
@@ -23,6 +24,16 @@ const TOTAL_POINTS = 15
 const MIN_ATTR = 0
 const MAX_ATTR = 3
 const MAX_PLAYERS_PER_PROFESSION = 2
+
+const DEFAULT_OPENING_CONFIG = {
+  active: true,
+  title: 'O Despertar em Varezhia',
+  imageUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1920&q=80',
+  content: 'O som distante de sirenes há muito cessou. As ruas de Varezhia, outrora vibrantes, agora pertencem às sombras e àqueles que não descansam em paz.\n\nVocê acorda entre os escombros, com poucas memórias do colapso e apenas o instinto básico de respirar. Cada esquina esconde perigos inimagináveis, mas também a esperança tênue de sobrevivência.\n\nReúna seus pertences, mantenha o silêncio e prepare-se. Seu destino começa agora.',
+  musicUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  musicVolume: 70,
+  buttonText: 'Entrar em Varezhia',
+}
 
 function getErrorMessage(code) {
   switch (code) {
@@ -463,6 +474,11 @@ export default function Register() {
   const [expandTraitsSection, setExpandTraitsSection] = useState(true)
   const [expandPerksSection, setExpandPerksSection] = useState(true)
 
+  // Abertura Narrativa
+  const [showOpening, setShowOpening]       = useState(false)
+  const [pendingSpawnLoc, setPendingSpawnLoc] = useState(null)
+  const [openingConfig, setOpeningConfig]   = useState(DEFAULT_OPENING_CONFIG)
+
   // Firestore data
   const [registeredUsers, setRegisteredUsers] = useState([])
   const [preMadeSheets, setPreMadeSheets] = useState([])
@@ -491,7 +507,15 @@ export default function Register() {
       if (snap.exists()) setCustomStarterConfig(snap.data().config || {})
     }, (err) => console.warn('Aviso ao consultar itens iniciais:', err))
 
-    return () => { unsubUsers(); unsubSheets(); unsubLocs(); unsubConfig(); unsubStarters() }
+    const unsubOpening = onSnapshot(doc(db, 'game_config', 'opening'), (snap) => {
+      if (snap.exists()) {
+        setOpeningConfig(prev => ({ ...DEFAULT_OPENING_CONFIG, ...snap.data() }))
+      } else {
+        setOpeningConfig(DEFAULT_OPENING_CONFIG)
+      }
+    }, (err) => console.warn('Aviso ao consultar abertura narrativa:', err))
+
+    return () => { unsubUsers(); unsubSheets(); unsubLocs(); unsubConfig(); unsubStarters(); unsubOpening() }
   }, [])
 
   // Local padrão de nascimento configurado pelo Admin (padrão: acampamento)
@@ -730,7 +754,14 @@ export default function Register() {
         baseAttributes: { ...attrs },
         inventory: preMadeStarterItems,
       })
-      navigate(`/location/${spawnLoc}`)
+      // Mostra abertura narrativa se configurada e ativa; caso contrário, redireciona direto
+      const isOpeningActive = openingConfig ? openingConfig.active !== false : true
+      if (isOpeningActive) {
+        setPendingSpawnLoc(spawnLoc)
+        setShowOpening(true)
+      } else {
+        navigate(`/location/${spawnLoc}`)
+      }
     } catch (err) {
       setError(getErrorMessage(err.code))
       setStep(1)
@@ -774,12 +805,36 @@ export default function Register() {
         baseAttributes: { ...attrs },
         inventory: starterEquipment,
       })
-      navigate(`/location/${spawnLoc}`)
+      // Mostra abertura narrativa se configurada e ativa; caso contrário, redireciona direto
+      const isOpeningActive = openingConfig ? openingConfig.active !== false : true
+      if (isOpeningActive) {
+        setPendingSpawnLoc(spawnLoc)
+        setShowOpening(true)
+      } else {
+        navigate(`/location/${spawnLoc}`)
+      }
     } catch (err) {
       setError(getErrorMessage(err.code))
       setStep(1)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // ─── Conclusão da Abertura Narrativa ──────────────────────────────────────
+  async function handleOpeningComplete() {
+    try {
+      const uid = auth.currentUser?.uid
+      if (uid) {
+        await updateDoc(doc(db, 'users', uid), {
+          'character.introductionSeen': true,
+        })
+      }
+    } catch (err) {
+      console.warn('Aviso ao marcar abertura como vista:', err)
+    } finally {
+      setShowOpening(false)
+      navigate(`/location/${pendingSpawnLoc}`)
     }
   }
 
@@ -801,6 +856,7 @@ export default function Register() {
   const totalSteps = creationMode === 'custom' ? [1, 2, 3, 4, 5] : [1, 2, 3, 4, 5]
 
   return (
+    <>
     <div className="register-page" style={{ padding: '30px 16px', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div className="register-box" style={{ maxWidth: step >= 2 ? '960px' : '480px', width: '100%', transition: 'max-width 0.3s ease' }}>
         {/* Logo */}
@@ -1379,5 +1435,15 @@ export default function Register() {
         </div>
       </div>
     </div>
+
+    {/* ─── ABERTURA NARRATIVA ─────────────────────────────────────────────── */}
+    {showOpening && (
+      <NarrativeOpeningModal
+        config={openingConfig || DEFAULT_OPENING_CONFIG}
+        previewMode={false}
+        onComplete={handleOpeningComplete}
+      />
+    )}
+  </>
   )
 }

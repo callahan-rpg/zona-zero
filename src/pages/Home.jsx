@@ -58,7 +58,7 @@ Hoje, os sobreviventes se agrupam em abrigos subterrâneos, hospitais desativado
 }
 
 export default function Home() {
-  const { user } = useAuth()
+  const { user, character } = useAuth()
   const navigate = useNavigate()
 
   // null = ainda não recebeu resposta do Firestore
@@ -126,7 +126,7 @@ export default function Home() {
       navigate('/rules')
     } else if (type === 'login') {
       if (user) {
-        navigate('/location/sala-hospital')
+        navigate(`/location/${character?.currentLocation || 'acampamento'}`)
       } else {
         navigate('/login')
       }

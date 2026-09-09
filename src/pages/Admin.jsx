@@ -28,6 +28,7 @@ import AdminRadioEditor from '../components/AdminRadioEditor.jsx'
 import AdminBaseDefenseEditor from '../components/AdminBaseDefenseEditor.jsx'
 import AdminCookingEditor from '../components/AdminCookingEditor.jsx'
 import AdminWaterSourcesEditor from '../components/AdminWaterSourcesEditor.jsx'
+import AdminNarrativeEditor from '../components/AdminNarrativeEditor.jsx'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -922,10 +923,19 @@ export default function Admin() {
     try {
       const docRef = doc(db, 'users', playerUid)
       const updates = { role: newRole }
+      let newAttrs = null
+      let base = null
       if (newRole === 'admin') {
         // Admins não fazem parte de nenhuma profissão para não ocupar vagas
         updates['character.profession'] = null
         updates['character.specialty'] = null
+        base = selectedPlayer?.character?.baseAttributes || selectedPlayer?.character?.attributes || {}
+        newAttrs = {}
+        ATTRIBUTE_LIST.forEach(({ key }) => {
+          newAttrs[key] = Number(base[key] ?? 0)
+        })
+        updates['character.baseAttributes'] = base
+        updates['character.attributes'] = newAttrs
       }
       await updateDoc(docRef, updates)
       setSelectedPlayer(prev => {
@@ -933,7 +943,13 @@ export default function Admin() {
           return {
             ...prev,
             role: newRole,
-            character: newRole === 'admin' ? { ...prev.character, profession: null, specialty: null } : prev.character
+            character: newRole === 'admin' ? {
+              ...prev.character,
+              profession: null,
+              specialty: null,
+              baseAttributes: base || prev.character?.baseAttributes,
+              attributes: newAttrs || prev.character?.attributes
+            } : prev.character
           }
         }
         return prev
@@ -947,15 +963,29 @@ export default function Admin() {
   async function clearPlayerProfession(playerUid) {
     try {
       const docRef = doc(db, 'users', playerUid)
+      const base = selectedPlayer?.character?.baseAttributes || selectedPlayer?.character?.attributes || {}
+      const newAttrs = {}
+      ATTRIBUTE_LIST.forEach(({ key }) => {
+        newAttrs[key] = Number(base[key] ?? 0)
+      })
+
       await updateDoc(docRef, {
         'character.profession': null,
-        'character.specialty': null
+        'character.specialty': null,
+        'character.baseAttributes': base,
+        'character.attributes': newAttrs
       })
       setSelectedPlayer(prev => {
         if (prev?.uid === playerUid) {
           return {
             ...prev,
-            character: { ...prev.character, profession: null, specialty: null }
+            character: {
+              ...prev.character,
+              profession: null,
+              specialty: null,
+              baseAttributes: base,
+              attributes: newAttrs
+            }
           }
         }
         return prev
@@ -1818,7 +1848,15 @@ export default function Admin() {
             <button className={`btn btn-sm ${activeTab === 'water_sources' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('water_sources')} style={{ borderColor: 'rgba(56, 189, 248, 0.4)', color: activeTab === 'water_sources' ? '#fff' : '#7dd3fc', background: activeTab === 'water_sources' ? '#0284c7' : 'transparent', fontWeight: 'bold' }}>
               💧 Fontes de Água
             </button>
+            <button className={`btn btn-sm ${activeTab === 'narrative' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('narrative')} style={{ borderColor: 'rgba(250, 204, 21, 0.5)', color: activeTab === 'narrative' ? '#000' : '#fde047', background: activeTab === 'narrative' ? '#eab308' : 'transparent', fontWeight: 'bold' }}>
+              📖 Abertura Narrativa
+            </button>
           </div>
+
+          {/* CONTEÚDO DA TAB NARRATIVE: ABERTURA NARRATIVA */}
+          {activeTab === 'narrative' && (
+            <AdminNarrativeEditor />
+          )}
 
           {/* CONTEÚDO DA TAB RADIO: SISTEMA DE RÁDIO E TRANSMISSÕES */}
           {activeTab === 'radio' && (
@@ -5082,11 +5120,20 @@ export default function Admin() {
                         abilities: firstSpec.abilities || [],
                       } : null
 
+                      const base = selectedPlayer.character?.baseAttributes || selectedPlayer.character?.attributes || {}
+                      const bonuses = calculateProfessionBonuses(newProf.id, firstSpecId)
+                      const newAttrs = {}
+                      ATTRIBUTE_LIST.forEach(({ key }) => {
+                        newAttrs[key] = (Number(base[key]) || 0) + (Number(bonuses[key]) || 0)
+                      })
+
                       try {
                         const docRef = doc(db, 'users', selectedPlayer.uid)
                         await updateDoc(docRef, {
                           'character.profession': profPayload,
                           'character.specialty': specPayload,
+                          'character.baseAttributes': base,
+                          'character.attributes': newAttrs,
                         })
                         setSelectedPlayer(prev => ({
                           ...prev,
@@ -5094,6 +5141,8 @@ export default function Admin() {
                             ...prev.character,
                             profession: profPayload,
                             specialty: specPayload,
+                            baseAttributes: base,
+                            attributes: newAttrs,
                           }
                         }))
                       } catch (err) {
@@ -5115,16 +5164,27 @@ export default function Admin() {
                         abilities: spec.abilities || [],
                       }
 
+                      const base = selectedPlayer.character?.baseAttributes || selectedPlayer.character?.attributes || {}
+                      const bonuses = calculateProfessionBonuses(currentProfId, newSpecId)
+                      const newAttrs = {}
+                      ATTRIBUTE_LIST.forEach(({ key }) => {
+                        newAttrs[key] = (Number(base[key]) || 0) + (Number(bonuses[key]) || 0)
+                      })
+
                       try {
                         const docRef = doc(db, 'users', selectedPlayer.uid)
                         await updateDoc(docRef, {
                           'character.specialty': specPayload,
+                          'character.baseAttributes': base,
+                          'character.attributes': newAttrs,
                         })
                         setSelectedPlayer(prev => ({
                           ...prev,
                           character: {
                             ...prev.character,
                             specialty: specPayload,
+                            baseAttributes: base,
+                            attributes: newAttrs,
                           }
                         }))
                       } catch (err) {
@@ -5169,21 +5229,26 @@ export default function Admin() {
                       const newAttrs = {}
 
                       ATTRIBUTE_LIST.forEach(({ key }) => {
-                        const baseVal = Number(base[key] || 0)
-                        const bonusVal = Number(bonuses[key] || 0)
+                        const baseVal = Number(base[key] ?? 0)
+                        const bonusVal = Number(bonuses[key] ?? 0)
                         newAttrs[key] = baseVal + bonusVal
                       })
 
                       try {
                         const docRef = doc(db, 'users', selectedPlayer.uid)
                         await updateDoc(docRef, {
+                          'character.baseAttributes': base,
                           'character.attributes': newAttrs,
                         })
                         setSelectedPlayer(prev => ({
                           ...prev,
-                          character: { ...prev.character, attributes: newAttrs }
+                          character: {
+                            ...prev.character,
+                            baseAttributes: base,
+                            attributes: newAttrs,
+                          }
                         }))
-                        alert('Atributos recalculados!')
+                        alert('Atributos recalculados com sucesso!')
                       } catch (err) {
                         alert('Erro ao recalcular atributos: ' + err.message)
                       }
@@ -5419,37 +5484,111 @@ export default function Admin() {
                     )
                   })()}
 
-                  {/* Editor dos 8 Atributos */}
-                  <div style={{ marginBottom: 20 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', margin: 0 }}>
-                        Editar Atributos de Sobrevivência (8)
-                      </label>
-                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Valores totais efetivos salvos no personagem</span>
-                    </div>
+                  {/* Editor dos 8 Atributos (Base & Total) */}
+                  {(() => {
+                    const char = selectedPlayer.character || {}
+                    const currentProfId = char.profession?.id || (typeof char.profession === 'string' ? char.profession : null)
+                    const currentSpecId = char.specialty?.id || (typeof char.specialty === 'string' ? char.specialty : '')
+                    const bonuses = calculateProfessionBonuses(currentProfId, currentSpecId)
+                    const baseAttrs = char.baseAttributes || char.attributes || {}
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                      {ATTRIBUTE_LIST.map(({ key, label, icon, color }) => (
-                        <div key={key} className="form-group" style={{ marginBottom: 0, textAlign: 'center', background: 'rgba(255,255,255,0.02)', padding: '8px 4px', borderRadius: 6, border: '1px solid var(--glass-border)' }}>
-                          <label style={{ fontSize: 10, textTransform: 'capitalize', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, color }}>
-                            <span>{icon}</span>
-                            <span>{label}</span>
+                    const handleBaseAttrChange = async (attrKey, rawVal) => {
+                      const numVal = Math.max(0, Number(rawVal) || 0)
+                      const newBase = { ...baseAttrs, [attrKey]: numVal }
+                      const newAttrs = {}
+                      ATTRIBUTE_LIST.forEach(({ key }) => {
+                        const b = Number(newBase[key] ?? 0)
+                        const bon = Number(bonuses[key] ?? 0)
+                        newAttrs[key] = b + bon
+                      })
+
+                      try {
+                        const docRef = doc(db, 'users', selectedPlayer.uid)
+                        await updateDoc(docRef, {
+                          'character.baseAttributes': newBase,
+                          'character.attributes': newAttrs
+                        })
+                        setSelectedPlayer(prev => ({
+                          ...prev,
+                          character: {
+                            ...prev.character,
+                            baseAttributes: newBase,
+                            attributes: newAttrs
+                          }
+                        }))
+                      } catch (err) {
+                        alert('Erro ao atualizar atributo: ' + err.message)
+                      }
+                    }
+
+                    return (
+                      <div style={{ marginBottom: 20 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                          <label style={{ fontSize: 11, color: 'var(--accent-yellow)', textTransform: 'uppercase', margin: 0, fontWeight: 700 }}>
+                            ⚙️ Editar Atributos de Sobrevivência (8)
                           </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="99"
-                            value={selectedPlayer.character.attributes?.[key] ?? 1}
-                            onChange={(e) => {
-                              const newAttrs = { ...selectedPlayer.character.attributes, [key]: Number(e.target.value) }
-                              updatePlayerStats(selectedPlayer.uid, 'attributes', newAttrs)
-                            }}
-                            style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 13, marginTop: 4 }}
-                          />
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                            Altere a <strong>Base</strong> (o total com bônus de profissão é recalculado automaticamente)
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                          {ATTRIBUTE_LIST.map(({ key, label, icon, color }) => {
+                            const baseVal = baseAttrs?.[key] ?? 0
+                            const bonusVal = Number(bonuses?.[key] || 0)
+                            const totalVal = Number(baseVal) + bonusVal
+
+                            return (
+                              <div
+                                key={key}
+                                className="form-group"
+                                style={{
+                                  marginBottom: 0,
+                                  textAlign: 'center',
+                                  background: 'rgba(255,255,255,0.02)',
+                                  padding: '8px 6px',
+                                  borderRadius: 6,
+                                  border: '1px solid var(--glass-border)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between'
+                                }}
+                              >
+                                <label style={{ fontSize: 10, textTransform: 'capitalize', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, color, marginBottom: 4 }}>
+                                  <span>{icon}</span>
+                                  <span>{label}</span>
+                                </label>
+
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="99"
+                                    value={baseVal}
+                                    onChange={(e) => handleBaseAttrChange(key, e.target.value)}
+                                    style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 13, width: '100%', padding: '4px' }}
+                                    title={`Base: ${baseVal}`}
+                                  />
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 4, fontSize: 9.5 }}>
+                                  {bonusVal > 0 && (
+                                    <span style={{ color: '#4ade80', fontWeight: 600 }} title="Bônus de Profissão/Especialidade">
+                                      +{bonusVal} prof
+                                    </span>
+                                  )}
+                                  <span style={{ color: 'var(--text-secondary)' }}>
+                                    Total: <strong style={{ color: bonusVal > 0 ? '#4ade80' : '#fff' }}>{totalVal}</strong>
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>

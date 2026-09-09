@@ -23,7 +23,10 @@ const DEFAULT_SEEDS_CONFIG = [
     cropItemId: 'tomate',
     cropName: 'Tomate',
     cropIcon: '🍅',
+    growthTimeValue: 3,
+    growthTimeUnit: 'days',
     growthDays: 3,
+    growthHours: 72,
     goodConditionMin: 3,
     goodConditionMax: 6,
     badConditionMin: 1,
@@ -35,7 +38,10 @@ const DEFAULT_SEEDS_CONFIG = [
     cropItemId: 'milho',
     cropName: 'Milho',
     cropIcon: '🌽',
+    growthTimeValue: 4,
+    growthTimeUnit: 'days',
     growthDays: 4,
+    growthHours: 96,
     goodConditionMin: 3,
     goodConditionMax: 6,
     badConditionMin: 1,
@@ -47,7 +53,10 @@ const DEFAULT_SEEDS_CONFIG = [
     cropItemId: 'batata',
     cropName: 'Batata',
     cropIcon: '🥔',
+    growthTimeValue: 3,
+    growthTimeUnit: 'days',
     growthDays: 3,
+    growthHours: 72,
     goodConditionMin: 3,
     goodConditionMax: 6,
     badConditionMin: 1,
@@ -55,6 +64,45 @@ const DEFAULT_SEEDS_CONFIG = [
     goodConditionThreshold: 70,
   },
 ]
+
+function parseSeedGrowth(s) {
+  let timeValue = 3
+  let timeUnit = 'days'
+
+  if (s.growthTimeUnit && (s.growthTimeValue !== undefined && s.growthTimeValue !== '')) {
+    timeValue = Number(s.growthTimeValue) || 1
+    timeUnit = s.growthTimeUnit === 'hours' ? 'hours' : 'days'
+  } else if (s.growthHours !== undefined && s.growthHours !== null && s.growthHours !== '') {
+    const hrs = Number(s.growthHours)
+    if (hrs >= 24 && hrs % 24 === 0) {
+      timeValue = hrs / 24
+      timeUnit = 'days'
+    } else {
+      timeValue = hrs || 1
+      timeUnit = 'hours'
+    }
+  } else if (s.growthDays !== undefined && s.growthDays !== null && s.growthDays !== '') {
+    const days = Number(s.growthDays)
+    if (days > 0 && days < 1) {
+      timeValue = Math.round(days * 24) || 1
+      timeUnit = 'hours'
+    } else {
+      timeValue = days || 1
+      timeUnit = 'days'
+    }
+  } else if (s.growthMs) {
+    const hrs = Math.round(s.growthMs / 3600000)
+    if (hrs >= 24 && hrs % 24 === 0) {
+      timeValue = hrs / 24
+      timeUnit = 'days'
+    } else {
+      timeValue = hrs || 1
+      timeUnit = 'hours'
+    }
+  }
+
+  return { timeValue, timeUnit }
+}
 
 export default function AdminActivitiesEditor({ locations = [] }) {
   const [activities, setActivities] = useState([])
@@ -172,31 +220,43 @@ export default function AdminActivitiesEditor({ locations = [] }) {
     // Seeds config normalizado para array
     let seeds = DEFAULT_SEEDS_CONFIG
     if (Array.isArray(act.seedsConfig) && act.seedsConfig.length > 0) {
-      seeds = act.seedsConfig.map(s => ({
-        seedItemId: s.seedItemId || '',
-        cropItemId: s.cropItemId || '',
-        cropName: s.cropName || '',
-        cropIcon: s.cropIcon || '🌱',
-        growthDays: s.growthDays || Math.round((s.growthMs || 259200000) / 86400000),
-        goodConditionMin: s.goodConditionYield?.min ?? s.goodConditionMin ?? 3,
-        goodConditionMax: s.goodConditionYield?.max ?? s.goodConditionMax ?? 6,
-        badConditionMin: s.badConditionYield?.min ?? s.badConditionMin ?? 1,
-        badConditionMax: s.badConditionYield?.max ?? s.badConditionMax ?? 2,
-        goodConditionThreshold: s.goodConditionThreshold ?? 70,
-      }))
+      seeds = act.seedsConfig.map(s => {
+        const parsed = parseSeedGrowth(s)
+        return {
+          seedItemId: s.seedItemId || '',
+          cropItemId: s.cropItemId || '',
+          cropName: s.cropName || '',
+          cropIcon: s.cropIcon || '🌱',
+          growthTimeValue: parsed.timeValue,
+          growthTimeUnit: parsed.timeUnit,
+          growthDays: parsed.timeUnit === 'days' ? parsed.timeValue : Number((parsed.timeValue / 24).toFixed(2)),
+          growthHours: parsed.timeUnit === 'hours' ? parsed.timeValue : parsed.timeValue * 24,
+          goodConditionMin: s.goodConditionYield?.min ?? s.goodConditionMin ?? 3,
+          goodConditionMax: s.goodConditionYield?.max ?? s.goodConditionMax ?? 6,
+          badConditionMin: s.badConditionYield?.min ?? s.badConditionMin ?? 1,
+          badConditionMax: s.badConditionYield?.max ?? s.badConditionMax ?? 2,
+          goodConditionThreshold: s.goodConditionThreshold ?? 70,
+        }
+      })
     } else if (act.seedsConfig && typeof act.seedsConfig === 'object') {
-      seeds = Object.entries(act.seedsConfig).map(([k, v]) => ({
-        seedItemId: k,
-        cropItemId: v.cropItemId || k.replace('semente_', ''),
-        cropName: v.cropName || v.name || 'Fruto',
-        cropIcon: v.cropIcon || v.icon || '🌱',
-        growthDays: v.growthDays || Math.round((v.growthMs || 259200000) / 86400000),
-        goodConditionMin: v.goodConditionYield?.min ?? v.harvestMin ?? 3,
-        goodConditionMax: v.goodConditionYield?.max ?? v.harvestMax ?? 6,
-        badConditionMin: v.badConditionYield?.min ?? 1,
-        badConditionMax: v.badConditionYield?.max ?? 2,
-        goodConditionThreshold: v.goodConditionThreshold ?? 70,
-      }))
+      seeds = Object.entries(act.seedsConfig).map(([k, v]) => {
+        const parsed = parseSeedGrowth(v)
+        return {
+          seedItemId: k,
+          cropItemId: v.cropItemId || k.replace('semente_', ''),
+          cropName: v.cropName || v.name || 'Fruto',
+          cropIcon: v.cropIcon || v.icon || '🌱',
+          growthTimeValue: parsed.timeValue,
+          growthTimeUnit: parsed.timeUnit,
+          growthDays: parsed.timeUnit === 'days' ? parsed.timeValue : Number((parsed.timeValue / 24).toFixed(2)),
+          growthHours: parsed.timeUnit === 'hours' ? parsed.timeValue : parsed.timeValue * 24,
+          goodConditionMin: v.goodConditionYield?.min ?? v.harvestMin ?? 3,
+          goodConditionMax: v.goodConditionYield?.max ?? v.harvestMax ?? 6,
+          badConditionMin: v.badConditionYield?.min ?? 1,
+          badConditionMax: v.badConditionYield?.max ?? 2,
+          goodConditionThreshold: v.goodConditionThreshold ?? 70,
+        }
+      })
     }
 
     setForm({
@@ -337,7 +397,10 @@ export default function AdminActivitiesEditor({ locations = [] }) {
           cropItemId: defaultCropItem.itemId,
           cropName: defaultCropItem.name,
           cropIcon: defaultCropItem.icon || '🌱',
+          growthTimeValue: 3,
+          growthTimeUnit: 'days',
           growthDays: 3,
+          growthHours: 72,
           goodConditionMin: 3,
           goodConditionMax: 6,
           badConditionMin: 1,
@@ -402,13 +465,22 @@ export default function AdminActivitiesEditor({ locations = [] }) {
         docData.wormFindChanceCaring = (Number(form.wormFindChanceCaring) || 30) / 100
         docData.seedsConfig = form.seedsConfig.map(s => {
           const cropMeta = supplyItems.find(i => i.itemId === s.cropItemId)
+          const timeVal = Math.max(1, Number(s.growthTimeValue ?? s.growthDays) || 1)
+          const timeUnit = s.growthTimeUnit === 'hours' ? 'hours' : 'days'
+          const totalHours = timeUnit === 'hours' ? timeVal : timeVal * 24
+          const totalMs = totalHours * 60 * 60 * 1000
+          const growthDays = timeUnit === 'days' ? timeVal : Number((totalHours / 24).toFixed(2))
+
           return {
             seedItemId: String(s.seedItemId || '').trim().toLowerCase(),
             cropItemId: String(s.cropItemId || s.seedItemId.replace('semente_', '')).trim().toLowerCase(),
             cropName: cropMeta?.name || s.cropName || 'Colheita',
             cropIcon: cropMeta?.icon || s.cropIcon || '🌱',
-            growthDays: Number(s.growthDays) || 3,
-            growthMs: (Number(s.growthDays) || 3) * 24 * 60 * 60 * 1000,
+            growthTimeValue: timeVal,
+            growthTimeUnit: timeUnit,
+            growthHours: totalHours,
+            growthDays,
+            growthMs: totalMs,
             goodConditionYield: {
               min: Number(s.goodConditionMin) || 3,
               max: Number(s.goodConditionMax) || 6,
@@ -500,7 +572,7 @@ export default function AdminActivitiesEditor({ locations = [] }) {
         wormFindChanceCaring: 0.30,
         seedsConfig: DEFAULT_SEEDS_CONFIG.map(s => ({
           ...s,
-          growthMs: s.growthDays * 24 * 60 * 60 * 1000,
+          growthMs: (s.growthTimeUnit === 'hours' ? s.growthTimeValue : s.growthDays * 24) * 60 * 60 * 1000,
           goodConditionYield: { min: s.goodConditionMin, max: s.goodConditionMax },
           badConditionYield: { min: s.badConditionMin, max: s.badConditionMax },
         })),
@@ -916,18 +988,30 @@ export default function AdminActivitiesEditor({ locations = [] }) {
                         </div>
                       </div>
 
-                      {/* Linha 2: Dias de crescimento e Faixas de rendimento */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: 6, fontSize: 10 }}>
+                      {/* Linha 2: Tempo de crescimento (Horas / Dias) e Faixas de rendimento */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '125px 1fr 1fr', gap: 6, fontSize: 10 }}>
                         <div>
-                          <label style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>Dias Cresc.</label>
-                          <input
-                            type="number"
-                            min="1"
-                            className="input-field"
-                            value={seed.growthDays}
-                            onChange={e => handleSeedFieldChange(idx, 'growthDays', e.target.value)}
-                            style={{ width: '100%', padding: '3px 4px', fontSize: 11 }}
-                          />
+                          <label style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>Tempo Cresc.</label>
+                          <div style={{ display: 'flex', gap: 3 }}>
+                            <input
+                              type="number"
+                              min="1"
+                              className="input-field"
+                              value={seed.growthTimeValue ?? seed.growthDays ?? 3}
+                              onChange={e => handleSeedFieldChange(idx, 'growthTimeValue', e.target.value)}
+                              style={{ width: '55%', padding: '3px 4px', fontSize: 11 }}
+                              placeholder="1"
+                            />
+                            <select
+                              className="input-field"
+                              value={seed.growthTimeUnit || 'days'}
+                              onChange={e => handleSeedFieldChange(idx, 'growthTimeUnit', e.target.value)}
+                              style={{ width: '45%', padding: '3px 2px', fontSize: 10 }}
+                            >
+                              <option value="hours">Horas</option>
+                              <option value="days">Dias</option>
+                            </select>
+                          </div>
                         </div>
                         <div>
                           <label style={{ color: '#86efac', display: 'block', marginBottom: 2 }}>Bom (≥70% HP) Min-Max</label>

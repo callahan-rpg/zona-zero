@@ -23,6 +23,8 @@ import {
   addItemToInventory,
   generateActivityStateId,
   formatHoursAgo,
+  formatGrowthDuration,
+  formatRemainingTime,
   getBarColor,
   FARMING_DEFAULTS,
 } from '../utils/activitySystem'
@@ -35,6 +37,10 @@ const DEFAULT_SEED_CONFIGS = {
     cropItemId: 'tomate',
     cropName: 'Tomate',
     cropIcon: '🍅',
+    growthTimeValue: 3,
+    growthTimeUnit: 'days',
+    growthHours: 72,
+    growthDays: 3,
     growthMs: 3 * 24 * 60 * 60 * 1000, // 3 dias reais
     harvestMin: 3,
     harvestMax: 6,
@@ -49,6 +55,10 @@ const DEFAULT_SEED_CONFIGS = {
     cropItemId: 'milho',
     cropName: 'Milho',
     cropIcon: '🌽',
+    growthTimeValue: 4,
+    growthTimeUnit: 'days',
+    growthHours: 96,
+    growthDays: 4,
     growthMs: 4 * 24 * 60 * 60 * 1000, // 4 dias reais
     harvestMin: 3,
     harvestMax: 6,
@@ -63,6 +73,10 @@ const DEFAULT_SEED_CONFIGS = {
     cropItemId: 'batata',
     cropName: 'Batata',
     cropIcon: '🥔',
+    growthTimeValue: 3,
+    growthTimeUnit: 'days',
+    growthHours: 72,
+    growthDays: 3,
     growthMs: 3 * 24 * 60 * 60 * 1000, // 3 dias reais
     harvestMin: 3,
     harvestMax: 6,
@@ -159,7 +173,11 @@ export default function FarmingModal({ activity, character, locationSlug, onClos
       const plotId = generateActivityStateId('farming', locationSlug, user.uid)
       const plotRef = doc(db, 'activity_states', plotId)
       const nowIso = new Date().toISOString()
-      const growthMs = seedCfg.growthMs || (seedCfg.growthDays ? seedCfg.growthDays * 24 * 60 * 60 * 1000 : 3 * 24 * 60 * 60 * 1000)
+      const growthMs = seedCfg.growthMs
+        || (seedCfg.growthHours ? seedCfg.growthHours * 60 * 60 * 1000 : null)
+        || (seedCfg.growthTimeUnit === 'hours' ? (seedCfg.growthTimeValue || 1) * 60 * 60 * 1000 : null)
+        || (seedCfg.growthDays ? seedCfg.growthDays * 24 * 60 * 60 * 1000 : null)
+        || (seedCfg.growthTimeValue ? seedCfg.growthTimeValue * 24 * 60 * 60 * 1000 : 3 * 24 * 60 * 60 * 1000)
 
       let wormResult = null
       let toolLossResult = null
@@ -579,11 +597,14 @@ export default function FarmingModal({ activity, character, locationSlug, onClos
                 style={{ flex: 1, minWidth: 200, padding: '8px 10px', fontSize: 13 }}
               >
                 <option value="">Selecione uma semente...</option>
-                {availableSeeds.map(s => (
-                  <option key={s.seedId} value={s.seedId}>
-                    {s.icon || '🌱'} {s.cropName || s.name} ({s.count} disponível{s.count > 1 ? 'is' : ''}) — {s.description || 'Cresce em poucos dias.'}
-                  </option>
-                ))}
+                {availableSeeds.map(s => {
+                  const durationLabel = formatGrowthDuration(s)
+                  return (
+                    <option key={s.seedId} value={s.seedId}>
+                      {s.icon || '🌱'} {s.cropName || s.name} ({s.count} disponível{s.count > 1 ? 'is' : ''}) — {durationLabel ? `Cresce em ${durationLabel}` : (s.description || 'Cresce em poucos dias')}
+                    </option>
+                  )
+                })}
               </select>
 
               <button
@@ -675,7 +696,7 @@ export default function FarmingModal({ activity, character, locationSlug, onClos
                       )}
                       {!state.isDead && !state.isReady && (
                         <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.1)', color: '#94a3b8', padding: '2px 8px', borderRadius: 10 }}>
-                          🌱 Em crescimento ({state.growthPct}%)
+                          🌱 Em crescimento ({state.growthPct}%) • {state.remainingFormatted}
                         </span>
                       )}
                     </div>
@@ -688,7 +709,12 @@ export default function FarmingModal({ activity, character, locationSlug, onClos
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>
                           <span>Crescimento</span>
-                          <strong style={{ color: '#fff' }}>{state.growthPct}%</strong>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            {state.growthPct < 100 && (
+                              <span style={{ fontSize: 10, color: '#38bdf8' }}>⏱️ {state.remainingFormatted}</span>
+                            )}
+                            <strong style={{ color: '#fff' }}>{state.growthPct}%</strong>
+                          </div>
                         </div>
                         <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden' }}>
                           <div style={{

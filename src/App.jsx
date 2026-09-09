@@ -26,16 +26,18 @@ function ProtectedRoute({ children }) {
 }
 
 function PublicRoute({ children }) {
-  const { user, loading } = useAuth()
+  const { user, character, loading } = useAuth()
   if (loading) return <div className="loading-screen"><span className="loading-dot" /></div>
-  return !user ? children : <Navigate to="/location/sala-hospital" replace />
+  const targetLoc = character?.currentLocation || 'acampamento'
+  return !user ? children : <Navigate to={`/location/${targetLoc}`} replace />
 }
 
 function AdminRoute({ children }) {
-  const { user, role, loading } = useAuth()
+  const { user, character, role, loading } = useAuth()
   if (loading) return <div className="loading-screen"><span className="loading-dot" /></div>
   if (!user) return <Navigate to="/login" replace />
-  return role === 'admin' ? children : <Navigate to="/location/sala-hospital" replace />
+  const targetLoc = character?.currentLocation || 'acampamento'
+  return role === 'admin' ? children : <Navigate to={`/location/${targetLoc}`} replace />
 }
 
 /**
@@ -63,9 +65,8 @@ function GlobalRadioScheduler() {
 }
 
 /**
- * GlobalAmbientSound: Renderizado dentro do BrowserRouter em nível global.
- * Fica sempre montado na árvore DOM para manter o áudio contínuo sem cortes
- * e sem reiniciar quando o jogador se move entre quartos/corredores ou abre menus.
+ * GlobalAmbientSound: Gerencia o áudio ambiente de clima e o som específico da locação
+ * de forma unificada e ininterrupta entre trocas de página.
  */
 function GlobalAmbientSound() {
   const { user } = useAuth()
@@ -75,18 +76,12 @@ function GlobalAmbientSound() {
   const [locationSoundUrl, setLocationSoundUrl] = useState('')
   const [disableWeatherSound, setDisableWeatherSound] = useState(false)
 
-  // 1. Escuta configuração climática global em tempo real apenas se logado
+  // 1. Escuta o clima global em tempo real
   useEffect(() => {
     if (!user) return
-    const unsub = onSnapshot(
-      doc(db, 'game_config', 'global'),
-      (snap) => {
-        if (snap.exists()) setGameConfig(snap.data())
-      },
-      (err) => {
-        console.warn('Aviso som ambiente game_config:', err)
-      }
-    )
+    const unsub = onSnapshot(doc(db, 'game_config', 'global'), (snap) => {
+      if (snap.exists()) setGameConfig(snap.data())
+    })
     return unsub
   }, [user])
 
@@ -151,7 +146,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/rules" element={<Rules />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/register" element={<Register />} />
 
         {/* Rotas protegidas */}
         <Route path="/location/:slug" element={<ProtectedRoute><Location /></ProtectedRoute>} />
