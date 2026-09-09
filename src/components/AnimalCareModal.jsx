@@ -31,20 +31,22 @@ export default function AnimalCareModal({ activity, character, locationSlug, onC
   // Escuta o estado compartilhado do galinheiro neste local
   useEffect(() => {
     const docRef = doc(db, 'activity_states', stateDocId)
+    // totalAnimals definido na atividade (ou 10 como fallback)
+    const configuredTotal = Number(activity?.totalAnimals) || 10
 
     const unsubscribe = onSnapshot(
       docRef,
       async (docSnap) => {
         if (!docSnap.exists()) {
-          // Cria o estado inicial padrão se ainda não existir
+          // Cria o estado inicial usando o totalAnimals configurado na atividade
           const initialData = {
             id: stateDocId,
             type: 'animal_care',
             activityId: activity?.id || 'coop_default',
             locationSlug,
             name: activity?.name || 'Galinheiro Comunitário',
-            totalAnimals: 10,
-            aliveAnimals: 10,
+            totalAnimals: configuredTotal,
+            aliveAnimals: configuredTotal,
             feeding: 100,
             hygiene: 100,
             health: 100,
@@ -62,7 +64,19 @@ export default function AnimalCareModal({ activity, character, locationSlug, onC
           }
           setCoopState(initialData)
         } else {
-          setCoopState(docSnap.data())
+          const data = docSnap.data()
+          // Sincroniza totalAnimals se o admin alterou a configuração da atividade
+          // (não altera aliveAnimals — preserva mortes já ocorridas)
+          if (data.totalAnimals !== configuredTotal) {
+            try {
+              await setDoc(docRef, { totalAnimals: configuredTotal }, { merge: true })
+            } catch (e) {
+              console.warn('Erro ao sincronizar totalAnimals:', e)
+            }
+            setCoopState({ ...data, totalAnimals: configuredTotal })
+          } else {
+            setCoopState(data)
+          }
         }
         setLoading(false)
       },
@@ -73,7 +87,7 @@ export default function AnimalCareModal({ activity, character, locationSlug, onC
     )
 
     return () => unsubscribe()
-  }, [locationSlug, stateDocId])
+  }, [locationSlug, stateDocId, activity?.totalAnimals])
 
   function showMsg(type, msg) {
     setFeedback({ type, msg })

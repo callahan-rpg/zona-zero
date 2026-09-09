@@ -5,7 +5,11 @@ import {
   doc,
   setDoc,
   deleteDoc,
-  updateDoc
+  updateDoc,
+  getDocs,
+  query,
+  where,
+  writeBatch,
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { ACTIVITY_TYPES } from '../utils/activitySystem'
@@ -519,6 +523,43 @@ export default function AdminActivitiesEditor({ locations = [] }) {
     } catch (err) {
       console.error(err)
       showMsg('error', `Erro ao excluir: ${err.message}`)
+    }
+  }
+
+  /**
+   * Reseta todos os activity_states relacionados a uma atividade.
+   * - animal_care: deleta o doc `coop_{locationSlug}` e recria do zero com totalAnimals correto
+   * - farming:     deleta todos os canteiros do locationSlug
+   */
+  async function handleResetState(act) {
+    const typeLabel = act.type === 'animal_care' ? 'galinheiro' : 'plantação'
+    if (!window.confirm(
+      `Resetar todos os dados de estado do ${typeLabel} "${act.name}"?\n\nIsso vai apagar canteiros/estado do galinheiro desta locação. A atividade em si (configurações) não será excluída.`
+    )) return
+
+    try {
+      const batch = writeBatch(db)
+
+      if (act.type === 'animal_care') {
+        // Galinheiro: documento único `coop_{locationSlug}`
+        const coopId = `coop_${act.locationSlug}`
+        batch.delete(doc(db, 'activity_states', coopId))
+      } else if (act.type === 'farming') {
+        // Plantação: todos activity_states do tipo farming neste locationSlug
+        const q = query(
+          collection(db, 'activity_states'),
+          where('locationSlug', '==', act.locationSlug),
+          where('type', '==', 'farming')
+        )
+        const snap = await getDocs(q)
+        snap.forEach(d => batch.delete(d.ref))
+      }
+
+      await batch.commit()
+      showMsg('success', `✅ Estado do ${typeLabel} resetado! Ao abrir novamente, será recriado com as configurações atuais.`)
+    } catch (err) {
+      console.error(err)
+      showMsg('error', `Erro ao resetar estado: ${err.message}`)
     }
   }
 
@@ -1210,7 +1251,7 @@ export default function AdminActivitiesEditor({ locations = [] }) {
                   </div>
 
                   {/* Ações */}
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button
                       className="btn btn-sm"
                       onClick={() => handleToggle(act)}
@@ -1226,6 +1267,22 @@ export default function AdminActivitiesEditor({ locations = [] }) {
                     >
                       ✏️ Editar
                     </button>
+                    {(act.type === 'farming' || act.type === 'animal_care') && (
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => handleResetState(act)}
+                        style={{
+                          fontSize: 11,
+                          padding: '4px 8px',
+                          background: 'rgba(251,191,36,0.15)',
+                          borderColor: '#fbbf24',
+                          color: '#fde68a',
+                        }}
+                        title="Apagar dados de estado (canteiros/galinheiro) e reiniciar do zero"
+                      >
+                        🔄 Resetar Estado
+                      </button>
+                    )}
                     <button
                       className="btn btn-sm btn-danger"
                       onClick={() => handleDelete(act.id)}
