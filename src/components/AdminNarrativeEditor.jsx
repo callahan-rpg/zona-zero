@@ -1,9 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { uploadImageFree } from '../utils/imageUpload'
 import { extractYouTubeId } from '../utils/audioSystem'
 import NarrativeOpeningModal from './NarrativeOpeningModal.jsx'
+
+/**
+ * Verifica se a URL é link direto de áudio (MP3/WAV/OGG/AAC/Catbox/Cloud)
+ */
+function isDirectAudioUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  const clean = url.trim().toLowerCase()
+  if (clean.includes('youtube.com') || clean.includes('youtu.be')) return false
+  return (
+    clean.startsWith('http://') ||
+    clean.startsWith('https://') ||
+    clean.startsWith('data:audio/') ||
+    clean.startsWith('blob:')
+  )
+}
 
 export default function AdminNarrativeEditor() {
   const [openingConfig, setOpeningConfig] = useState({
@@ -11,7 +26,7 @@ export default function AdminNarrativeEditor() {
     title: 'O Despertar em Varezhia',
     imageUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1920&q=80',
     content: 'O som distante de sirenes há muito cessou. As ruas de Varezhia, outrora vibrantes, agora pertencem às sombras e àqueles que não descansam em paz.\n\nVocê acorda entre os escombros, com poucas memórias do colapso e apenas o instinto básico de respirar. Cada esquina esconde perigos inimagináveis, mas também a esperança tênue de sobrevivência.\n\nReúna seus pertences, mantenha o silêncio e prepare-se. Seu destino começa agora.',
-    musicUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    musicUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=dark-ambient-atmospheric-background-112194.mp3',
     musicVolume: 70,
     buttonText: 'Entrar em Varezhia',
   })
@@ -21,6 +36,10 @@ export default function AdminNarrativeEditor() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
+
+  // Testador de áudio no próprio painel
+  const [isPlayingTestAudio, setIsPlayingTestAudio] = useState(false)
+  const testAudioRef = useRef(null)
 
   // Escuta configurações do Firestore
   useEffect(() => {
@@ -33,8 +52,23 @@ export default function AdminNarrativeEditor() {
       console.warn('Erro ao escutar game_config/opening:', err)
       setLoading(false)
     })
-    return unsub
+    return () => {
+      unsub()
+      if (testAudioRef.current) {
+        testAudioRef.current.pause()
+        testAudioRef.current = null
+      }
+    }
   }, [])
+
+  // Parar teste de áudio se URL mudar
+  useEffect(() => {
+    if (testAudioRef.current) {
+      testAudioRef.current.pause()
+      testAudioRef.current = null
+      setIsPlayingTestAudio(false)
+    }
+  }, [openingConfig.musicUrl])
 
   // Upload gratuito de imagem
   async function handleImageFileChange(e) {
@@ -49,6 +83,43 @@ export default function AdminNarrativeEditor() {
       alert('Erro no upload da imagem: ' + err.message)
     } finally {
       setUploadingImage(false)
+    }
+  }
+
+  // Alterna teste de reprodução de áudio direto no painel
+  function toggleTestAudio() {
+    if (isPlayingTestAudio) {
+      if (testAudioRef.current) {
+        testAudioRef.current.pause()
+        testAudioRef.current = null
+      }
+      setIsPlayingTestAudio(false)
+      return
+    }
+
+    if (!openingConfig.musicUrl?.trim()) {
+      alert('Insira uma URL de áudio ou link de música primeiro.')
+      return
+    }
+
+    if (isDirectAudioUrl(openingConfig.musicUrl)) {
+      try {
+        const audio = new Audio(openingConfig.musicUrl.trim())
+        testAudioRef.current = audio
+        audio.volume = Math.max(0, Math.min(1, (openingConfig.musicVolume || 70) / 100))
+        audio.play()
+          .then(() => setIsPlayingTestAudio(true))
+          .catch((err) => {
+            alert('Não foi possível reproduzir este áudio. Verifique se o link direto está acessível: ' + err.message)
+            setIsPlayingTestAudio(false)
+          })
+
+        audio.onended = () => setIsPlayingTestAudio(false)
+      } catch (err) {
+        alert('Erro ao criar player de áudio: ' + err.message)
+      }
+    } else {
+      alert('Para testar links do YouTube ou ver o resultado final completo, use o botão "👁️ Testar / Pré-visualizar" no topo!')
     }
   }
 
@@ -78,7 +149,8 @@ export default function AdminNarrativeEditor() {
     }
   }
 
-  const ytId = extractYouTubeId(openingConfig.musicUrl)
+  const isDirectAudio = isDirectAudioUrl(openingConfig.musicUrl)
+  const ytId = !isDirectAudio ? extractYouTubeId(openingConfig.musicUrl) : null
 
   if (loading) {
     return (
@@ -120,7 +192,7 @@ export default function AdminNarrativeEditor() {
               Abertura Narrativa (Pós-Criação de Ficha)
             </h3>
             <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
-              Apresentação cinematográfica com imagem, música do YouTube e texto exibida <strong>uma única vez</strong> logo após o jogador concluir a criação da ficha.
+              Apresentação cinematográfica com imagem, música e texto narrativo exibida <strong>uma única vez</strong> logo após o jogador concluir a criação da ficha.
             </p>
           </div>
         </div>
@@ -138,7 +210,7 @@ export default function AdminNarrativeEditor() {
               padding: '8px 16px'
             }}
           >
-            👁️ Testar / Pré-visualizar
+            👁️ Testar / Pré-visualizar Modal
           </button>
 
           <div style={{
@@ -301,7 +373,7 @@ export default function AdminNarrativeEditor() {
           </div>
         </div>
 
-        {/* Seção Música YouTube */}
+        {/* Seção Música / Áudio */}
         <div style={{
           padding: 16,
           background: 'rgba(255,255,255,0.02)',
@@ -311,27 +383,58 @@ export default function AdminNarrativeEditor() {
           flexDirection: 'column',
           gap: 12
         }}>
-          <label style={{ fontSize: 12, fontWeight: 700, color: '#facc15', margin: 0 }}>
-            🎵 Música de Fundo (YouTube) — Autoplay ao Abrir
-          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#facc15', margin: 0 }}>
+              🎵 Música de Fundo (Áudio Direto MP3 / OGG ou YouTube)
+            </label>
+            {isDirectAudio && (
+              <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 700 }}>
+                ⚡ Modo Áudio Direto HTML5 Ativo (Mais Estável e Rápido)
+              </span>
+            )}
+          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 14, alignItems: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 200px', gap: 12, alignItems: 'center' }}>
             <div>
               <input
                 type="text"
                 value={openingConfig.musicUrl}
                 onChange={(e) => setOpeningConfig(prev => ({ ...prev, musicUrl: e.target.value }))}
-                placeholder="https://www.youtube.com/watch?v=... ou ID do vídeo"
-                style={{ padding: '8px 12px', fontSize: 12 }}
+                placeholder="https://exemplo.com/musica.mp3 ou link do YouTube"
+                style={{ padding: '8px 12px', fontSize: 12, width: '100%' }}
               />
-              <span style={{ fontSize: 10.5, color: ytId ? '#4ade80' : 'var(--text-muted)', marginTop: 4, display: 'block' }}>
-                {ytId ? `✅ ID do YouTube detectado: ${ytId}` : 'Cole um link do YouTube (vídeo, shorts ou youtu.be)'}
+              <span style={{ fontSize: 10.5, color: isDirectAudio ? '#4ade80' : ytId ? '#38bdf8' : 'var(--text-muted)', marginTop: 4, display: 'block' }}>
+                {isDirectAudio
+                  ? '✅ Link direto de áudio detectado (MP3/WAV/OGG/Web). Reprodução instantânea!'
+                  : ytId
+                  ? `ℹ️ Link do YouTube detectado (ID: ${ytId})`
+                  : 'Cole o link direto do arquivo (.mp3, .ogg, .wav, Discord, Catbox) ou link do YouTube.'}
               </span>
             </div>
 
+            {/* Botão de Testar Áudio no Painel */}
+            {isDirectAudio && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={toggleTestAudio}
+                style={{
+                  background: isPlayingTestAudio ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+                  borderColor: isPlayingTestAudio ? '#ef4444' : '#22c55e',
+                  color: isPlayingTestAudio ? '#fca5a5' : '#86efac',
+                  padding: '8px 14px',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {isPlayingTestAudio ? '⏹️ Parar' : '▶️ Ouvir'}
+              </button>
+            )}
+
+            {/* Slider de Volume */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Volume Inicial:</span>
+                <span style={{ color: 'var(--text-muted)' }}>Volume Padrão:</span>
                 <strong style={{ color: '#fff' }}>{openingConfig.musicVolume}%</strong>
               </div>
               <input
@@ -339,10 +442,30 @@ export default function AdminNarrativeEditor() {
                 min="0"
                 max="100"
                 value={openingConfig.musicVolume}
-                onChange={(e) => setOpeningConfig(prev => ({ ...prev, musicVolume: Number(e.target.value) }))}
+                onChange={(e) => {
+                  const newVol = Number(e.target.value)
+                  setOpeningConfig(prev => ({ ...prev, musicVolume: newVol }))
+                  if (testAudioRef.current) {
+                    testAudioRef.current.volume = newVol / 100
+                  }
+                }}
                 style={{ accentColor: '#eab308' }}
               />
             </div>
+          </div>
+
+          {/* Dica de Hospedagem Gratuita de Áudio */}
+          <div style={{
+            background: 'rgba(56, 189, 248, 0.08)',
+            border: '1px solid rgba(56, 189, 248, 0.25)',
+            borderRadius: 6,
+            padding: '10px 14px',
+            fontSize: 11.5,
+            color: '#bae6fd',
+            lineHeight: 1.5
+          }}>
+            <strong>💡 Recomendação de Áudio:</strong> Links diretos de arquivo (como <code>.mp3</code>) tocam sem restrições ou bloqueios dos navegadores.
+            Você pode hospedar seus áudios gratuitamente em sites como <strong>Catbox.moe</strong> (basta arrastar o MP3 e copiar o link <code>files.catbox.moe/...mp3</code>), <strong>Discord</strong> (enviando o arquivo e copiando o link do anexo) ou qualquer servidor na nuvem.
           </div>
         </div>
 

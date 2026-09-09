@@ -2,16 +2,25 @@ import { useEffect, useRef, useState } from 'react'
 import { extractYouTubeId } from '../utils/audioSystem'
 
 /**
+ * Verifica se uma URL é um arquivo direto de áudio (MP3, WAV, OGG, Web, Base64, etc.)
+ */
+function isDirectAudioUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  const clean = url.trim().toLowerCase()
+  if (clean.includes('youtube.com') || clean.includes('youtu.be')) return false
+  return (
+    clean.startsWith('http://') ||
+    clean.startsWith('https://') ||
+    clean.startsWith('data:audio/') ||
+    clean.startsWith('blob:')
+  )
+}
+
+/**
  * NarrativeOpeningModal
  * ─────────────────────────────────────────────────────────────────────────────
  * Modal de abertura narrativa — exibido uma única vez após a criação da ficha.
- * Reutilizável em modo preview pelo painel administrativo.
- *
- * Props:
- *   config        — { title, imageUrl, content, musicUrl, musicVolume, buttonText }
- *   previewMode   — boolean; se true, "Continuar" fecha sem salvar/navegar
- *   onComplete    — () => void; chamado quando o jogador confirma (modo player)
- *   onClose       — () => void; chamado para fechar (modo preview)
+ * Suporta áudio direto (MP3 / WAV / OGG / Web Audio) e fallback para YouTube.
  */
 export default function NarrativeOpeningModal({
   config = {},
@@ -30,18 +39,51 @@ export default function NarrativeOpeningModal({
 
   const [volume, setVolume]   = useState(Number(musicVolume) || 70)
   const [muted, setMuted]     = useState(false)
-  const [playerReady, setPlayerReady] = useState(false)
-  const [completing, setCompleting]   = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [completing, setCompleting] = useState(false)
 
   const playerContainerRef = useRef(null)
   const ytPlayerRef        = useRef(null)
+  const html5AudioRef      = useRef(null)
   const volumeBeforeMute   = useRef(volume)
 
-  const videoId = extractYouTubeId(musicUrl)
+  const isDirectAudio = isDirectAudioUrl(musicUrl)
+  const ytVideoId = !isDirectAudio ? extractYouTubeId(musicUrl) : null
+  const hasAudioSource = Boolean(musicUrl?.trim() && (isDirectAudio || ytVideoId))
 
-  // ── Inicializa YouTube Player ──────────────────────────────────────────────
+  // ── 1. Inicializa Áudio Direto (HTML5 Audio) ────────────────────────────────
   useEffect(() => {
-    if (!videoId) return
+    if (!isDirectAudio || !musicUrl) return
+
+    const audio = new Audio()
+    html5AudioRef.current = audio
+    audio.src = musicUrl.trim()
+    audio.loop = true
+    audio.volume = Math.max(0, Math.min(1, volume / 100))
+    audio.preload = 'auto'
+
+    const playPromise = audio.play()
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          setIsPlaying(true)
+        })
+        .catch((err) => {
+          console.warn('Autoplay direto bloqueado pelo navegador, aguardando clique:', err)
+          setIsPlaying(false)
+        })
+    }
+
+    return () => {
+      audio.pause()
+      audio.src = ''
+      html5AudioRef.current = null
+    }
+  }, [isDirectAudio, musicUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 2. Inicializa YouTube Player (Fallback) ──────────────────────────────────
+  useEffect(() => {
+    if (isDirectAudio || !ytVideoId) return
 
     let intervalId = null
     let destroyed = false
@@ -50,7 +92,6 @@ export default function NarrativeOpeningModal({
       if (destroyed || !playerContainerRef.current || ytPlayerRef.current) return
 
       try {
-        // Cria div placeholder
         const placeholder = document.createElement('div')
         placeholder.id = 'narrative-yt-player-' + Date.now()
         playerContainerRef.current.appendChild(placeholder)
@@ -58,7 +99,7 @@ export default function NarrativeOpeningModal({
         ytPlayerRef.current = new window.YT.Player(placeholder.id, {
           height: '200',
           width: '200',
-          videoId,
+          videoId: ytVideoId,
           playerVars: {
             autoplay:       1,
             controls:       0,
@@ -68,7 +109,7 @@ export default function NarrativeOpeningModal({
             playsinline:    1,
             rel:            0,
             loop:           1,
-            playlist:       videoId, // necessário para loop funcionar
+            playlist:       ytVideoId,
             iv_load_policy: 3,
             origin:         window.location.origin,
             enablejsapi:    1,
@@ -79,14 +120,17 @@ export default function NarrativeOpeningModal({
                 event.target.setVolume(volume)
                 event.target.unMute()
                 event.target.playVideo()
+                setIsPlaying(true)
               } catch (e) {
                 console.warn('Erro onReady YouTube:', e)
               }
-              setPlayerReady(true)
             },
             onStateChange: (event) => {
               if (event.data === window.YT?.PlayerState?.ENDED) {
                 try { event.target.playVideo() } catch (_) {}
+              }
+              if (event.data === window.YT?.PlayerState?.PLAYING) {
+                setIsPlaying(true)
               }
             },
           },
@@ -109,7 +153,6 @@ export default function NarrativeOpeningModal({
     if (window.YT && typeof window.YT.Player === 'function') {
       initPlayer()
     } else {
-      // Garante injeção do script caso ainda não exista
       if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
         const tag = document.createElement('script')
         tag.src = 'https://www.youtube.com/iframe_api'
@@ -121,9 +164,7 @@ export default function NarrativeOpeningModal({
         }
       }
 
-      // Interval polling para detectar YT.Player imediatamente quando carregar
       intervalId = setInterval(checkAndInit, 100)
-
       const prev = window.onYouTubeIframeAPIReady
       window.onYouTubeIframeAPIReady = () => {
         if (typeof prev === 'function') prev()
@@ -142,13 +183,24 @@ export default function NarrativeOpeningModal({
         ytPlayerRef.current = null
       }
     }
-  }, [videoId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isDirectAudio, ytVideoId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Controle de Volume ─────────────────────────────────────────────────────
   function handleVolumeChange(newVol) {
     const v = Number(newVol)
     setVolume(v)
     setMuted(v === 0)
+
+    // HTML5 Audio
+    if (html5AudioRef.current) {
+      html5AudioRef.current.volume = Math.max(0, Math.min(1, v / 100))
+      html5AudioRef.current.muted = v === 0
+      if (v > 0 && html5AudioRef.current.paused) {
+        html5AudioRef.current.play().then(() => setIsPlaying(true)).catch(() => {})
+      }
+    }
+
+    // YouTube Player
     if (ytPlayerRef.current && typeof ytPlayerRef.current.setVolume === 'function') {
       try {
         ytPlayerRef.current.setVolume(v)
@@ -167,13 +219,20 @@ export default function NarrativeOpeningModal({
     }
   }
 
-  // Desbloqueia reprodução caso a política de autoplay do browser exija interação
+  // Desbloqueia reprodução garantida ao primeiro toque/clique no modal
   function ensureAudioPlaying() {
+    if (html5AudioRef.current && html5AudioRef.current.paused) {
+      html5AudioRef.current.volume = Math.max(0, Math.min(1, volume / 100))
+      html5AudioRef.current.muted = muted
+      html5AudioRef.current.play().then(() => setIsPlaying(true)).catch(() => {})
+    }
+
     if (ytPlayerRef.current && typeof ytPlayerRef.current.playVideo === 'function') {
       try {
         ytPlayerRef.current.setVolume(volume)
         ytPlayerRef.current.unMute()
         ytPlayerRef.current.playVideo()
+        setIsPlaying(true)
       } catch (_) {}
     }
   }
@@ -182,6 +241,12 @@ export default function NarrativeOpeningModal({
   async function handleContinue() {
     if (completing) return
     setCompleting(true)
+    if (html5AudioRef.current) {
+      try {
+        html5AudioRef.current.pause()
+        html5AudioRef.current.src = ''
+      } catch (_) {}
+    }
     if (previewMode) {
       onClose?.()
     } else {
@@ -190,25 +255,26 @@ export default function NarrativeOpeningModal({
     setCompleting(false)
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="narrative-overlay" onClick={ensureAudioPlaying}>
-      {/* Container visível no DOM para o navegador não pausar iframe */}
-      <div
-        ref={playerContainerRef}
-        style={{
-          position: 'fixed',
-          bottom: 10,
-          right: 10,
-          width: 10,
-          height: 10,
-          opacity: 0.001,
-          pointerEvents: 'none',
-          zIndex: -1,
-          overflow: 'hidden'
-        }}
-        aria-hidden="true"
-      />
+    <div className="narrative-overlay" onClick={ensureAudioPlaying} onTouchStart={ensureAudioPlaying}>
+      {/* Container YouTube (apenas se for link do YouTube) */}
+      {!isDirectAudio && ytVideoId && (
+        <div
+          ref={playerContainerRef}
+          style={{
+            position: 'fixed',
+            bottom: 10,
+            right: 10,
+            width: 10,
+            height: 10,
+            opacity: 0.001,
+            pointerEvents: 'none',
+            zIndex: -1,
+            overflow: 'hidden'
+          }}
+          aria-hidden="true"
+        />
+      )}
 
       {/* Modal */}
       <div className="narrative-modal" role="dialog" aria-modal="true" aria-label={title}>
@@ -270,12 +336,12 @@ export default function NarrativeOpeningModal({
             {/* Rodapé da coluna: controle de áudio + botão */}
             <div className="narrative-footer">
               {/* Controle de Áudio */}
-              {videoId && (
+              {hasAudioSource && (
                 <div className="narrative-audio-ctrl">
                   <button
                     type="button"
                     className="narrative-mute-btn"
-                    onClick={toggleMute}
+                    onClick={(e) => { e.stopPropagation(); toggleMute(); }}
                     title={muted ? 'Ativar som' : 'Silenciar'}
                   >
                     {muted || volume === 0 ? '🔇' : volume < 40 ? '🔉' : '🔊'}
@@ -285,7 +351,8 @@ export default function NarrativeOpeningModal({
                     min="0"
                     max="100"
                     value={volume}
-                    onChange={(e) => handleVolumeChange(e.target.value)}
+                    onChange={(e) => { e.stopPropagation(); handleVolumeChange(e.target.value); }}
+                    onClick={(e) => e.stopPropagation()}
                     className="narrative-volume-slider"
                     title={`Volume: ${volume}%`}
                   />

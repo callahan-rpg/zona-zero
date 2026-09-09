@@ -30,7 +30,7 @@ const DEFAULT_OPENING_CONFIG = {
   title: 'O Despertar em Varezhia',
   imageUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1920&q=80',
   content: 'O som distante de sirenes há muito cessou. As ruas de Varezhia, outrora vibrantes, agora pertencem às sombras e àqueles que não descansam em paz.\n\nVocê acorda entre os escombros, com poucas memórias do colapso e apenas o instinto básico de respirar. Cada esquina esconde perigos inimagináveis, mas também a esperança tênue de sobrevivência.\n\nReúna seus pertences, mantenha o silêncio e prepare-se. Seu destino começa agora.',
-  musicUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  musicUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=dark-ambient-atmospheric-background-112194.mp3',
   musicVolume: 70,
   buttonText: 'Entrar em Varezhia',
 }
