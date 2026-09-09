@@ -1,5 +1,5 @@
-/* ===========================
-   ZONA ZERO — Estilos Globais
+﻿/* ===========================
+   ZONA ZERO â€” Estilos Globais
    =========================== */
 
 @keyframes spin {
@@ -54,7 +54,7 @@
   --radius-lg: 20px;
   --radius-pill: 9999px;
 
-  /* Transições */
+  /* TransiÃ§Ãµes */
   --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -102,7 +102,7 @@ body {
 }
 
 /* ===========================
-   COMPONENTE GLASS (reutilizável)
+   COMPONENTE GLASS (reutilizÃ¡vel)
    =========================== */
 .glass {
   background: var(--glass-bg);
@@ -151,7 +151,7 @@ body {
 }
 
 /* ===========================
-   BOTÕES
+   BOTÃ•ES
    =========================== */
 .btn {
   display: inline-flex;
@@ -216,7 +216,7 @@ body {
 }
 
 /* ===========================
-   FORMULÁRIOS (Auth)
+   FORMULÃRIOS (Auth)
    =========================== */
 .auth-page {
   min-height: 100vh;
@@ -1014,7 +1014,7 @@ body {
   transition: opacity 2s ease-in-out;
 }
 
-/* Fallback gradient quando não há imagem */
+/* Fallback gradient quando nÃ£o hÃ¡ imagem */
 .location-bg.fallback {
   background:
     radial-gradient(ellipse at 30% 60%, rgba(20, 24, 30, 0.45) 0%, transparent 60%),
@@ -1086,7 +1086,7 @@ body {
   }
 }
 
-/* Botões de navegação da esquerda colados ao lado do chat */
+/* BotÃµes de navegaÃ§Ã£o da esquerda colados ao lado do chat */
 .nav-buttons-left {
   display: flex;
   flex-direction: column;
@@ -1094,7 +1094,7 @@ body {
   gap: 12px;
 }
 
-/* Botões de navegação da direita colados ao lado do chat */
+/* BotÃµes de navegaÃ§Ã£o da direita colados ao lado do chat */
 .nav-buttons-right {
   display: flex;
   flex-direction: column;
@@ -1255,7 +1255,7 @@ body {
 .loot-item-qty { font-family: 'Share Tech Mono', monospace; color: var(--accent-dim); }
 
 /* ===========================
-   DADOS — Painel Flutuante e Arrastável
+   DADOS â€” Painel Flutuante e ArrastÃ¡vel
    =========================== */
 
 /* Painel principal: flutua sobre a tela, sem overlay */
@@ -1274,7 +1274,7 @@ body {
   user-select: none;
 }
 
-/* Header: área de arrasto com cursor de mover */
+/* Header: Ã¡rea de arrasto com cursor de mover */
 .dice-float-header {
   display: flex;
   align-items: center;
@@ -1294,7 +1294,7 @@ body {
   color: var(--text-primary);
 }
 
-/* Botão fechar */
+/* BotÃ£o fechar */
 .dice-close {
   width: 24px;
   height: 24px;
@@ -1313,7 +1313,7 @@ body {
 }
 .dice-close:hover { color: var(--accent-red); border-color: var(--accent-red); }
 
-/* Seleção de tipos de dado — compacta */
+/* SeleÃ§Ã£o de tipos de dado â€” compacta */
 .dice-float-types {
   display: flex;
   gap: 6px;
@@ -1423,7 +1423,7 @@ body {
   letter-spacing: 1px;
 }
 
-/* Alças de redimensionamento (Resize Handles) */
+/* AlÃ§as de redimensionamento (Resize Handles) */
 .resize-handle {
   position: absolute;
   z-index: 10;
@@ -1481,7 +1481,7 @@ body {
   cursor: nesw-resize;
 }
 
-/* Área de resultado */
+/* Ãrea de resultado */
 .dice-float-result {
   display: flex;
   flex-direction: column;
@@ -1550,7 +1550,7 @@ body {
   color: var(--text-muted);
 }
 
-/* Animação de rolagem */
+/* AnimaÃ§Ã£o de rolagem */
 .dice-rolling {
   display: flex;
   flex-direction: column;
@@ -1575,7 +1575,7 @@ body {
   color: var(--accent-dim);
 }
 
-/* Botão rolar */
+/* BotÃ£o rolar */
 .dice-roll-btn {
   width: 100%;
   padding: 9px 12px;
@@ -1600,7 +1600,7 @@ body {
 
 .dice-roll-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* Histórico compacto e expansível */
+/* HistÃ³rico compacto e expansÃ­vel */
 .dice-float-history {
   border-top: 1px solid var(--glass-border);
   padding: 8px 12px 12px;
@@ -1899,7 +1899,7 @@ body {
 }
 
 /* ===========================
-   CHARACTER POPUP — Painel Flutuante e Arrastável
+   CHARACTER POPUP â€” Painel Flutuante e ArrastÃ¡vel
    =========================== */
 .character-float-panel {
   position: fixed;
@@ -2164,7 +2164,7 @@ body {
 }
 
 /* ===========================
-   INVENTÁRIO AVANÇADO — Abas e Cards
+   INVENTÃRIO AVANÃ‡ADO â€” Abas e Cards
    =========================== */
 .character-inventory {
   padding: 24px 32px 32px;
@@ -2178,7 +2178,7 @@ body {
   margin-bottom: 16px;
 }
 
-/* Abas de Navegação */
+/* Abas de NavegaÃ§Ã£o */
 .inventory-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -2469,7 +2469,7 @@ body {
 }
 
 /* ===========================
-   REGISTER — Criação de Personagem
+   REGISTER â€” CriaÃ§Ã£o de Personagem
    =========================== */
 .register-page {
   min-height: 100vh;
@@ -2537,7 +2537,7 @@ body {
   }
 }
 
-/* Distribuição de atributos */
+/* DistribuiÃ§Ã£o de atributos */
 .attr-distribution {
   display: flex;
   flex-direction: column;
@@ -2655,7 +2655,7 @@ body {
 }
 
 /* ===========================
-   ANIMAÇÕES
+   ANIMAÃ‡Ã•ES
    =========================== */
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -2781,7 +2781,7 @@ body {
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
 }
 
-/* Alerta quando vital está baixo (< 25%) */
+/* Alerta quando vital estÃ¡ baixo (< 25%) */
 .vital-progress-fill.vital-thirst.vital-low,
 .vital-thirst.vital-low .vital-progress-fill { 
   background: linear-gradient(90deg, #ef4444, #b91c1c) !important; 
@@ -2915,8 +2915,8 @@ body {
 }
 
 /* ===========================
-   BOTÕES DE BUSCA (CHAT)
-   Suprimentos vs Busca Única
+   BOTÃ•ES DE BUSCA (CHAT)
+   Suprimentos vs Busca Ãšnica
    =========================== */
 .loot-search-actions-bar {
   display: flex;
@@ -2985,8 +2985,8 @@ body {
 }
 
 /* ===========================
-   MODAL DE BUSCA ÚNICA
-   Grade de seleção de itens
+   MODAL DE BUSCA ÃšNICA
+   Grade de seleÃ§Ã£o de itens
    =========================== */
 .unique-loot-modal-overlay {
   position: fixed;
@@ -3063,7 +3063,7 @@ body {
 }
 
 .unique-item-card.selected::after {
-  content: '✓';
+  content: '\2714';
   position: absolute;
   top: 6px;
   right: 8px;
@@ -3153,7 +3153,7 @@ body {
 }
 
 /* ===========================
-   BOTÃO DE NAVEGAÇÃO BLOQUEADO
+   BOTÃƒO DE NAVEGAÃ‡ÃƒO BLOQUEADO
    =========================== */
 .nav-btn-locked {
   opacity: 0.55 !important;
@@ -3164,7 +3164,7 @@ body {
 }
 
 .nav-btn-locked::before {
-  content: '🔒';
+  content: '\1F512';
   position: absolute;
   top: -8px;
   right: -8px;
@@ -3176,7 +3176,7 @@ body {
 }
 
 /* ===========================
-   INVENTÁRIO — CARDS DE ITEM
+   INVENTÃRIO â€” CARDS DE ITEM
    (Usar / Descartar)
    =========================== */
 .item-card-actions {
@@ -3647,7 +3647,7 @@ body {
   color: var(--text-primary);
 }
 
-/* Floating combat text (Números de dano flutuante) */
+/* Floating combat text (NÃºmeros de dano flutuante) */
 .floating-text-container {
   position: absolute;
   top: 0;
@@ -3845,9 +3845,9 @@ body {
   to   { width: 0%; }
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
-   SISTEMA DE MAPA — LAYOUT CENTRAL COM PAINEL LATERAL DIREITO
-   ══════════════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   SISTEMA DE MAPA â€” LAYOUT CENTRAL COM PAINEL LATERAL DIREITO
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .map-view-page {
   display: flex;
@@ -3866,7 +3866,7 @@ body {
   position: relative;
 }
 
-/* ── 1. ÁREA CENTRAL DO MAPA ─────────────────────────────────────────── */
+/* â”€â”€ 1. ÃREA CENTRAL DO MAPA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .map-view-main {
   flex: 1;
   display: flex;
@@ -3955,7 +3955,7 @@ body {
   border-color: rgba(255, 255, 255, 0.25);
 }
 
-/* Moldura e Imagem Central do Mapa — Wrapper é o viewport estático para o zoom */
+/* Moldura e Imagem Central do Mapa â€” Wrapper Ã© o viewport estÃ¡tico para o zoom */
 .map-frame-wrapper {
   flex: 1;
   display: flex;
@@ -3978,7 +3978,7 @@ body {
   cursor: grabbing;
 }
 
-/* O frame exibe a imagem na proporção natural dela (ex: 1920x1000) */
+/* O frame exibe a imagem na proporÃ§Ã£o natural dela (ex: 1920x1000) */
 .map-frame {
   position: relative;
   width: 100%;
@@ -3987,12 +3987,12 @@ body {
   overflow: hidden;
   background: #040604;
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.8), inset 0 0 40px rgba(0, 0, 0, 0.8);
-  /* transform-origin 0 0 é obrigatório para que a matemática do zoomAtPoint funcione */
+  /* transform-origin 0 0 Ã© obrigatÃ³rio para que a matemÃ¡tica do zoomAtPoint funcione */
   transform-origin: 0 0;
   will-change: transform;
 }
 
-/* Imagem exibida sem distorção, na proporção natural */
+/* Imagem exibida sem distorÃ§Ã£o, na proporÃ§Ã£o natural */
 .map-frame-img {
   width: 100%;
   height: auto;
@@ -4001,7 +4001,7 @@ body {
   filter: brightness(0.9) contrast(1.08);
 }
 
-/* Grade Tática de Satélite */
+/* Grade TÃ¡tica de SatÃ©lite */
 .map-frame-grid {
   position: absolute;
   top: 0;
@@ -4015,7 +4015,7 @@ body {
   background-size: 40px 40px;
 }
 
-/* Rodapé do Frame */
+/* RodapÃ© do Frame */
 .map-frame-footer {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.4);
@@ -4023,7 +4023,7 @@ body {
   padding: 4px 0;
 }
 
-/* ── PINS INTERATIVOS NA MOLDURA DO MAPA ────────────────────────────── */
+/* â”€â”€ PINS INTERATIVOS NA MOLDURA DO MAPA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .map-view-pin {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -4058,7 +4058,7 @@ body {
   transition: all 0.15s ease;
 }
 
-/* Anel de seleção em pulso */
+/* Anel de seleÃ§Ã£o em pulso */
 .map-view-pin-ring {
   position: absolute;
   top: 50%;
@@ -4094,7 +4094,7 @@ body {
   100% { transform: translate(-50%, -50%) scale(1.7); opacity: 0; }
 }
 
-/* Rótulo de texto do Pin */
+/* RÃ³tulo de texto do Pin */
 .map-view-pin-label {
   margin-top: 4px;
   background: rgba(0, 0, 0, 0.88);
@@ -4111,7 +4111,7 @@ body {
   letter-spacing: 0.3px;
 }
 
-/* ── 2. PAINEL LATERAL DIREITO (INFORMAÇÕES, RECURSOS E LOCALIDADES) ─── */
+/* â”€â”€ 2. PAINEL LATERAL DIREITO (INFORMAÃ‡Ã•ES, RECURSOS E LOCALIDADES) â”€â”€â”€ */
 .map-view-sidebar {
   width: 340px;
   min-width: 340px;
@@ -4137,7 +4137,7 @@ body {
   gap: 12px;
 }
 
-/* Cabeçalho do nó */
+/* CabeÃ§alho do nÃ³ */
 .map-node-header {
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   padding-bottom: 12px;
@@ -4164,7 +4164,7 @@ body {
   letter-spacing: 0.5px;
 }
 
-/* Cards de Informações */
+/* Cards de InformaÃ§Ãµes */
 .map-node-card {
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -4195,7 +4195,7 @@ body {
   transition: width 0.4s ease;
 }
 
-/* Descrição */
+/* DescriÃ§Ã£o */
 .map-node-description {
   font-size: 12px;
   line-height: 1.6;
@@ -4203,7 +4203,7 @@ body {
   margin: 0;
 }
 
-/* Botões de Ação */
+/* BotÃµes de AÃ§Ã£o */
 .map-node-actions {
   display: flex;
   flex-direction: column;
@@ -4321,7 +4321,7 @@ body {
   text-align: center;
 }
 
-/* ── RESPONSIVIDADE ─────────────────────────────────────────────────── */
+/* â”€â”€ RESPONSIVIDADE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (max-width: 960px) {
   .map-view-container {
     flex-direction: column;
@@ -4340,7 +4340,7 @@ body {
 }
 
 
-/* ── Layout raiz ─────────────────────────────────────────────────────────── */
+/* â”€â”€ Layout raiz â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .map-page {
   display: flex;
   flex-direction: column;
@@ -4358,7 +4358,7 @@ body {
   padding-top: var(--hud-height, 56px);
 }
 
-/* ══ SIDEBAR ESQUERDA ════════════════════════════════════════════════════ */
+/* â•â• SIDEBAR ESQUERDA â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .map-sidebar {
   width: 290px;
   min-width: 290px;
@@ -4372,7 +4372,7 @@ body {
   flex-shrink: 0;
 }
 
-/* Cabeçalho da sidebar */
+/* CabeÃ§alho da sidebar */
 .map-sidebar__header {
   padding: 14px 14px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
@@ -4391,7 +4391,7 @@ body {
   margin: 0;
 }
 
-/* Botão voltar dentro da sidebar */
+/* BotÃ£o voltar dentro da sidebar */
 .map-back-btn-side {
   background: rgba(255, 200, 80, 0.1);
   border: 1px solid rgba(255, 200, 80, 0.35);
@@ -4410,7 +4410,7 @@ body {
   transform: translateX(-2px);
 }
 
-/* ── Lista de Cidades ──────────────────────────────────────────────────── */
+/* â”€â”€ Lista de Cidades â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .map-sidebar__city-list {
   list-style: none;
   margin: 0;
@@ -4469,7 +4469,7 @@ body {
   line-height: 1.5;
 }
 
-/* ── Preview da Cidade Selecionada ─────────────────────────────────────── */
+/* â”€â”€ Preview da Cidade Selecionada â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .map-sidebar__preview {
   flex: 1;
   display: flex;
@@ -4553,7 +4553,7 @@ body {
   font-style: italic;
 }
 
-/* Botão Explorar */
+/* BotÃ£o Explorar */
 .map-sidebar__enter-btn {
   width: 100%;
   padding: 10px 14px;
@@ -4577,7 +4577,7 @@ body {
   box-shadow: 0 4px 16px rgba(255, 200, 59, 0.2);
 }
 
-/* Dica quando está dentro da cidade sem pin selecionado */
+/* Dica quando estÃ¡ dentro da cidade sem pin selecionado */
 .map-sidebar__city-hint {
   flex: 1;
   display: flex;
@@ -4590,7 +4590,7 @@ body {
   line-height: 1.5;
 }
 
-/* MapInfoPanel embedded (sem própria borda/bg quando dentro da sidebar) */
+/* MapInfoPanel embedded (sem prÃ³pria borda/bg quando dentro da sidebar) */
 .map-info-panel--embedded {
   width: 100% !important;
   min-width: 0 !important;
@@ -4601,7 +4601,7 @@ body {
   animation: none !important;
 }
 
-/* ══ ÁREA DO CANVAS ══════════════════════════════════════════════════════ */
+/* â•â• ÃREA DO CANVAS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .map-canvas-area {
   flex: 1;
   position: relative;
@@ -4623,7 +4623,7 @@ body {
   cursor: grabbing;
 }
 
-/* Camada da imagem com aceleração GPU — sem tamanho fixo, a imagem define o tamanho */
+/* Camada da imagem com aceleraÃ§Ã£o GPU â€” sem tamanho fixo, a imagem define o tamanho */
 .map-canvas-layer {
   position: relative;
   transform-origin: 0 0;
@@ -4632,7 +4632,7 @@ body {
   line-height: 0;
 }
 
-/* Imagem base de fundo (País / Cidade) — tamanho natural, explorável com pan/zoom */
+/* Imagem base de fundo (PaÃ­s / Cidade) â€” tamanho natural, explorÃ¡vel com pan/zoom */
 .map-image-base {
   display: block;
   width: auto;
@@ -4645,7 +4645,7 @@ body {
   image-rendering: auto;
 }
 
-/* Grade sutil tática de satélite */
+/* Grade sutil tÃ¡tica de satÃ©lite */
 .map-tactical-grid-overlay {
   position: absolute;
   top: 0;
@@ -4659,7 +4659,7 @@ body {
   background-size: 60px 60px;
 }
 
-/* ── Pins Interativos ─────────────────────────────────────────────────── */
+/* â”€â”€ Pins Interativos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .map-interactive-pin {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -4701,7 +4701,7 @@ body {
   line-height: 1;
 }
 
-/* Anel de seleção */
+/* Anel de seleÃ§Ã£o */
 .map-pin-select-ring {
   position: absolute;
   top: 50%;
@@ -4737,7 +4737,7 @@ body {
   100% { transform: translate(-50%, -52%) scale(1.8); opacity: 0; }
 }
 
-/* Rótulo de texto do Pin */
+/* RÃ³tulo de texto do Pin */
 .map-pin-label {
   margin-top: 6px;
   display: flex;
@@ -4767,7 +4767,7 @@ body {
   letter-spacing: 0.5px;
 }
 
-/* ── Cabeçalho Overlay no Canvas ──────────────────────────────────────── */
+/* â”€â”€ CabeÃ§alho Overlay no Canvas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .map-overlay-title {
   position: absolute;
   top: 14px;
@@ -4801,7 +4801,7 @@ body {
   text-align: center;
 }
 
-/* ── Painel de Informações (modo standalone, quando clica no canvas da cidade) */
+/* â”€â”€ Painel de InformaÃ§Ãµes (modo standalone, quando clica no canvas da cidade) */
 .map-info-panel {
   width: 290px;
   min-width: 290px;
@@ -4908,7 +4908,7 @@ body {
   transition: width 0.4s ease;
 }
 
-/* Descrição */
+/* DescriÃ§Ã£o */
 .map-info-panel__description {
   padding: 14px 16px;
   font-size: 12.5px;
@@ -4917,7 +4917,7 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Ações */
+/* AÃ§Ãµes */
 .map-info-panel__actions {
   padding: 16px;
   margin-top: auto;
@@ -4971,7 +4971,7 @@ body {
   font-size: 12px;
 }
 
-/* ── Legenda Tática ──────────────────────────────────────────────────── */
+/* â”€â”€ Legenda TÃ¡tica â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .map-legend {
   position: absolute;
   bottom: 14px;
@@ -4992,7 +4992,7 @@ body {
   white-space: nowrap;
 }
 
-/* ── Botão Voltar (overlay dentro do canvas) ─────────────────────────── */
+/* â”€â”€ BotÃ£o Voltar (overlay dentro do canvas) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .map-back-btn {
   background: rgba(255, 200, 80, 0.15);
   border: 1px solid rgba(255, 200, 80, 0.5);
@@ -5010,7 +5010,7 @@ body {
   transform: translateX(-2px);
 }
 
-/* ── Responsividade ──────────────────────────────────────────────────── */
+/* â”€â”€ Responsividade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (max-width: 900px) {
   .map-body {
     flex-direction: column;
@@ -5048,7 +5048,7 @@ body {
 }
 
 /* ==========================================================================
-   HOME PAGE (Design Editorial Cinematográfico — Referência Visual de Luxo)
+   HOME PAGE (Design Editorial CinematogrÃ¡fico â€” ReferÃªncia Visual de Luxo)
    ========================================================================== */
 .home-page-wrapper {
   min-height: 100vh;
@@ -5063,7 +5063,7 @@ body {
   box-sizing: border-box;
 }
 
-/* Container externo que engloba o cabeçalho no topo e a imagem logo abaixo */
+/* Container externo que engloba o cabeÃ§alho no topo e a imagem logo abaixo */
 .home-outer-container {
   width: 100%;
   max-width: 100%;
@@ -5073,7 +5073,7 @@ body {
   gap: 8px;
 }
 
-/* ── Cabeçalho da Home (Fica acima da imagem, fundo escuro limpo) ────────── */
+/* â”€â”€ CabeÃ§alho da Home (Fica acima da imagem, fundo escuro limpo) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .home-navbar {
   display: flex;
   align-items: center;
@@ -5101,7 +5101,7 @@ body {
   transform: translateY(-1px);
 }
 
-/* Pílula central com ícones de navegação */
+/* PÃ­lula central com Ã­cones de navegaÃ§Ã£o */
 .home-nav-pills {
   display: flex;
   align-items: center;
@@ -5144,7 +5144,7 @@ body {
   letter-spacing: 0.5px;
 }
 
-/* Botão de Ação à Direita */
+/* BotÃ£o de AÃ§Ã£o Ã  Direita */
 .home-nav-right {
   display: flex;
   align-items: center;
@@ -5187,7 +5187,7 @@ body {
   color: #ffffff;
 }
 
-/* ── Moldura Expandida com a Imagem de Fundo (Cantos Arredondados) ────────── */
+/* â”€â”€ Moldura Expandida com a Imagem de Fundo (Cantos Arredondados) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .home-viewport-frame {
   position: relative;
   width: 100%;
@@ -5240,7 +5240,7 @@ body {
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
 }
 
-/* ── Setas de Navegação Flutuantes (Canto Inferior Direito) ───────────────── */
+/* â”€â”€ Setas de NavegaÃ§Ã£o Flutuantes (Canto Inferior Direito) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .home-slider-arrows {
   display: flex;
   align-items: center;
@@ -5270,7 +5270,7 @@ body {
   transform: scale(1.1);
 }
 
-/* ── Modais da Home (História & Regras) ───────────────────────────────────── */
+/* â”€â”€ Modais da Home (HistÃ³ria & Regras) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .home-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -5359,7 +5359,7 @@ body {
   justify-content: flex-end;
 }
 
-/* ── HUD Link Estilo ─────────────────────────────────────────────────────── */
+/* â”€â”€ HUD Link Estilo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .hud-logo-link {
   text-decoration: none;
   cursor: pointer;
@@ -5371,7 +5371,7 @@ body {
   transform: scale(1.03);
 }
 
-/* ── Cabeçalho da Home no estilo HUD (quando logado) ────────────────────── */
+/* â”€â”€ CabeÃ§alho da Home no estilo HUD (quando logado) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .home-navbar--hud {
   position: relative;
   left: 50%;
@@ -5389,7 +5389,7 @@ body {
   gap: 8px;
 }
 
-/* ── Responsividade da Home ──────────────────────────────────────────────── */
+/* â”€â”€ Responsividade da Home â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (max-width: 950px) {
   .home-outer-container {
     height: auto;
@@ -5409,7 +5409,7 @@ body {
   }
 }
 
-/* ── ESTILOS DO ESQUELETO DE EQUIPAMENTO (PAPERDOLL) & DURABILIDADE ──────── */
+/* â”€â”€ ESTILOS DO ESQUELETO DE EQUIPAMENTO (PAPERDOLL) & DURABILIDADE â”€â”€â”€â”€â”€â”€â”€â”€ */
 .equipment-paperdoll-panel {
   background: rgba(18, 20, 26, 0.75);
   border: 1px solid var(--glass-border);
@@ -5488,7 +5488,7 @@ body {
   color: var(--text-secondary);
 }
 
-/* Layout Anatômico */
+/* Layout AnatÃ´mico */
 .paperdoll-body-layout {
   display: grid;
   grid-template-columns: 1fr 140px 1fr;
@@ -5744,7 +5744,7 @@ body {
 }
 
 /* ============================================================ */
-/* SEÇÃO DE ACESSÓRIOS DO PAPERDOLL (6 SLOTS EM GRID)          */
+/* SEÃ‡ÃƒO DE ACESSÃ“RIOS DO PAPERDOLL (6 SLOTS EM GRID)          */
 /* ============================================================ */
 .paperdoll-accessories-section {
   margin-top: 4px;
@@ -6012,7 +6012,7 @@ body {
   color: var(--text-muted);
 }
 
-/* Barra de Navegação por Abas */
+/* Barra de NavegaÃ§Ã£o por Abas */
 .rules-tab-navigation {
   display: flex;
   gap: 8px;
@@ -6055,7 +6055,7 @@ body {
   font-size: 16px;
 }
 
-/* Conteúdo da Seção */
+/* ConteÃºdo da SeÃ§Ã£o */
 .rules-section-view {
   display: flex;
   flex-direction: column;
@@ -6107,7 +6107,7 @@ body {
   font-weight: bold;
 }
 
-/* Layout de Profissões */
+/* Layout de ProfissÃµes */
 .professions-showcase-layout {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -6212,7 +6212,7 @@ body {
   display: block;
 }
 
-/* Coluna de Detalhe da Profissão */
+/* Coluna de Detalhe da ProfissÃ£o */
 .professions-detail-col {
   display: flex;
   flex-direction: column;
@@ -6476,7 +6476,7 @@ body {
 }
 
 /* ===========================
-   ABA 2: PROGRESSÃO
+   ABA 2: PROGRESSÃƒO
    =========================== */
 .progression-pill-highlight {
   display: flex;
@@ -6598,7 +6598,7 @@ body {
   color: #facc15;
 }
 
-/* 3 Níveis de Dificuldade */
+/* 3 NÃ­veis de Dificuldade */
 .section-divider-title {
   font-family: 'Oswald', sans-serif;
   font-size: 20px;
@@ -6768,7 +6768,7 @@ body {
 }
 
 /* ===========================
-   ABA 3: COMBATE & BALÍSTICA
+   ABA 3: COMBATE & BALÃSTICA
    =========================== */
 .formula-callout {
   background: rgba(239, 68, 68, 0.1);
@@ -7000,7 +7000,7 @@ body {
 }
 
 /* ===========================
-   ABA 4: INFECÇÃO & CONDIÇÕES
+   ABA 4: INFECÃ‡ÃƒO & CONDIÃ‡Ã•ES
    =========================== */
 .infection-stages-timeline {
   display: grid;
@@ -7256,7 +7256,7 @@ body {
   margin-bottom: 4px;
 }
 
-/* Rodapé */
+/* RodapÃ© */
 .rules-page-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding: 24px 32px;
@@ -7310,7 +7310,7 @@ body {
 
 
 /* ---------------------------------------------------------------------------
-   NARRATIVE OPENING MODAL � Abertura Narrativa do RPG
+   NARRATIVE OPENING MODAL — Abertura Narrativa do RPG
    --------------------------------------------------------------------------- */
 
 .narrative-overlay {
@@ -7577,3 +7577,4 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+

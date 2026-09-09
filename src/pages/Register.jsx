@@ -23,7 +23,7 @@ import { RARITY_META } from '../utils/itemSystem'
 const TOTAL_POINTS = 15
 const MIN_ATTR = 0
 const MAX_ATTR = 3
-const MAX_PLAYERS_PER_PROFESSION = 2
+const MAX_PLAYERS_PER_PROFESSION = 3
 
 const DEFAULT_OPENING_CONFIG = {
   active: true,
@@ -1152,7 +1152,7 @@ export default function Register() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <label style={{ fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--accent)', margin: 0, fontWeight: 700 }}>
-                    1. Escolha sua Profissão (Limite de 2 por Profissão)
+                    1. Escolha sua Profissão (Limite de 3 por Profissão)
                   </label>
                   <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Vagas em tempo real</span>
                 </div>
@@ -1168,7 +1168,7 @@ export default function Register() {
                         <span style={{ fontSize: 24 }}>{prof.icon}</span>
                         <strong style={{ fontSize: 12, color: isSelected ? '#fff' : isFull ? 'var(--text-muted)' : 'var(--text-primary)' }}>{prof.name}</strong>
                         <span style={{ fontSize: 9.5, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: isFull ? 'rgba(239, 68, 68, 0.2)' : remainingSlots === 1 ? 'rgba(234, 179, 8, 0.2)' : 'rgba(34, 197, 94, 0.15)', color: isFull ? '#f87171' : remainingSlots === 1 ? '#facc15' : '#4ade80' }}>
-                          {isFull ? 'Lotado (2/2)' : `${remainingSlots} vaga${remainingSlots > 1 ? 's' : ''}`}
+                          {isFull ? `Lotado (${MAX_PLAYERS_PER_PROFESSION}/${MAX_PLAYERS_PER_PROFESSION})` : `${remainingSlots} vaga${remainingSlots > 1 ? 's' : ''}`}
                         </span>
                         <span style={{ fontSize: 9.5, color: 'var(--accent-yellow)', fontWeight: 600 }}>{prof.bonusSummary}</span>
                       </button>
