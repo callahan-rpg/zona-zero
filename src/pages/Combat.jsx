@@ -82,14 +82,7 @@ export default function CombatPage() {
     return unsub
   }, [selectedSlug])
 
-  // 3. Escuta todos os sobreviventes (apenas para o admin gerenciar participantes)
-  useEffect(() => {
-    if (!isAdmin) return
-    const unsub = onSnapshot(collection(db, 'users'), (snap) => {
-      setAllPlayers(snap.docs.map(d => ({ uid: d.id, ...d.data() })))
-    })
-    return unsub
-  }, [isAdmin])
+
 
   // 4. Escuta dados em tempo real dos sobreviventes no combate selecionado
   useEffect(() => {

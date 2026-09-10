@@ -209,11 +209,12 @@ export default function Admin() {
   })
 
   useEffect(() => {
+    if (activeTab !== 'calendar') return
     const unsub = onSnapshot(collection(db, 'calendar_events'), (snap) => {
       setCalendarEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
     return unsub
-  }, [])
+  }, [activeTab])
 
   async function handleAddEvent(e) {
     e.preventDefault()
@@ -256,15 +257,14 @@ export default function Admin() {
     }
   }
 
-  // ==========================================
-  // TAB CATALOG: CATÁLOGO GERAL DE ITENS
-  // ==========================================
   useEffect(() => {
+    // Carrega o catálogo apenas nas abas que interagem com o catálogo ou itens
+    if (!['catalog', 'locations', 'players', 'starter_items', 'shops'].includes(activeTab)) return
     const unsub = onSnapshot(collection(db, 'items_db'), (snap) => {
       setCatalogItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     })
     return unsub
-  }, [])
+  }, [activeTab])
 
   async function handlePopulatePresets() {
     if (!confirm('Deseja cadastrar os itens padrão de sobrevivência (Cozinha, Quarto, Banheiro, Garagem, Armas) no catálogo?')) return
@@ -520,20 +520,22 @@ export default function Admin() {
   const [uniquePickerSearch, setUniquePickerSearch] = useState('')
   const [uniquePickerCategory, setUniquePickerCategory] = useState('all')
 
-  // Listener das coleções de loot do Firestore
+  // Listener das coleções de loot do Firestore (apenas aba locations)
   useEffect(() => {
+    if (activeTab !== 'locations') return
     const unsub = onSnapshot(collection(db, 'loot_collections'), (snap) => {
       setLootCollections(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     })
     return unsub
-  }, [])
+  }, [activeTab])
 
   useEffect(() => {
+    if (!['locations', 'combat', 'config'].includes(activeTab)) return
     const unsub = onSnapshot(collection(db, 'locations'), (snap) => {
       setLocations(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     })
     return unsub
-  }, [])
+  }, [activeTab])
 
   function handleLocEdit(loc) {
     setEditingLoc(loc.id)
@@ -869,11 +871,12 @@ export default function Admin() {
   const [pickerOpen, setPickerOpen] = useState(false)
 
   useEffect(() => {
+    if (activeTab !== 'players') return
     const unsub = onSnapshot(collection(db, 'users'), (snap) => {
       setPlayers(snap.docs.map((d) => ({ uid: d.id, ...d.data() })))
     })
     return unsub
-  }, [])
+  }, [activeTab])
 
   async function updatePlayerStats(playerUid, field, value) {
     try {
@@ -1150,13 +1153,14 @@ export default function Admin() {
   const [shopSalePickerOpen, setShopSalePickerOpen] = useState(false)
   const [shopAcceptedPickerOpen, setShopAcceptedPickerOpen] = useState(false)
 
-  // Escuta lojas em tempo real
+  // Escuta lojas em tempo real (apenas se estiver na aba shops)
   useEffect(() => {
+    if (activeTab !== 'shops') return
     const unsub = onSnapshot(collection(db, 'shops'), (snap) => {
       setShops(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
     return unsub
-  }, [])
+  }, [activeTab])
 
   // ==========================================
   // TAB PREMADE: FICHAS PRÉ-PRONTAS
@@ -1186,11 +1190,12 @@ export default function Admin() {
   })
 
   useEffect(() => {
+    if (activeTab !== 'premade') return
     const unsub = onSnapshot(collection(db, 'pre_made_sheets'), (snap) => {
       setPreMadeSheets(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
     return unsub
-  }, [])
+  }, [activeTab])
 
   // ==========================================
   // TAB STARTER_ITEMS: EQUIPAMENTOS INICIAIS POR PROFISSÃO
@@ -1203,13 +1208,14 @@ export default function Admin() {
   const [starterCatalogCategory, setStarterCatalogCategory] = useState('all')
 
   useEffect(() => {
+    if (activeTab !== 'starter_items') return
     const unsub = onSnapshot(doc(db, 'game_config', 'starter_items'), (snap) => {
       if (snap.exists()) {
         setCustomStarterConfig(snap.data().config || {})
       }
     })
     return unsub
-  }, [])
+  }, [activeTab])
 
   const currentStarterKey = `${starterProfId}_${starterSpecId}`
   const currentSpecStarterItems = customStarterConfig[currentStarterKey] !== undefined
@@ -1544,7 +1550,7 @@ export default function Admin() {
 
   // Escuta dados do combate ativo na locação selecionada
   useEffect(() => {
-    if (!selectedCombatSlug) return
+    if (activeTab !== 'combat' || !selectedCombatSlug) return
     const unsub = onSnapshot(doc(db, 'active_combats', selectedCombatSlug), (snap) => {
       if (snap.exists()) {
         const data = snap.data()
@@ -1559,7 +1565,7 @@ export default function Admin() {
       }
     })
     return unsub
-  }, [selectedCombatSlug])
+  }, [activeTab, selectedCombatSlug])
 
   // Iniciar / Atualizar Combate no Firestore
   async function handleStartOrUpdateCombat(e) {

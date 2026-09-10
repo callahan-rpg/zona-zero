@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { useItemCatalog } from '../utils/itemCatalogService'
 import HUD from '../components/HUD.jsx'
 import GameIcon from '../components/GameIcon.jsx'
 import EquipmentPaperdoll from '../components/EquipmentPaperdoll.jsx'
@@ -41,7 +42,6 @@ export default function PublicCharacter() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [activeCategory, setActiveCategory] = useState('all')
-  const [catalogMap, setCatalogMap] = useState({})
 
   // Modal de socorro médico
   const [showMedicalModal, setShowMedicalModal] = useState(false)
@@ -50,19 +50,8 @@ export default function PublicCharacter() {
   const [medicalError, setMedicalError] = useState('')
   const [medicalSuccess, setMedicalSuccess] = useState('')
 
-  // Escuta o catálogo global para manter nomes, imagens e raridades atualizados
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'items_db'), (snap) => {
-      const map = {}
-      snap.docs.forEach(d => {
-        const data = d.data()
-        const key = data.itemId || d.id
-        map[key] = data
-      })
-      setCatalogMap(map)
-    })
-    return unsub
-  }, [])
+  // Utiliza o listener único compartilhado e em cache do catálogo de itens global
+  const { map: catalogMap } = useItemCatalog()
 
   useEffect(() => {
     async function load() {

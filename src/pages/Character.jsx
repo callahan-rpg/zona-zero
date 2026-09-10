@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
-import { collection, getDocs, onSnapshot } from 'firebase/firestore'
+import { collection, getDocs } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { useItemCatalog } from '../utils/itemCatalogService'
 import HUD from '../components/HUD.jsx'
 import GameIcon from '../components/GameIcon.jsx'
 import MoneyTransferModal from '../components/MoneyTransferModal.jsx'
@@ -196,21 +197,8 @@ export default function Character() {
     loadSurvivors()
   }, [showTransfer, user])
 
-  const [catalogMap, setCatalogMap] = useState({})
-
-  // Escuta o catálogo de itens global para sincronizar imagens, nomes e raridades atualizadas em tempo real
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'items_db'), (snap) => {
-      const map = {}
-      snap.docs.forEach(d => {
-        const data = d.data()
-        const key = data.itemId || d.id
-        map[key] = data
-      })
-      setCatalogMap(map)
-    })
-    return unsub
-  }, [])
+  // Utiliza o listener único compartilhado e em cache do catálogo de itens global
+  const { map: catalogMap } = useItemCatalog()
 
   const rawInventory = character?.inventory || []
 

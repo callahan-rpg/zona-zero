@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { collection, doc, onSnapshot, getDocs, updateDoc } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
 import NarrativeOpeningModal from '../components/NarrativeOpeningModal.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -494,31 +494,32 @@ export default function Register() {
       })
       .catch((err) => console.warn('Aviso ao consultar usuários:', err))
 
-    const unsubSheets = onSnapshot(collection(db, 'pre_made_sheets'), (snap) => {
-      setPreMadeSheets(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    }, (err) => console.warn('Aviso ao consultar fichas pré-prontas:', err))
+    // Carregamento pontual único para evitar listeners permanentes em tela de registro
+    async function loadRegisterData() {
+      try {
+        const [sheetsSnap, locsSnap, configSnap, startersSnap, openingSnap] = await Promise.all([
+          getDocs(collection(db, 'pre_made_sheets')),
+          getDocs(collection(db, 'locations')),
+          getDoc(doc(db, 'game_config', 'global')),
+          getDoc(doc(db, 'game_config', 'starter_items')),
+          getDoc(doc(db, 'game_config', 'opening'))
+        ])
 
-    const unsubLocs = onSnapshot(collection(db, 'locations'), (snap) => {
-      setLocations(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    }, (err) => console.warn('Aviso ao consultar locações:', err))
-
-    const unsubConfig = onSnapshot(doc(db, 'game_config', 'global'), (snap) => {
-      if (snap.exists()) setGlobalConfig(snap.data())
-    }, (err) => console.warn('Aviso ao consultar game_config global:', err))
-
-    const unsubStarters = onSnapshot(doc(db, 'game_config', 'starter_items'), (snap) => {
-      if (snap.exists()) setCustomStarterConfig(snap.data().config || {})
-    }, (err) => console.warn('Aviso ao consultar itens iniciais:', err))
-
-    const unsubOpening = onSnapshot(doc(db, 'game_config', 'opening'), (snap) => {
-      if (snap.exists()) {
-        setOpeningConfig(prev => ({ ...DEFAULT_OPENING_CONFIG, ...snap.data() }))
-      } else {
-        setOpeningConfig(DEFAULT_OPENING_CONFIG)
+        setPreMadeSheets(sheetsSnap.docs.map(d => ({ id: d.id, ...d.data() })))
+        setLocations(locsSnap.docs.map(d => ({ id: d.id, ...d.data() })))
+        if (configSnap.exists()) setGlobalConfig(configSnap.data())
+        if (startersSnap.exists()) setCustomStarterConfig(startersSnap.data().config || {})
+        if (openingSnap.exists()) {
+          setOpeningConfig(prev => ({ ...DEFAULT_OPENING_CONFIG, ...openingSnap.data() }))
+        } else {
+          setOpeningConfig(DEFAULT_OPENING_CONFIG)
+        }
+      } catch (err) {
+        console.warn('Aviso ao carregar dados do registro:', err)
       }
-    }, (err) => console.warn('Aviso ao consultar abertura narrativa:', err))
+    }
 
-    return () => { unsubSheets(); unsubLocs(); unsubConfig(); unsubStarters(); unsubOpening() }
+    loadRegisterData()
   }, [])
 
   // Local padrão de nascimento configurado pelo Admin (padrão: acampamento)
