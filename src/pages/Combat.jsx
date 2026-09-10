@@ -13,7 +13,6 @@ export default function CombatPage() {
   const [combats, setCombats] = useState([])
   const [selectedSlug, setSelectedSlug] = useState('')
   const [activeCombat, setActiveCombat] = useState(null)
-  const [participantsData, setParticipantsData] = useState({})
   const [allPlayers, setAllPlayers] = useState([])
   // IDs dos cards expandidos (local, não persiste)
   const [expandedCards, setExpandedCards] = useState(new Set())
@@ -82,39 +81,9 @@ export default function CombatPage() {
     return unsub
   }, [selectedSlug])
 
-
-
-  // 4. Escuta dados em tempo real dos sobreviventes no combate selecionado
-  useEffect(() => {
-    if (!activeCombat || !activeCombat.participantUids || activeCombat.participantUids.length === 0) {
-      setParticipantsData({})
-      return
-    }
-
-    const unsubs = activeCombat.participantUids.map(uid => {
-      return onSnapshot(doc(db, 'users', uid), (snap) => {
-        if (snap.exists()) {
-          const udata = snap.data()
-          setParticipantsData(prev => ({
-            ...prev,
-            [uid]: {
-              uid,
-              name: udata.character?.name || 'Sobrevivente',
-              avatarUrl: udata.character?.avatarUrl || '',
-              vitals: udata.character?.vitals || { blood: 100, hunger: 100, thirst: 100 },
-              attributes: udata.character?.attributes || { forca: 1, destreza: 1, constituicao: 1, sabedoria: 1, carisma: 1 },
-              level: udata.character?.level || 1,
-              status: activeCombat.participantStatus?.[uid] || []
-            }
-          }))
-        }
-      })
-    })
-
-    return () => {
-      unsubs.forEach(unsub => unsub && unsub())
-    }
-  }, [activeCombat?.participantUids, activeCombat?.participantStatus])
+  // participantsData vem denormalizado no doc active_combats — sem listeners separados por usuário
+  // O admin atualiza combat.participantsData ao salvar edições de HP/vitals
+  const participantsData = activeCombat?.participantsData || {}
 
   // =========================================================================
   // ADMIN ACTIONS: REORDENAÇÃO & EDIÇÃO EM TEMPO REAL
@@ -173,29 +142,40 @@ export default function CombatPage() {
   const handleSavePlayerEdit = async (e) => {
     e.preventDefault()
     if (!editingPlayer) return
+    const uid = editingPlayer.uid
+    const newAttrs = {
+      forca: Number(playerAttrForm.forca) || 1,
+      destreza: Number(playerAttrForm.destreza) || 1,
+      constituicao: Number(playerAttrForm.constituicao) || 1,
+      sabedoria: Number(playerAttrForm.sabedoria) || 1,
+      carisma: Number(playerAttrForm.carisma) || 1
+    }
+    const newBlood = Number(playerHpInput)
     try {
-      const userRef = doc(db, 'users', editingPlayer.uid)
+      // 1. Atualiza o doc do usuário (fonte primária de verdade)
+      const userRef = doc(db, 'users', uid)
       await updateDoc(userRef, {
-        'character.vitals.blood': Number(playerHpInput),
-        'character.attributes': {
-          forca: Number(playerAttrForm.forca) || 1,
-          destreza: Number(playerAttrForm.destreza) || 1,
-          constituicao: Number(playerAttrForm.constituicao) || 1,
-          sabedoria: Number(playerAttrForm.sabedoria) || 1,
-          carisma: Number(playerAttrForm.carisma) || 1
-        }
+        'character.vitals.blood': newBlood,
+        'character.attributes': newAttrs
       })
 
-      // Atualiza comentário de turno e log do combate
+      // 2. Atualiza o campo denormalizado em active_combats para o CombatHUD
       const currentComments = activeCombat?.participantComments || {}
-      const updatedComments = {
-        ...currentComments,
-        [editingPlayer.uid]: playerCommentInput.trim()
+      const updatedComments = { ...currentComments, [uid]: playerCommentInput.trim() }
+      const existingPData = activeCombat?.participantsData || {}
+      const updatedPData = {
+        ...existingPData,
+        [uid]: {
+          ...(existingPData[uid] || {}),
+          uid,
+          vitals: { ...(existingPData[uid]?.vitals || {}), blood: newBlood },
+          attributes: newAttrs
+        }
       }
-
       const combatRef = doc(db, 'active_combats', selectedSlug)
       await updateDoc(combatRef, {
-        participantComments: updatedComments
+        participantComments: updatedComments,
+        participantsData: updatedPData
       })
 
       setEditingPlayer(null)
@@ -203,6 +183,7 @@ export default function CombatPage() {
       alert('Erro ao salvar jogador: ' + err.message)
     }
   }
+
 
   // Toggle status de sobrevivente
   const handleTogglePlayerStatus = async (uid, statusId) => {

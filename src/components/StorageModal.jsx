@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
-import { doc, onSnapshot, collection } from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { useItemCatalog } from '../utils/itemCatalogService'
 import { RARITY_META, DEFAULT_PRESET_ITEMS } from '../utils/itemSystem.js'
 import { STORAGE_TYPES, depositToStorage, withdrawFromStorage } from '../utils/storageSystem.js'
 import { getItemCategory } from '../pages/Character.jsx'
@@ -38,7 +39,6 @@ export default function StorageModal({
 
   const [storageData, setStorageData] = useState(initialStorageData)
   const [baseDefenseConfig, setBaseDefenseConfig] = useState(null)
-  const [catalogMap, setCatalogMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -69,21 +69,8 @@ export default function StorageModal({
     return unsub
   }, [isOpen])
 
-  // Escuta o catálogo de itens (items_db) para hidratar nomes e imagens
-  useEffect(() => {
-    if (!isOpen) return
-    const unsub = onSnapshot(collection(db, 'items_db'), (snap) => {
-      const map = {}
-      snap.docs.forEach(d => {
-        const data = d.data()
-        if (d.id) map[d.id] = data
-        if (data.itemId) map[data.itemId] = data
-        if (data.name) map[data.name.toLowerCase().trim()] = data
-      })
-      setCatalogMap(map)
-    })
-    return unsub
-  }, [isOpen])
+  // Usa o listener único compartilhado de items_db (cache global)
+  const { map: catalogMap } = useItemCatalog()
 
   // Escuta o documento do Storage em tempo real
   useEffect(() => {

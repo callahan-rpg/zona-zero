@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -12,9 +12,8 @@ export default function CombatHUD({ locationSlug }) {
   const [impactAnimation, setImpactAnimation] = useState(null)
   const [floatingTexts, setFloatingTexts] = useState([])
   const [showDetails, setShowDetails] = useState(true)
-  const [participantsData, setParticipantsData] = useState({})
 
-  // Escuta o combate ativo na locação
+  // Escuta o combate ativo na locação — participantsData já vem denormalizado no documento
   useEffect(() => {
     if (!locationSlug) return
     const unsub = onSnapshot(doc(db, 'active_combats', locationSlug), (snap) => {
@@ -50,34 +49,9 @@ export default function CombatHUD({ locationSlug }) {
     return unsub
   }, [locationSlug])
 
-  // Escuta dados em tempo real dos personagens participantes
-  useEffect(() => {
-    if (!combat || !combat.participantUids || combat.participantUids.length === 0) return
-
-    const unsubs = combat.participantUids.map(uid => {
-      return onSnapshot(doc(db, 'users', uid), (snap) => {
-        if (snap.exists()) {
-          const udata = snap.data()
-          setParticipantsData(prev => ({
-            ...prev,
-            [uid]: {
-              uid,
-              name: udata.character?.name || 'Sobrevivente',
-              avatarUrl: udata.character?.avatarUrl || '',
-              vitals: udata.character?.vitals || { blood: 100, hunger: 100, thirst: 100 },
-              attributes: udata.character?.attributes || { forca: 1, destreza: 1, constituicao: 1, sabedoria: 1, carisma: 1 },
-              level: udata.character?.level || 1,
-              status: combat.participantStatus?.[uid] || []
-            }
-          }))
-        }
-      })
-    })
-
-    return () => {
-      unsubs.forEach(unsub => unsub && unsub())
-    }
-  }, [combat?.participantUids, combat?.participantStatus])
+  // participantsData vem denormalizado no doc active_combats — sem listeners separados
+  // O admin atualiza combat.participantsData via updateDoc ao modificar HP/vitals
+  const participantsData = combat?.participantsData || {}
 
   if (loading || !combat || !combat.active) {
     return null

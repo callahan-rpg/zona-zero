@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
@@ -38,14 +38,11 @@ export default function Map() {
   const dragRef = useRef({ active: false, startX: 0, startY: 0, startPan: { x: 0, y: 0 }, moved: false })
   const [, setRerender] = useState(0)
 
-  // 1. Escuta o config do Firestore em tempo real
+  // Carrega config do mapa uma vez (muda raramente, não precisa de listener em tempo real)
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'map_config', 'global'), (snap) => {
-      if (snap.exists()) setRemoteMapConfig(snap.data())
-    }, (err) => {
-      console.warn('Usando dados canônicos locais do mapa:', err)
-    })
-    return unsub
+    getDoc(doc(db, 'map_config', 'global'))
+      .then((snap) => { if (snap.exists()) setRemoteMapConfig(snap.data()) })
+      .catch((err) => { console.warn('Usando dados canônicos locais do mapa:', err) })
   }, [])
 
   // ── Nível calculado: 1 = País, 2 = Cidade, 3 = Distrito ──────────────────

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { doc, onSnapshot, getDoc } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { db } from './firebase/config'
 import { useAuth } from './contexts/AuthContext.jsx'
+import { useGameConfig } from './contexts/GameConfigContext.jsx'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
 import Home from './pages/Home.jsx'
@@ -67,25 +68,17 @@ function GlobalRadioScheduler() {
 /**
  * GlobalAmbientSound: Gerencia o áudio ambiente de clima e o som específico da locação
  * de forma unificada e ininterrupta entre trocas de página.
+ * Usa o GameConfigContext compartilhado — sem abrir conexão Firestore própria.
  */
 function GlobalAmbientSound() {
   const { user } = useAuth()
+  const gameConfig = useGameConfig()
   const routeLocation = useLocation()
-  const [gameConfig, setGameConfig] = useState(null)
   const [isIndoor, setIsIndoor] = useState(false)
   const [locationSoundUrl, setLocationSoundUrl] = useState('')
   const [disableWeatherSound, setDisableWeatherSound] = useState(false)
 
-  // 1. Escuta o clima global em tempo real
-  useEffect(() => {
-    if (!user) return
-    const unsub = onSnapshot(doc(db, 'game_config', 'global'), (snap) => {
-      if (snap.exists()) setGameConfig(snap.data())
-    })
-    return unsub
-  }, [user])
-
-  // 2. Extrai o slug do local da rota atual e busca se é Indoor, se tem som específico da sala e se o clima é silenciado
+  // Extrai o slug do local da rota atual e busca se é Indoor, se tem som específico da sala e se o clima é silenciado
   useEffect(() => {
     const pathname = routeLocation.pathname
     if (pathname.startsWith('/location/')) {

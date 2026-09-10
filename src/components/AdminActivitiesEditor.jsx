@@ -12,6 +12,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { useItemCatalog } from '../utils/itemCatalogService'
 import { ACTIVITY_TYPES } from '../utils/activitySystem'
 import { DEFAULT_PRESET_ITEMS } from '../utils/itemSystem'
 
@@ -110,7 +111,8 @@ function parseSeedGrowth(s) {
 
 export default function AdminActivitiesEditor({ locations = [] }) {
   const [activities, setActivities] = useState([])
-  const [catalogItems, setCatalogItems] = useState([])
+  // Usa o listener único compartilhado de items_db (cache global)
+  const { list: catalogItems } = useItemCatalog()
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState(null)
   const [feedback, setFeedback] = useState({ type: '', msg: '' })
@@ -154,22 +156,7 @@ export default function AdminActivitiesEditor({ locations = [] }) {
         setLoading(false)
       }
     )
-
-    // Escuta catálogo geral de itens para puxar a categoria "Mantimentos"
-    const unsubCatalog = onSnapshot(
-      collection(db, 'items_db'),
-      (snap) => {
-        setCatalogItems(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-      },
-      (err) => {
-        console.warn('Erro ao carregar catálogo de itens:', err)
-      }
-    )
-
-    return () => {
-      unsubActivities()
-      unsubCatalog()
-    }
+    return unsubActivities
   }, [])
 
   // Lista unificada e filtrada de itens da categoria "Mantimentos" (supplies)

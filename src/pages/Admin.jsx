@@ -9,6 +9,7 @@ import {
   addDoc
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { useGameConfig } from '../contexts/GameConfigContext.jsx'
 import HUD from '../components/HUD.jsx'
 import { SEASONS, MOON_PHASES, MONTHS, calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { RARITY_META, DEFAULT_PRESET_ITEMS, SUPPLY_RARITIES, UNIQUE_RARITIES, getMaxHp, EQUIPMENT_SLOTS } from '../utils/itemSystem'
@@ -120,41 +121,39 @@ export default function Admin() {
     }
   }
 
+  // Usa game_config do GameConfigContext — sem listener local
+  const globalConfigFromCtx = useGameConfig()
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'game_config', 'global'), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data()
-        setGlobalConfig(data)
-        setTempTitle(data.title || '')
-        setTempWeather(data.weather || {
-          mode: 'dynamic',
-          condition: 'sunny',
-          temperature: 20,
-          label: 'Ensolarado',
-          icon: '☀️',
-          region: 'Leste Europeu'
-        })
-        setTempWeatherSounds(data.weatherSounds || DEFAULT_WEATHER_SOUNDS)
-        setTempTime(data.time || {
-          mode: 'dynamic',
-          value: '12:00',
-          period: 'day',
-          baseEpochMs: Date.now(),
-          baseYear: 2026,
-          baseMonth: 8,
-          baseDay: 26,
-          baseHour: 12,
-          baseMinute: 0,
-          seasonOverride: '',
-          moonOverride: ''
-        })
-        setTempMaintenance(!!data.maintenance)
-        setGlobalMsg(data.global_message || '')
-        setTempDefaultSpawnLocation(data.defaultSpawnLocation || 'acampamento')
-      }
+    if (!globalConfigFromCtx) return
+    const data = globalConfigFromCtx
+    setGlobalConfig(data)
+    setTempTitle(data.title || '')
+    setTempWeather(data.weather || {
+      mode: 'dynamic',
+      condition: 'sunny',
+      temperature: 20,
+      label: 'Ensolarado',
+      icon: '☀️',
+      region: 'Leste Europeu'
     })
-    return unsub
-  }, [])
+    setTempWeatherSounds(data.weatherSounds || DEFAULT_WEATHER_SOUNDS)
+    setTempTime(data.time || {
+      mode: 'dynamic',
+      value: '12:00',
+      period: 'day',
+      baseEpochMs: Date.now(),
+      baseYear: 2026,
+      baseMonth: 8,
+      baseDay: 26,
+      baseHour: 12,
+      baseMinute: 0,
+      seasonOverride: '',
+      moonOverride: ''
+    })
+    setTempMaintenance(!!data.maintenance)
+    setGlobalMsg(data.global_message || '')
+    setTempDefaultSpawnLocation(data.defaultSpawnLocation || 'acampamento')
+  }, [globalConfigFromCtx])
 
   async function saveGlobalConfig(e) {
     e.preventDefault()
@@ -871,12 +870,13 @@ export default function Admin() {
   const [pickerOpen, setPickerOpen] = useState(false)
 
   useEffect(() => {
-    if (activeTab !== 'players') return
+    if (activeTab !== 'players' && activeTab !== 'combat') return
     const unsub = onSnapshot(collection(db, 'users'), (snap) => {
       setPlayers(snap.docs.map((d) => ({ uid: d.id, ...d.data() })))
     })
     return unsub
   }, [activeTab])
+
 
   async function updatePlayerStats(playerUid, field, value) {
     try {
@@ -1575,6 +1575,25 @@ export default function Admin() {
       return alert('Selecione ao menos 1 sobrevivente ou 1 inimigo para o combate')
     }
 
+    // Monta campo denormalizado: copia dados essenciais dos jogadores selecionados
+    // para que CombatHUD não precise abrir N listeners separados em users/{uid}
+    const existingPData = activeCombatData?.participantsData || {}
+    const participantsData = {}
+    selectedCombatPlayers.forEach(uid => {
+      const player = players.find(p => p.uid === uid)
+      const char = player?.character || {}
+      const maxHp = getMaxHp(char)
+      participantsData[uid] = {
+        ...(existingPData[uid] || {}),
+        uid,
+        name: char.name || 'Sobrevivente',
+        avatarUrl: char.avatarUrl || '',
+        vitals: char.vitals || { blood: maxHp, hunger: 100, thirst: 100 },
+        attributes: char.attributes || { forca: 1, destreza: 1, constituicao: 1, sabedoria: 1, carisma: 1 },
+        level: char.level || 1
+      }
+    })
+
     try {
       const docRef = doc(db, 'active_combats', selectedCombatSlug)
       await setDoc(docRef, {
@@ -1582,6 +1601,7 @@ export default function Admin() {
         locationSlug: selectedCombatSlug,
         title: combatTitle.trim() || 'Combate Ativo',
         participantUids: selectedCombatPlayers,
+        participantsData,
         enemies: combatEnemies,
         combatLog: activeCombatData?.combatLog || [
           { id: Math.random().toString(36).substring(2), text: `Combate iniciado em ${selectedCombatSlug}!`, timestamp: Date.now() }
@@ -1594,6 +1614,7 @@ export default function Admin() {
       alert('Erro ao iniciar combate: ' + err.message)
     }
   }
+
 
   // Encerrar Combate
   async function handleEndCombat() {

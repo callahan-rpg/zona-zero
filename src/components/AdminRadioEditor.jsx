@@ -70,20 +70,19 @@ export default function AdminRadioEditor({ locations = [] }) {
   const [deletingId, setDeletingId] = useState(null)
   const [clearingAll, setClearingAll] = useState(false)
 
-  // Escuta contagem de usuários com Rádio
+  // Carrega contagem de usuários com Rádio uma vez (informação estatística, não precisa de listener)
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'users'), (snap) => {
-      let withRadio = 0
-      snap.docs.forEach(d => {
-        const char = d.data().character
-        if (char && hasRadio(char.inventory)) {
-          withRadio++
-        }
+    getDocs(collection(db, 'users'))
+      .then((snap) => {
+        let withRadio = 0
+        snap.docs.forEach(d => {
+          const char = d.data().character
+          if (char && hasRadio(char.inventory)) withRadio++
+        })
+        setTotalUsersCount(snap.docs.length)
+        setRadioUsersCount(withRadio)
       })
-      setTotalUsersCount(snap.docs.length)
-      setRadioUsersCount(withRadio)
-    })
-    return unsub
+      .catch(() => {})
   }, [])
 
   // Escuta mensagens automáticas

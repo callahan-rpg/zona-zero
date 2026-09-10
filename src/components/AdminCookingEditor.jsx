@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react'
-import {
-  collection,
-  onSnapshot,
-  doc,
-  setDoc,
-  deleteDoc,
-  updateDoc
-} from 'firebase/firestore'
+import { collection, onSnapshot, doc, runTransaction } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { useItemCatalog } from '../utils/itemCatalogService'
 import { DEFAULT_RECIPES, COOKING_UTENSILS } from '../utils/cookingSystem'
 import { DEFAULT_PRESET_ITEMS, RARITY_META } from '../utils/itemSystem'
 
@@ -44,9 +38,10 @@ export default function AdminCookingEditor({ catalogItems = [] }) {
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
-  const [itemsDbLive, setItemsDbLive] = useState([])
+  // Usa o listener único compartilhado de items_db (cache global)
+  const { list: itemsDbLive } = useItemCatalog()
 
-  // Escuta catálogo geral do Firestore (items_db) e receitas
+  // Escuta catálogo de receitas
   useEffect(() => {
     const unsubRecipes = onSnapshot(collection(db, 'recipes'), (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -56,17 +51,7 @@ export default function AdminCookingEditor({ catalogItems = [] }) {
       console.error('Erro ao carregar receitas:', err)
       setLoading(false)
     })
-
-    const unsubItems = onSnapshot(collection(db, 'items_db'), (snap) => {
-      setItemsDbLive(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    }, (err) => {
-      console.warn('Erro ao carregar items_db no editor de cozinha:', err)
-    })
-
-    return () => {
-      unsubRecipes()
-      unsubItems()
-    }
+    return unsubRecipes
   }, [])
 
   // Lista unificada e filtrada EXCLUSIVAMENTE de itens da categoria "Mantimentos" (supplies)

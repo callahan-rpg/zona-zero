@@ -8,6 +8,7 @@ import {
   updateDoc
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { useItemCatalog } from '../utils/itemCatalogService'
 import { DEFAULT_WATER_SOURCES } from '../utils/waterSystem'
 import { DEFAULT_PRESET_ITEMS } from '../utils/itemSystem'
 
@@ -34,10 +35,12 @@ export default function AdminWaterSourcesEditor({ locations = [] }) {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
-  const [itemsDbLive, setItemsDbLive] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Escuta fontes de água do Firestore (/water_sources) e itens
+  // Usa o listener único compartilhado de items_db (cache global)
+  const { list: itemsDbLive } = useItemCatalog()
+
+  // Escuta fontes de água do Firestore (/water_sources)
   useEffect(() => {
     const unsubSources = onSnapshot(collection(db, 'water_sources'), (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -47,17 +50,7 @@ export default function AdminWaterSourcesEditor({ locations = [] }) {
       console.error('Erro ao carregar fontes de água:', err)
       setLoading(false)
     })
-
-    const unsubItems = onSnapshot(collection(db, 'items_db'), (snap) => {
-      setItemsDbLive(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    }, (err) => {
-      console.warn('Erro ao carregar items_db no editor de água:', err)
-    })
-
-    return () => {
-      unsubSources()
-      unsubItems()
-    }
+    return unsubSources
   }, [])
 
   // Lista unificada e filtrada de itens de mantimentos / recipientes

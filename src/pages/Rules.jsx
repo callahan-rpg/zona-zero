@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { doc, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
@@ -14,30 +14,31 @@ export default function Rules() {
   // Estado das configurações das regras do Firestore
   const [rulesConfig, setRulesConfig] = useState(DEFAULT_RULES_CONFIG)
 
-  // Escuta as configurações de regras no Firestore em tempo real
+  // Carrega regras uma vez (muda raramente, não precisa de listener em tempo real)
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'rules_config', 'global'), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data()
-        setRulesConfig({
-          ...DEFAULT_RULES_CONFIG,
-          ...data,
-          hero: { ...DEFAULT_RULES_CONFIG.hero, ...(data.hero || {}) },
-          professionsIntro: { ...DEFAULT_RULES_CONFIG.professionsIntro, ...(data.professionsIntro || {}) },
-          professions: data.professions && data.professions.length > 0 ? data.professions : DEFAULT_RULES_CONFIG.professions,
-          progression: { ...DEFAULT_RULES_CONFIG.progression, ...(data.progression || {}) },
-          combat: { ...DEFAULT_RULES_CONFIG.combat, ...(data.combat || {}) },
-          conditions: { ...DEFAULT_RULES_CONFIG.conditions, ...(data.conditions || {}) },
-          survivalTime: { ...DEFAULT_RULES_CONFIG.survivalTime, ...(data.survivalTime || {}) }
-        })
-      } else {
+    getDoc(doc(db, 'rules_config', 'global'))
+      .then((snap) => {
+        if (snap.exists()) {
+          const data = snap.data()
+          setRulesConfig({
+            ...DEFAULT_RULES_CONFIG,
+            ...data,
+            hero: { ...DEFAULT_RULES_CONFIG.hero, ...(data.hero || {}) },
+            professionsIntro: { ...DEFAULT_RULES_CONFIG.professionsIntro, ...(data.professionsIntro || {}) },
+            professions: data.professions && data.professions.length > 0 ? data.professions : DEFAULT_RULES_CONFIG.professions,
+            progression: { ...DEFAULT_RULES_CONFIG.progression, ...(data.progression || {}) },
+            combat: { ...DEFAULT_RULES_CONFIG.combat, ...(data.combat || {}) },
+            conditions: { ...DEFAULT_RULES_CONFIG.conditions, ...(data.conditions || {}) },
+            survivalTime: { ...DEFAULT_RULES_CONFIG.survivalTime, ...(data.survivalTime || {}) }
+          })
+        } else {
+          setRulesConfig(DEFAULT_RULES_CONFIG)
+        }
+      })
+      .catch((err) => {
+        console.warn('Usando regras padrão locais:', err)
         setRulesConfig(DEFAULT_RULES_CONFIG)
-      }
-    }, (err) => {
-      console.warn('Usando regras padrão locais:', err)
-      setRulesConfig(DEFAULT_RULES_CONFIG)
-    })
-    return unsub
+      })
   }, [])
 
   // Abas principais

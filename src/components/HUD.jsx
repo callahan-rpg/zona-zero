@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { doc, onSnapshot, collection } from 'firebase/firestore'
+import { collection, getDocs, query, where, limit } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { useGameConfig } from '../contexts/GameConfigContext.jsx'
 import DiceRoller from './DiceRoller.jsx'
 import CharacterPopup from './CharacterPopup.jsx'
 import CalendarModal from './CalendarModal.jsx'
@@ -22,9 +23,10 @@ import {
 
 export default function HUD({ locationName }) {
   const { character, role, logout } = useAuth()
+  // Usa o GameConfigContext centralizado — sem abrir conexão Firestore própria
+  const gameConfig = useGameConfig()
   const navigate = useNavigate()
   const location = useLocation()
-  const [gameConfig, setGameConfig] = useState(null)
   const [calendarEvents, setCalendarEvents] = useState([])
   const [hasActiveCombat, setHasActiveCombat] = useState(false)
   const [showDice, setShowDice] = useState(false)
@@ -46,15 +48,20 @@ export default function HUD({ locationName }) {
     return () => window.removeEventListener('open_money_transfer_modal', handleOpenMoney)
   }, [])
 
-  // Escuta combates ativos no Firestore para exibir o botão com badge pulsante
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'active_combats'), (snap) => {
-      const anyActive = snap.docs.some(d => d.data().active)
-      setHasActiveCombat(anyActive)
-    })
-    return unsub
+  // Polling leve (30s) para verificar se há combate ativo — evita onSnapshot de coleção inteira
+  const checkActiveCombat = useCallback(async () => {
+    try {
+      const q = query(collection(db, 'active_combats'), where('active', '==', true), limit(1))
+      const snap = await getDocs(q)
+      setHasActiveCombat(!snap.empty)
+    } catch { /* silencioso */ }
   }, [])
 
+  useEffect(() => {
+    checkActiveCombat()
+    const interval = setInterval(checkActiveCombat, 30_000)
+    return () => clearInterval(interval)
+  }, [checkActiveCombat])
 
   function toggleWeatherFx() {
     setWeatherFxEnabled(prev => {
@@ -65,20 +72,20 @@ export default function HUD({ locationName }) {
     })
   }
 
-  // Escuta configurações globais do jogo em tempo real
+  // Carrega eventos do calendário via cache de sessão — evita onSnapshot permanente
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'game_config', 'global'), (snap) => {
-      if (snap.exists()) setGameConfig(snap.data())
-    })
-    return unsub
-  }, [])
-
-  // Escuta eventos do calendário cadastrados no Firestore
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'calendar_events'), (snap) => {
-      setCalendarEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    })
-    return unsub
+    const CACHE_KEY = 'zz_calendar_cache'
+    const cached = sessionStorage.getItem(CACHE_KEY)
+    if (cached) {
+      try { setCalendarEvents(JSON.parse(cached)) } catch { /* ignora */ }
+    }
+    getDocs(collection(db, 'calendar_events'))
+      .then((snap) => {
+        const events = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        setCalendarEvents(events)
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(events))
+      })
+      .catch(() => { /* silencioso */ })
   }, [])
 
   // Relógio do jogo (atualiza periodicamente a simulação)

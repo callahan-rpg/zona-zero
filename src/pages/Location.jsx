@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { doc, getDoc, updateDoc, runTransaction, onSnapshot, collection, query, where } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { useGameConfig } from '../contexts/GameConfigContext.jsx'
 import HUD from '../components/HUD.jsx'
 import CombatHUD from '../components/CombatHUD.jsx'
 import WeatherEffects from '../components/WeatherEffects.jsx'
@@ -72,7 +73,8 @@ export default function Location() {
 
   const [location, setLocation] = useState(null)
   const [loadingLocation, setLoadingLocation] = useState(true)
-  const [gameConfig, setGameConfig] = useState(null)
+  // Usa o GameConfigContext centralizado — sem abrir conexão Firestore própria
+  const gameConfig = useGameConfig()
   const [weatherFxEnabled, setWeatherFxEnabled] = useState(() => {
     return localStorage.getItem('zz_weather_fx') !== 'false'
   })
@@ -226,13 +228,7 @@ export default function Location() {
     return () => window.removeEventListener('weather_fx_toggle', handleFxToggle)
   }, [])
 
-  // Escuta configurações de clima global em tempo real
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'game_config', 'global'), (snap) => {
-      if (snap.exists()) setGameConfig(snap.data())
-    })
-    return unsub
-  }, [])
+  // game_config é fornecido pelo GameConfigContext — sem listener local
 
   // Carrega dados da locação do Firestore
   useEffect(() => {
