@@ -21,6 +21,7 @@ import { getMaxHp, DEFAULT_PRESET_ITEMS, getItemUses, hasRadio } from '../utils/
 import { addItemToInventory } from '../utils/activitySystem'
 import { canUnequipBackpack } from '../utils/weightSystem'
 import { syncPlayerIndex } from '../utils/playerIndexService'
+import { getCatalogItem } from '../utils/itemCatalogService'
 
 const AuthContext = createContext(null)
 
@@ -661,8 +662,15 @@ export function AuthProvider({ children }) {
 
       if (!targetItem) throw new Error('Item não encontrado no inventário.')
 
-      // Determina o equipSlot do item diretamente ou a partir do preset / catalog
+      // Determina o equipSlot do item diretamente ou a partir do catálogo consolidado / presets locais (0 leituras)
       let naturalSlot = targetItem.equipSlot
+      if (!naturalSlot) {
+        const catItem = getCatalogItem(targetItem.itemId)
+        if (catItem?.equipSlot) {
+          naturalSlot = catItem.equipSlot
+          targetItem.equipSlot = catItem.equipSlot
+        }
+      }
       if (!naturalSlot) {
         const preset = DEFAULT_PRESET_ITEMS.find((p) => p.itemId === targetItem.itemId)
         if (preset?.equipSlot) {
@@ -672,13 +680,15 @@ export function AuthProvider({ children }) {
       }
 
       if (!naturalSlot) {
-        // Tenta buscar na coleção items_db
-        const itemDbRef = doc(db, 'items_db', targetItem.itemId)
-        const itemDbSnap = await transaction.get(itemDbRef)
-        if (itemDbSnap.exists() && itemDbSnap.data().equipSlot) {
-          naturalSlot = itemDbSnap.data().equipSlot
-          targetItem.equipSlot = naturalSlot
-        }
+        // Fallback legado na coleção items_db caso seja um item muito antigo
+        try {
+          const itemDbRef = doc(db, 'items_db', targetItem.itemId)
+          const itemDbSnap = await transaction.get(itemDbRef)
+          if (itemDbSnap.exists() && itemDbSnap.data().equipSlot) {
+            naturalSlot = itemDbSnap.data().equipSlot
+            targetItem.equipSlot = naturalSlot
+          }
+        } catch (_) {}
       }
 
       if (!naturalSlot) throw new Error('Este item não pode ser equipado em nenhum slot corporal.')

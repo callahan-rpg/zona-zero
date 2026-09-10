@@ -31,6 +31,7 @@ import AdminCookingEditor from '../components/AdminCookingEditor.jsx'
 import AdminWaterSourcesEditor from '../components/AdminWaterSourcesEditor.jsx'
 import AdminNarrativeEditor from '../components/AdminNarrativeEditor.jsx'
 import { migratePlayersIndex } from '../utils/playerIndexService'
+import { saveConsolidatedCatalog, consolidateCatalogFromItemsDb } from '../utils/itemCatalogService'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -258,13 +259,32 @@ export default function Admin() {
   }
 
   useEffect(() => {
-    // Carrega o catálogo apenas nas abas que interagem com o catálogo ou itens
+    // Carrega o catálogo consolidado (apenas 1 leitura!) nas abas necessárias
     if (!['catalog', 'locations', 'players', 'starter_items', 'shops'].includes(activeTab)) return
-    const unsub = onSnapshot(collection(db, 'items_db'), (snap) => {
-      setCatalogItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    const unsub = onSnapshot(doc(db, 'game_config', 'items_catalog'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data()
+        setCatalogItems(data.items || [])
+      } else {
+        // Fallback inicial se ainda não consolidado
+        setCatalogItems(DEFAULT_PRESET_ITEMS)
+      }
+    }, (err) => {
+      console.warn('Erro ao escutar items_catalog:', err)
     })
     return unsub
   }, [activeTab])
+
+  async function handleConsolidateCatalog() {
+    if (!confirm('Deseja consolidar todos os itens do banco em um único documento (/game_config/items_catalog)? Isso reduzirá 99% das leituras do Firestore para todos os jogadores.')) return
+    try {
+      const list = await consolidateCatalogFromItemsDb()
+      setCatalogItems(list)
+      alert(`Catálogo otimizado com sucesso! ${list.length} itens consolidados em 1 único documento.`)
+    } catch (err) {
+      alert('Erro ao consolidar catálogo: ' + err.message)
+    }
+  }
 
   async function handlePopulatePresets() {
     if (!confirm('Deseja cadastrar os itens padrão de sobrevivência (Cozinha, Quarto, Banheiro, Garagem, Armas) no catálogo?')) return
@@ -272,7 +292,15 @@ export default function Admin() {
       for (const item of DEFAULT_PRESET_ITEMS) {
         await setDoc(doc(db, 'items_db', item.itemId), item)
       }
-      alert('Catálogo populado com os itens predefinidos com sucesso!')
+      // Consolida também no documento único
+      const existingMap = {}
+      catalogItems.forEach(i => { existingMap[i.itemId || i.id] = i })
+      DEFAULT_PRESET_ITEMS.forEach(i => { existingMap[i.itemId] = { ...i, id: i.itemId } })
+      const merged = Object.values(existingMap)
+      await saveConsolidatedCatalog(merged)
+      setCatalogItems(merged)
+
+      alert('Catálogo populado e consolidado com sucesso!')
     } catch (err) {
       alert('Erro ao popular catálogo: ' + err.message)
     }
@@ -284,7 +312,14 @@ export default function Admin() {
       for (const item of DEFAULT_BACKPACKS) {
         await setDoc(doc(db, 'items_db', item.itemId), item)
       }
-      alert('4 Mochilas cadastradas com sucesso no catálogo!')
+      const existingMap = {}
+      catalogItems.forEach(i => { existingMap[i.itemId || i.id] = i })
+      DEFAULT_BACKPACKS.forEach(i => { existingMap[i.itemId] = { ...i, id: i.itemId } })
+      const merged = Object.values(existingMap)
+      await saveConsolidatedCatalog(merged)
+      setCatalogItems(merged)
+
+      alert('4 Mochilas cadastradas e consolidadas no catálogo!')
     } catch (err) {
       alert('Erro ao semear mochilas: ' + err.message)
     }
@@ -333,8 +368,16 @@ export default function Admin() {
     }
 
     try {
+      // 1. Salva no items_db legado (para compatibilidade histórica)
       await setDoc(doc(db, 'items_db', cleanId), payload)
-      alert('Item salvo no catálogo!')
+
+      // 2. Atualiza o catálogo consolidado (1 único doc para todos os jogadores)
+      const existingWithout = catalogItems.filter(i => (i.itemId || i.id) !== cleanId)
+      const updatedList = [...existingWithout, { id: cleanId, ...payload }]
+      await saveConsolidatedCatalog(updatedList)
+      setCatalogItems(updatedList)
+
+      alert('Item salvo com sucesso no catálogo consolidado!')
       setEditingCatalogItem(null)
       setCatalogForm({
         itemId: '',
@@ -371,8 +414,15 @@ export default function Admin() {
   async function handleDeleteCatalogItem(id) {
     if (!confirm('Deseja remover este item do catálogo?')) return
     try {
+      // 1. Remove do items_db legado
       await deleteDoc(doc(db, 'items_db', id))
-      alert('Item removido!')
+
+      // 2. Remove do documento consolidado
+      const updatedList = catalogItems.filter(i => (i.itemId || i.id) !== id)
+      await saveConsolidatedCatalog(updatedList)
+      setCatalogItems(updatedList)
+
+      alert('Item removido com sucesso!')
     } catch (err) {
       alert('Erro: ' + err.message)
     }
@@ -2334,7 +2384,10 @@ export default function Admin() {
                   <h3 style={{ fontSize: 14, textTransform: 'uppercase', color: 'var(--accent-yellow)', margin: 0 }}>
                     Catálogo ({catalogItems.length})
                   </h3>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn btn-sm" onClick={handleConsolidateCatalog} style={{ fontSize: 11, background: 'rgba(34, 197, 94, 0.15)', borderColor: '#22c55e', color: '#4ade80' }} title="Consolida todos os itens em 1 único documento no Firestore, economizando 99% das leituras">
+                      ⚡ Consolidar Catálogo Único
+                    </button>
                     <button type="button" className="btn btn-sm" onClick={handleSeedBackpacks} style={{ fontSize: 11, background: 'rgba(56, 189, 248, 0.15)', borderColor: '#38bdf8', color: '#38bdf8' }}>
                       🎒 Semear 4 Mochilas
                     </button>
