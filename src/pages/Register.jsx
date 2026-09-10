@@ -4,6 +4,7 @@ import { collection, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
 import NarrativeOpeningModal from '../components/NarrativeOpeningModal.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { getPlayerIndex } from '../utils/playerIndexService'
 import {
   PROFESSIONS,
   ATTRIBUTE_LIST,
@@ -487,12 +488,12 @@ export default function Register() {
   const [customStarterConfig, setCustomStarterConfig] = useState({})
 
   useEffect(() => {
-    // Consulta pontual de usuários registrados (apenas para apuração de vagas no momento do cadastro)
-    getDocs(collection(db, 'users'))
-      .then((snap) => {
-        setRegisteredUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() })))
+    // Consulta pontual do índice leve de jogadores (apenas para apuração de vagas no momento do cadastro)
+    getPlayerIndex()
+      .then((list) => {
+        setRegisteredUsers(list)
       })
-      .catch((err) => console.warn('Aviso ao consultar usuários:', err))
+      .catch((err) => console.warn('Aviso ao consultar índice de jogadores:', err))
 
     // Carregamento pontual único para evitar listeners permanentes em tela de registro
     async function loadRegisterData() {
@@ -532,7 +533,7 @@ export default function Register() {
   Object.keys(PROFESSIONS).forEach(pId => { professionCounts[pId] = 0 })
   registeredUsers.forEach(u => {
     if (u.role === 'admin' || u.isAdmin) return // Ignora staff/admins
-    const pId = u.character?.profession?.id || (typeof u.character?.profession === 'string' ? u.character.profession : null)
+    const pId = u.professionId || u.character?.profession?.id || (typeof u.character?.profession === 'string' ? u.character.profession : null)
     if (pId && professionCounts[pId] !== undefined) professionCounts[pId] += 1
   })
 

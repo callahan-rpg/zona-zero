@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { collection, getDocs } from 'firebase/firestore'
-import { db } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
+import { getPlayerIndex } from '../utils/playerIndexService'
 import HUD from '../components/HUD.jsx'
 
 export default function Characters() {
@@ -12,12 +11,11 @@ export default function Characters() {
   useEffect(() => {
     async function load() {
       try {
-        const snap = await getDocs(collection(db, 'users'))
-        const list = snap.docs
-          .map((d) => ({ uid: d.id, ...d.data().character }))
-          .filter((c) => !!c.name) // filtra usuários sem personagem criado
+        const list = await getPlayerIndex()
+        const valid = list
+          .filter((c) => !!c.name)
           .sort((a, b) => (b.level || 0) - (a.level || 0))
-        setCharacters(list)
+        setCharacters(valid)
       } catch (err) {
         console.error('Erro ao carregar personagens:', err)
       } finally {

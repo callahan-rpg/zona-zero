@@ -23,6 +23,7 @@ import {
   playRadioChime
 } from '../utils/radioSystem'
 import { hasRadio } from '../utils/itemSystem'
+import { getPlayerIndex } from '../utils/playerIndexService'
 import GameIcon from './GameIcon.jsx'
 
 export default function AdminRadioEditor({ locations = [] }) {
@@ -70,16 +71,15 @@ export default function AdminRadioEditor({ locations = [] }) {
   const [deletingId, setDeletingId] = useState(null)
   const [clearingAll, setClearingAll] = useState(false)
 
-  // Carrega contagem de usuários com Rádio uma vez (informação estatística, não precisa de listener)
+  // Carrega contagem de usuários com Rádio via índice leve
   useEffect(() => {
-    getDocs(collection(db, 'users'))
-      .then((snap) => {
+    getPlayerIndex()
+      .then((list) => {
         let withRadio = 0
-        snap.docs.forEach(d => {
-          const char = d.data().character
-          if (char && hasRadio(char.inventory)) withRadio++
+        list.forEach(p => {
+          if (p.hasRadio) withRadio++
         })
-        setTotalUsersCount(snap.docs.length)
+        setTotalUsersCount(list.length)
         setRadioUsersCount(withRadio)
       })
       .catch(() => {})

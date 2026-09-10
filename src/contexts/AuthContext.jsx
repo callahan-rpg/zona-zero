@@ -17,9 +17,10 @@ import {
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
-import { getMaxHp, DEFAULT_PRESET_ITEMS, getItemUses } from '../utils/itemSystem'
+import { getMaxHp, DEFAULT_PRESET_ITEMS, getItemUses, hasRadio } from '../utils/itemSystem'
 import { addItemToInventory } from '../utils/activitySystem'
 import { canUnequipBackpack } from '../utils/weightSystem'
+import { syncPlayerIndex } from '../utils/playerIndexService'
 
 const AuthContext = createContext(null)
 
@@ -94,6 +95,28 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     characterRef.current = character
   }, [character])
+
+  // Sincronização automática com /players_index com debounce de 2.5s
+  const lastIndexSyncKeyRef = useRef('')
+  const syncIndexTimerRef = useRef(null)
+
+  useEffect(() => {
+    if (!user?.uid || !character?.name) return
+
+    const profId = character?.profession?.id || (typeof character?.profession === 'string' ? character.profession : '')
+    const hasRad = hasRadio(character?.inventory || [])
+    const syncKey = `${character.name}|${character.avatarUrl || ''}|${character.level || 1}|${character.xp || 0}|${character.age || ''}|${profId}|${hasRad}|${role}`
+
+    if (lastIndexSyncKeyRef.current === syncKey) return
+
+    clearTimeout(syncIndexTimerRef.current)
+    syncIndexTimerRef.current = setTimeout(() => {
+      lastIndexSyncKeyRef.current = syncKey
+      syncPlayerIndex(user.uid, character, role)
+    }, 2500)
+
+    return () => clearTimeout(syncIndexTimerRef.current)
+  }, [user?.uid, character, role])
 
   // --------------------------------------------------------------------------
   // SISTEMA DE DEGRADAÇÃO AUTOMÁTICA DE VITAIS (TAXA DE JOGO)
@@ -273,6 +296,12 @@ export function AuthProvider({ children }) {
       } catch (sheetErr) {
         console.warn('Aviso ao atualizar status da ficha pré-pronta:', sheetErr)
       }
+    }
+
+    try {
+      await syncPlayerIndex(uid, newCharacter, 'player')
+    } catch (indexErr) {
+      console.warn('Aviso ao sincronizar players_index no cadastro:', indexErr)
     }
 
     setCharacter(newCharacter)

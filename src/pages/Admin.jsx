@@ -30,6 +30,7 @@ import AdminBaseDefenseEditor from '../components/AdminBaseDefenseEditor.jsx'
 import AdminCookingEditor from '../components/AdminCookingEditor.jsx'
 import AdminWaterSourcesEditor from '../components/AdminWaterSourcesEditor.jsx'
 import AdminNarrativeEditor from '../components/AdminNarrativeEditor.jsx'
+import { migratePlayersIndex } from '../utils/playerIndexService'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -868,6 +869,25 @@ export default function Admin() {
   const [pickerSearch, setPickerSearch] = useState('')
   const [pickerCategory, setPickerCategory] = useState('all')
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [migratingIndex, setMigratingIndex] = useState(false)
+  const [migrationStatus, setMigrationStatus] = useState(null)
+
+  async function handleMigratePlayersIndex() {
+    if (!window.confirm('Deseja sincronizar todos os jogadores para o índice leve (/players_index)? Isso reduzirá drasticamente as leituras no Firestore.')) return
+    setMigratingIndex(true)
+    setMigrationStatus('Lendo usuários existentes...')
+    try {
+      const res = await migratePlayersIndex((prog) => {
+        setMigrationStatus(`Indexando ${prog.processed} de ${prog.total} jogadores...`)
+      })
+      setMigrationStatus(`✅ Concluído! ${res.processed} de ${res.total} jogadores sincronizados no players_index.`)
+    } catch (err) {
+      console.error('Erro na migração do players_index:', err)
+      setMigrationStatus(`❌ Erro: ${err.message}`)
+    } finally {
+      setMigratingIndex(false)
+    }
+  }
 
   useEffect(() => {
     if (activeTab !== 'players' && activeTab !== 'combat') return
@@ -4856,11 +4876,55 @@ export default function Admin() {
 
           {/* CONTEÚDO DA TAB 3: SOBREVIVENTES */}
           {activeTab === 'players' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20 }}>
-              {/* Esquerda: lista de jogadores */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Jogadores Cadastrados</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '420px', overflowY: 'auto' }}>
+            <div>
+              {/* Painel de Otimização do Banco: Índice Leve (/players_index) */}
+              <div style={{
+                background: 'rgba(56, 189, 248, 0.08)',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                borderRadius: 8,
+                padding: '12px 16px',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 12
+              }}>
+                <div>
+                  <div style={{ fontWeight: 'bold', fontSize: 13, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>⚡</span> Otimização de Quota do Firestore: Índice Leve (/players_index)
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                    Economiza mais de 90% das leituras do banco em listas de sobreviventes e no sistema de rádio.
+                  </div>
+                  {migrationStatus && (
+                    <div style={{ fontSize: 12, marginTop: 4, color: migrationStatus.startsWith('❌') ? '#ef4444' : '#34d399', fontWeight: 600 }}>
+                      {migrationStatus}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={migratingIndex}
+                  onClick={handleMigratePlayersIndex}
+                  style={{
+                    background: '#0284c7',
+                    borderColor: '#38bdf8',
+                    color: '#fff',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {migratingIndex ? '⏳ Sincronizando...' : '🔄 Sincronizar Todos os Jogadores'}
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20 }}>
+                {/* Esquerda: lista de jogadores */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Jogadores Cadastrados</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '420px', overflowY: 'auto' }}>
                   {players.map((p) => (
                     <div
                       key={p.uid}
@@ -5793,6 +5857,7 @@ export default function Admin() {
                   Selecione um sobrevivente para editar
                 </div>
               )}
+            </div>
             </div>
           )}
 

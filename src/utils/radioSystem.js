@@ -1,7 +1,8 @@
-import { collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc, runTransaction, query, where, orderBy, limit } from 'firebase/firestore'
+import { collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, arrayUnion } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { hasRadio } from './itemSystem'
 import { calculateGameTime } from './timeSystem'
+import { getRadioReceivers } from './playerIndexService'
 
 /**
  * Frequências do Rádio e suas regras de tempo estritas
@@ -56,43 +57,34 @@ export async function sendManualBroadcast({
   const nowIso = new Date().toISOString()
   const nowMs = Date.now()
 
-  // 1. Busca todos os usuários do RPG
-  const usersSnap = await getDocs(collection(db, 'users'))
+  // 1. Busca apenas os usuários que possuem Rádio (via players_index filtrado no Firestore)
+  const receivers = await getRadioReceivers()
   const notifiedUids = []
-
-  // 2. Filtra usuários que possuem Rádio e dispara notificações atômicas
   const updatePromises = []
 
-  usersSnap.forEach((userDoc) => {
-    const userData = userDoc.data()
-    const inventory = userData.character?.inventory || []
-
-    if (hasRadio(inventory)) {
-      notifiedUids.push(userDoc.id)
-      const notifId = 'notif_radio_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36)
-      const newNotif = {
-        id: notifId,
-        type: 'radio_message',
-        senderName: senderName || 'Rádio do Acampamento',
-        senderAvatar: null,
-        message: cleanMessage,
-        category: category,
-        gameDateFormatted: gameTime.formattedDate,
-        gameTimeString: gameTime.timeString,
-        read: false,
-        createdAt: nowIso
-      }
-
-      const existingNotifs = userData.character?.notifications || []
-      const updatedNotifs = [newNotif, ...existingNotifs.slice(0, 49)]
-
-      const userRef = doc(db, 'users', userDoc.id)
-      updatePromises.push(
-        updateDoc(userRef, {
-          'character.notifications': updatedNotifs
-        })
-      )
+  // 2. Dispara notificações atômicas sem carregar os documentos pesados de users
+  receivers.forEach((receiver) => {
+    notifiedUids.push(receiver.uid)
+    const notifId = 'notif_radio_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36)
+    const newNotif = {
+      id: notifId,
+      type: 'radio_message',
+      senderName: senderName || 'Rádio do Acampamento',
+      senderAvatar: null,
+      message: cleanMessage,
+      category: category,
+      gameDateFormatted: gameTime.formattedDate,
+      gameTimeString: gameTime.timeString,
+      read: false,
+      createdAt: nowIso
     }
+
+    const userRef = doc(db, 'users', receiver.uid)
+    updatePromises.push(
+      updateDoc(userRef, {
+        'character.notifications': arrayUnion(newNotif)
+      }).catch(err => console.warn(`[radioSystem] Aviso ao notificar ${receiver.uid}:`, err))
+    )
   })
 
   await Promise.all(updatePromises)
@@ -215,41 +207,33 @@ export async function checkAndTriggerAutoBroadcasts(gameConfig = null) {
       }
 
       if (shouldSend && chosenMessage) {
-        // Dispara para todos os usuários com Rádio
-        const usersSnap = await getDocs(collection(db, 'users'))
+        // Dispara apenas para usuários que possuem Rádio (via players_index filtrado no Firestore)
+        const receivers = await getRadioReceivers()
         const notifiedUids = []
         const updatePromises = []
 
-        usersSnap.forEach((userDoc) => {
-          const userData = userDoc.data()
-          const inventory = userData.character?.inventory || []
-
-          if (hasRadio(inventory)) {
-            notifiedUids.push(userDoc.id)
-            const notifId = 'notif_radio_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36)
-            const newNotif = {
-              id: notifId,
-              type: 'radio_message',
-              senderName: schedule.senderName || 'Rádio do Acampamento',
-              senderAvatar: null,
-              message: chosenMessage,
-              category: schedule.group || schedule.category || 'Alerta do Rádio',
-              gameDateFormatted: gameTime.formattedDate,
-              gameTimeString: gameTime.timeString,
-              read: false,
-              createdAt: nowIso
-            }
-
-            const existingNotifs = userData.character?.notifications || []
-            const updatedNotifs = [newNotif, ...existingNotifs.slice(0, 49)]
-
-            const userRef = doc(db, 'users', userDoc.id)
-            updatePromises.push(
-              updateDoc(userRef, {
-                'character.notifications': updatedNotifs
-              })
-            )
+        receivers.forEach((receiver) => {
+          notifiedUids.push(receiver.uid)
+          const notifId = 'notif_radio_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36)
+          const newNotif = {
+            id: notifId,
+            type: 'radio_message',
+            senderName: schedule.senderName || 'Rádio do Acampamento',
+            senderAvatar: null,
+            message: chosenMessage,
+            category: schedule.group || schedule.category || 'Alerta do Rádio',
+            gameDateFormatted: gameTime.formattedDate,
+            gameTimeString: gameTime.timeString,
+            read: false,
+            createdAt: nowIso
           }
+
+          const userRef = doc(db, 'users', receiver.uid)
+          updatePromises.push(
+            updateDoc(userRef, {
+              'character.notifications': arrayUnion(newNotif)
+            }).catch(err => console.warn(`[radioSystem] Falha ao notificar ${receiver.uid}:`, err))
+          )
         })
 
         await Promise.all(updatePromises)

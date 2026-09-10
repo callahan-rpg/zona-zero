@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { collection, getDocs } from 'firebase/firestore'
-import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { getPlayerIndex } from '../utils/playerIndexService'
 
 export default function MoneyTransferModal({ isOpen, onClose }) {
   const { user, character, transferMoney } = useAuth()
@@ -25,13 +24,12 @@ export default function MoneyTransferModal({ isOpen, onClose }) {
       setSuccess('')
       setAmount('')
       try {
-        const snap = await getDocs(collection(db, 'users'))
-        const list = snap.docs
-          .map((d) => ({ uid: d.id, ...d.data().character }))
+        const list = await getPlayerIndex()
+        const filtered = list
           .filter((c) => c.uid !== user.uid && !!c.name)
-        setSurvivors(list)
-        if (list.length > 0) {
-          setRecipientUid(list[0].uid)
+        setSurvivors(filtered)
+        if (filtered.length > 0) {
+          setRecipientUid(filtered[0].uid)
         }
       } catch (err) {
         console.error('Erro ao buscar sobreviventes:', err)
