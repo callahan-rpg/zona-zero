@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { collection, onSnapshot } from 'firebase/firestore'
-import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { useItemCatalog } from '../utils/itemCatalogService'
 import { getVitalsDebuffs, getMaxHp } from '../utils/itemSystem'
 import { calculateCharacterCarryStats } from '../utils/weightSystem'
 import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
@@ -13,20 +12,7 @@ function xpForNextLevel(level) {
 
 export default function CharacterPopup({ onClose }) {
   const { character, role } = useAuth()
-  const [catalogMap, setCatalogMap] = useState({})
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'items_db'), (snap) => {
-      const map = {}
-      snap.docs.forEach(d => {
-        const data = d.data()
-        const key = data.itemId || d.id
-        map[key] = data
-      })
-      setCatalogMap(map)
-    })
-    return unsub
-  }, [])
+  const { map: catalogMap } = useItemCatalog()
 
   // Inicia posicionado no canto superior direito abaixo da HUD (ao lado de onde o dados abre ou centralizado à direita)
   const [pos, setPos] = useState({ x: Math.max(20, window.innerWidth - 380), y: 80 })

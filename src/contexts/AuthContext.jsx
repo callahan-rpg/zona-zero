@@ -34,28 +34,14 @@ export function AuthProvider({ children }) {
     let unsubUserDoc = null
     let isMounted = true
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (!isMounted) return
 
       if (firebaseUser) {
         setUser(firebaseUser)
         const docRef = doc(db, 'users', firebaseUser.uid)
 
-        // 1. Carregamento inicial imediato via getDoc
-        try {
-          const initialSnap = await getDoc(docRef)
-          if (initialSnap.exists() && isMounted) {
-            const data = initialSnap.data()
-            setCharacter(data.character)
-            setRole(data.role || 'player')
-          }
-        } catch (err) {
-          console.warn('Aviso ao carregar dados iniciais do usuário:', err)
-        } finally {
-          if (isMounted) setLoading(false)
-        }
-
-        // 2. Listener em tempo real para sincronização subsequente
+        // Listener em tempo real único (já retorna os dados imediatamente no snapshot inicial)
         if (unsubUserDoc) unsubUserDoc()
         unsubUserDoc = onSnapshot(docRef, (docSnap) => {
           if (docSnap.exists() && isMounted) {
@@ -84,33 +70,9 @@ export function AuthProvider({ children }) {
       if (isMounted) setLoading(false)
     }, 3000)
 
-    // Listener para quando a aba voltar a ter foco/ficar visível: sincronizar dados mais recentes
-    const handleFocus = async () => {
-      if (auth.currentUser) {
-        try {
-          const snap = await getDoc(doc(db, 'users', auth.currentUser.uid))
-          if (snap.exists() && isMounted) {
-            const data = snap.data()
-            setCharacter(data.character)
-            setRole(data.role || 'player')
-          }
-        } catch (err) {
-          console.warn('Erro ao sincronizar no foco:', err)
-        }
-      }
-    }
-
-    window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        handleFocus()
-      }
-    })
-
     return () => {
       isMounted = false
       clearTimeout(fallbackTimer)
-      window.removeEventListener('focus', handleFocus)
       if (unsubUserDoc) unsubUserDoc()
       unsubscribeAuth()
     }
@@ -138,11 +100,30 @@ export function AuthProvider({ children }) {
   // - Sede: -2% a cada 10 min (-0.2% por minuto)
   // - Fome: -1.5% a cada 15 min (-0.1% por minuto)
   // - Inanição/Desidratação (Fome ou Sede em 0%): -0.5% de Vida por minuto
+  // OTIMIZAÇÃO: A UI atualiza a cada 20s, mas a persistência no Firestore ocorre
+  // a cada 3 minutos (ou imediatamente se a vida cair), economizando 90% de writes.
   // --------------------------------------------------------------------------
+  const pendingVitalsRef = useRef(null)
+  const lastPersistTimeRef = useRef(Date.now())
+
   useEffect(() => {
     if (!user) return
 
     let lastTick = Date.now()
+
+    const persistVitalsNow = async (vitalsToSave) => {
+      if (!vitalsToSave || !user) return
+      try {
+        const userRef = doc(db, 'users', user.uid)
+        await updateDoc(userRef, {
+          'character.vitals': vitalsToSave
+        })
+        lastPersistTimeRef.current = Date.now()
+        pendingVitalsRef.current = null
+      } catch (err) {
+        console.error('Erro ao persistir vitais:', err)
+      }
+    }
 
     const interval = setInterval(async () => {
       // Se a aba estiver oculta/minimizada, apenas atualiza lastTick para não acumular nem punir
@@ -198,22 +179,37 @@ export function AuthProvider({ children }) {
           blood: newBlood,
         }
 
-        // 1. Atualização imediata na UI
+        // 1. Atualização imediata e fluida na UI local
         setCharacter(prev => prev ? ({ ...prev, vitals: nextVitals }) : prev)
+        pendingVitalsRef.current = nextVitals
 
-        // 2. Gravação assíncrona no Firestore
-        try {
-          const userRef = doc(db, 'users', user.uid)
-          await updateDoc(userRef, {
-            'character.vitals': nextVitals
-          })
-        } catch (err) {
-          console.error('Erro ao atualizar vitais:', err)
+        // 2. Gravação no Firestore apenas se:
+        // - Passaram 3 minutos (180s) desde a última gravação OU
+        // - A vida caiu (inanição crítica que precisa ser persistida)
+        const timeSinceLastPersist = now - lastPersistTimeRef.current
+        const bloodDropped = newBlood < curB
+
+        if (timeSinceLastPersist >= 180000 || bloodDropped) {
+          await persistVitalsNow(nextVitals)
         }
       }
-    }, 20000) // Intervalo a cada 20 segundos
+    }, 20000) // Cálculo local suave a cada 20 segundos
 
-    return () => clearInterval(interval)
+    // Salva qualquer alteração pendente caso o usuário feche a aba
+    const handleBeforeUnload = () => {
+      if (pendingVitalsRef.current && user) {
+        persistVitalsNow(pendingVitalsRef.current)
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      if (pendingVitalsRef.current && user) {
+        persistVitalsNow(pendingVitalsRef.current)
+      }
+    }
   }, [user?.uid])
 
   // Cadastro: cria conta + personagem
@@ -435,8 +431,6 @@ export function AuthProvider({ children }) {
         'character.vitals': updatedVitals,
       })
     })
-
-    await refreshCharacter()
   }
 
   // Usar item médico ou consumível em outro sobrevivente
@@ -580,7 +574,6 @@ export function AuthProvider({ children }) {
       }
     })
 
-    await refreshCharacter()
     return resultSummary
   }
 
@@ -621,8 +614,6 @@ export function AuthProvider({ children }) {
         'character.inventory': inventory,
       })
     })
-
-    await refreshCharacter()
   }
 
   // Equipar um item no slot anatômico correspondente
@@ -741,8 +732,6 @@ export function AuthProvider({ children }) {
         'character.inventory': inventory,
       })
     })
-
-    await refreshCharacter()
   }
 
   // Desequipar um item e mantê-lo na mochila
@@ -774,8 +763,6 @@ export function AuthProvider({ children }) {
         'character.inventory': inventory,
       })
     })
-
-    await refreshCharacter()
   }
 
   // Grava a conclusão da Busca Única e adiciona os itens selecionados ao inventário
@@ -827,8 +814,6 @@ export function AuthProvider({ children }) {
         [`character.uniqueSearchesDone.${locationSlug}`]: new Date(),
       })
     })
-
-    await refreshCharacter()
   }
 
   // Transferência de item de forma transacional e segura
@@ -926,8 +911,6 @@ export function AuthProvider({ children }) {
         'character.notifications': recipientNotifications
       })
     })
-
-    await refreshCharacter()
   }
 
   // Transferência de Novos Rublos de forma atômica e segura
@@ -996,8 +979,6 @@ export function AuthProvider({ children }) {
         'character.notifications': recipientNotifications
       })
     })
-
-    await refreshCharacter()
   }
 
   // Marca todas as notificações como lidas

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { doc, getDoc, updateDoc, runTransaction, onSnapshot, collection } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, runTransaction, onSnapshot, collection, query, where } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import HUD from '../components/HUD.jsx'
@@ -15,6 +15,7 @@ import CookingModal from '../components/CookingModal.jsx'
 import WaterSourceModal from '../components/WaterSourceModal.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
+import { useItemCatalog } from '../utils/itemCatalogService'
 
 /**
  * Retorna a imagem de fundo correta baseada na hora in-game.
@@ -99,7 +100,7 @@ export default function Location() {
   // Estados de Loja Local
   const [showShop, setShowShop] = useState(false)
   const [shopInfo, setShopInfo] = useState(null)
-  const [catalogItems, setCatalogItems] = useState([])
+  const { list: catalogItems } = useItemCatalog()
 
   // Estados de Armazenamento / Storages Locais
   const [locationStorages, setLocationStorages] = useState([])
@@ -125,12 +126,13 @@ export default function Location() {
     setTimeout(() => setToastMessage(null), 3500)
   }
 
-  // Escuta Pontos de Rádio vinculados a esta locação
+  // Escuta Pontos de Rádio vinculados a esta locação (filtrado na nuvem)
   useEffect(() => {
     if (!slug) return
-    const unsub = onSnapshot(collection(db, 'radio_points'), (snap) => {
+    const q = query(collection(db, 'radio_points'), where('locationSlug', '==', slug))
+    const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      const matched = docs.find(pt => pt.enabled !== false && (pt.locationSlug === slug || (slug === 'casa-grande-2-andar' && pt.locationSlug === 'casa-grande-2-andar')))
+      const matched = docs.find(pt => pt.enabled !== false)
       if (matched) {
         setActiveRadioPoint(matched)
       } else if (slug === 'casa-grande-2-andar') {
@@ -175,12 +177,13 @@ export default function Location() {
     return unsub
   }, [slug])
 
-  // Escuta Fontes de Água vinculadas a esta locação
+  // Escuta Fontes de Água vinculadas a esta locação (filtrado na nuvem)
   useEffect(() => {
     if (!slug) return
-    const unsub = onSnapshot(collection(db, 'water_sources'), (snap) => {
+    const q = query(collection(db, 'water_sources'), where('locationSlug', '==', slug))
+    const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      const matched = docs.find(s => s.enabled !== false && s.locationSlug === slug)
+      const matched = docs.find(s => s.enabled !== false)
       setActiveWaterSource(matched || null)
     })
     return unsub
@@ -189,35 +192,30 @@ export default function Location() {
   // Estados de Atividades de Produção Locais (Pesca, Plantação, Galinheiro, etc.)
   const [locationActivities, setLocationActivities] = useState([])
 
-  // Escuta recipientes de armazenamento vinculados a esta locação
+  // Escuta recipientes de armazenamento vinculados a esta locação (filtrado na nuvem)
   useEffect(() => {
     if (!slug) return
-    const unsub = onSnapshot(collection(db, 'storages'), (snap) => {
+    const q = query(collection(db, 'storages'), where('locationSlug', '==', slug))
+    const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      const matched = docs.filter(st => st.locationSlug === slug)
-      setLocationStorages(matched)
+      setLocationStorages(docs)
     })
     return unsub
   }, [slug])
 
-  // Escuta atividades de produção vinculadas a esta locação
+  // Escuta atividades de produção vinculadas a esta locação (filtrado na nuvem)
   useEffect(() => {
     if (!slug) return
-    const unsub = onSnapshot(collection(db, 'activities'), (snap) => {
+    const q = query(collection(db, 'activities'), where('locationSlug', '==', slug))
+    const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      const matched = docs.filter(act => act.locationSlug === slug && act.enabled !== false)
+      const matched = docs.filter(act => act.enabled !== false)
       setLocationActivities(matched)
     })
     return unsub
   }, [slug])
 
-  // Escuta catálogo geral de itens para hidratação de ícones e descrições na loja
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'items_db'), (snap) => {
-      setCatalogItems(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    })
-    return unsub
-  }, [])
+
 
   // Escuta alterações no toggle de efeitos visuais disparados pelo HUD
   useEffect(() => {

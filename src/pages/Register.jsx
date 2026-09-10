@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { collection, doc, onSnapshot, getDocs, updateDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
 import NarrativeOpeningModal from '../components/NarrativeOpeningModal.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -487,9 +487,12 @@ export default function Register() {
   const [customStarterConfig, setCustomStarterConfig] = useState({})
 
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      setRegisteredUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() })))
-    }, (err) => console.warn('Aviso ao consultar usuários:', err))
+    // Consulta pontual de usuários registrados (apenas para apuração de vagas no momento do cadastro)
+    getDocs(collection(db, 'users'))
+      .then((snap) => {
+        setRegisteredUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() })))
+      })
+      .catch((err) => console.warn('Aviso ao consultar usuários:', err))
 
     const unsubSheets = onSnapshot(collection(db, 'pre_made_sheets'), (snap) => {
       setPreMadeSheets(snap.docs.map(d => ({ id: d.id, ...d.data() })))
@@ -515,7 +518,7 @@ export default function Register() {
       }
     }, (err) => console.warn('Aviso ao consultar abertura narrativa:', err))
 
-    return () => { unsubUsers(); unsubSheets(); unsubLocs(); unsubConfig(); unsubStarters(); unsubOpening() }
+    return () => { unsubSheets(); unsubLocs(); unsubConfig(); unsubStarters(); unsubOpening() }
   }, [])
 
   // Local padrão de nascimento configurado pelo Admin (padrão: acampamento)
