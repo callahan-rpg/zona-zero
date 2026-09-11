@@ -44,6 +44,8 @@ export async function migrateAllBase64ToCloudinary(onProgress = () => {}) {
           await updateDoc(doc(db, 'items_db', d.id), { imageUrl: newUrl })
           totalMigrated++
           modified = true
+          // Pequena pausa para evitar flood de requisições simultâneas
+          await new Promise(r => setTimeout(r, 600))
         } catch (err) {
           errors.push(`Item ${data.name || d.id}: ${err.message}`)
         }
