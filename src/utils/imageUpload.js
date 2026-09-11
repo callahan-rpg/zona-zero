@@ -1,14 +1,17 @@
 /**
- * Utilitário para upload gratuito de imagens direto do navegador
- * Suporta ImgBB (com fallback para conversão Base64 / URL direta)
+ * Utilitário para upload de imagens utilizando o Cloudinary (Unsigned Preset).
+ * Mantém fallback para Base64 local caso ocorra algum problema de rede.
  */
 
-// Chave pública gratuita para ImgBB API (permite upload direto de imagens)
-const IMGBB_API_KEY = '6d207e02198a847aa98d0a2a901485a5' // ImgBB free upload API key
+const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'z3cr8lix'
+const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'zona_zero'
 
 /**
- * Faz upload de um arquivo de imagem (File) e retorna a URL direta da imagem hospedada.
- * Se houver erro de rede, comprime em DataURL Base64 para não travar o fluxo.
+ * Faz upload de um arquivo de imagem (File) e retorna a URL direta hospedada no Cloudinary.
+ * Se houver erro de rede, converte em DataURL Base64 como fallback seguro.
+ * 
+ * @param {File} file - Arquivo de imagem selecionado
+ * @returns {Promise<string>} URL segura HTTPS do Cloudinary ou DataURL Base64
  */
 export async function uploadImageFree(file) {
   if (!file) throw new Error('Nenhum arquivo fornecido.')
@@ -18,23 +21,27 @@ export async function uploadImageFree(file) {
     throw new Error('O arquivo selecionado deve ser uma imagem válida (PNG, JPG, WEBP, GIF, SVG).')
   }
 
-  // Tenta upload via ImgBB
+  // Tenta upload via Cloudinary
   try {
     const formData = new FormData()
-    formData.append('image', file)
+    formData.append('file', file)
+    formData.append('upload_preset', UPLOAD_PRESET)
 
-    const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
       method: 'POST',
       body: formData
     })
 
     const data = await response.json()
 
-    if (data && data.success && data.data && (data.data.display_url || data.data.url)) {
-      return data.data.display_url || data.data.url
+    if (response.ok && data.secure_url) {
+      return data.secure_url
+    } else {
+      console.warn('Erro na resposta do Cloudinary:', data)
+      throw new Error(data.error?.message || 'Falha ao processar upload no Cloudinary.')
     }
   } catch (err) {
-    console.warn('Upload ImgBB falhou, convertendo para Base64 local:', err)
+    console.warn('Upload Cloudinary falhou, convertendo para Base64 local como fallback:', err)
   }
 
   // Fallback seguro: converte para Base64 se a API remota estiver inacessível
