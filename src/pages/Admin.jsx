@@ -30,6 +30,7 @@ import AdminBaseDefenseEditor from '../components/AdminBaseDefenseEditor.jsx'
 import AdminCookingEditor from '../components/AdminCookingEditor.jsx'
 import AdminWaterSourcesEditor from '../components/AdminWaterSourcesEditor.jsx'
 import AdminNarrativeEditor from '../components/AdminNarrativeEditor.jsx'
+import AdminFormsEditor from '../components/AdminFormsEditor.jsx'
 import { migratePlayersIndex } from '../utils/playerIndexService'
 import { saveConsolidatedCatalog, consolidateCatalogFromItemsDb } from '../utils/itemCatalogService'
 import { migrateAllBase64ToCloudinary } from '../utils/cloudinaryMigration'
@@ -1986,7 +1987,15 @@ export default function Admin() {
             <button className={`btn btn-sm ${activeTab === 'narrative' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('narrative')} style={{ borderColor: 'rgba(250, 204, 21, 0.5)', color: activeTab === 'narrative' ? '#000' : '#fde047', background: activeTab === 'narrative' ? '#eab308' : 'transparent', fontWeight: 'bold' }}>
               📖 Abertura Narrativa
             </button>
+            <button className={`btn btn-sm ${activeTab === 'custom_forms' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('custom_forms')} style={{ borderColor: 'rgba(129, 140, 248, 0.5)', color: activeTab === 'custom_forms' ? '#fff' : '#a5b4fc', background: activeTab === 'custom_forms' ? '#4f46e5' : 'transparent', fontWeight: 'bold' }}>
+              📝 Formulários Discord
+            </button>
           </div>
+
+          {/* CONTEÚDO DA TAB CUSTOM FORMS: FORMULÁRIOS COM DISCORD WEBHOOK */}
+          {activeTab === 'custom_forms' && (
+            <AdminFormsEditor locations={locations} />
+          )}
 
           {/* CONTEÚDO DA TAB NARRATIVE: ABERTURA NARRATIVA */}
           {activeTab === 'narrative' && (

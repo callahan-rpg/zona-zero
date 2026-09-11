@@ -14,6 +14,7 @@ import RadioHistoryModal from '../components/RadioHistoryModal.jsx'
 import BaseDefenseBanner from '../components/BaseDefenseBanner.jsx'
 import CookingModal from '../components/CookingModal.jsx'
 import WaterSourceModal from '../components/WaterSourceModal.jsx'
+import CustomFormModal from '../components/CustomFormModal.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
 import { useItemCatalog } from '../utils/itemCatalogService'
@@ -122,6 +123,10 @@ export default function Location() {
   // Estados de Coleta de Água
   const [activeWaterSource, setActiveWaterSource] = useState(null)
   const [showWaterModal, setShowWaterModal] = useState(false)
+
+  // Estados de Formulários Customizados (Discord)
+  const [locationForms, setLocationForms] = useState([])
+  const [activeCustomForm, setActiveCustomForm] = useState(null)
 
   const showToast = (msg) => {
     setToastMessage(msg)
@@ -233,6 +238,17 @@ export default function Location() {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       const matched = docs.filter(act => act.enabled !== false)
       setLocationActivities(matched)
+    })
+    return unsub
+  }, [slug])
+
+  // Escuta formulários customizados vinculados a esta locação ou globais
+  useEffect(() => {
+    if (!slug) return
+    const unsub = onSnapshot(collection(db, 'custom_forms'), (snap) => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      const matched = docs.filter(f => f.enabled !== false && (!f.locationSlug || f.locationSlug === slug))
+      setLocationForms(matched)
     })
     return unsub
   }, [slug])
@@ -672,6 +688,26 @@ export default function Location() {
                 />
               ))}
 
+              {/* Botões de Formulários Customizados vinculados ao Discord */}
+              {locationForms.map(cf => (
+                <button
+                  key={cf.id}
+                  className="loot-btn"
+                  style={{
+                    background: `linear-gradient(135deg, ${cf.buttonColor ? `${cf.buttonColor}33` : 'rgba(234, 179, 8, 0.25)'} 0%, ${cf.buttonColor ? `${cf.buttonColor}15` : 'rgba(202, 138, 4, 0.2)'} 100%)`,
+                    borderColor: cf.buttonColor || '#eab308',
+                    color: cf.buttonColor || '#fef08a',
+                    fontWeight: 700,
+                    boxShadow: `0 0 12px ${cf.buttonColor ? `${cf.buttonColor}33` : 'rgba(234, 179, 8, 0.25)'}`
+                  }}
+                  onClick={() => setActiveCustomForm(cf)}
+                  title={cf.description || cf.title}
+                >
+                  <span>{cf.icon || '📝'}</span>
+                  {cf.buttonText || cf.title || 'Formulário'}
+                </button>
+              ))}
+
               {/* Botão 1: Buscar Suprimentos (Repetível / Cooldown / Sucata & Comuns) */}
               {location.loot?.enabled && (
                 <button
@@ -871,6 +907,17 @@ export default function Location() {
           waterSource={activeWaterSource}
           locationSlug={slug}
           onClose={() => setShowWaterModal(false)}
+        />
+      )}
+
+      {/* Modal de Formulário Customizado do Discord */}
+      {activeCustomForm && (
+        <CustomFormModal
+          form={activeCustomForm}
+          character={character}
+          user={user}
+          locationName={location?.name || slug}
+          onClose={() => setActiveCustomForm(null)}
         />
       )}
     </div>
