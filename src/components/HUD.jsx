@@ -28,7 +28,8 @@ export default function HUD({ locationName }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [calendarEvents, setCalendarEvents] = useState([])
-  const [hasActiveCombat, setHasActiveCombat] = useState(false)
+  // Status de combate em tempo real sincronizado via GameConfigContext (zero polling, zero leituras adicionais)
+  const hasActiveCombat = !!(gameConfig?.hasActiveCombat)
   const [showDice, setShowDice] = useState(false)
   const [showCharacter, setShowCharacter] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
@@ -48,21 +49,6 @@ export default function HUD({ locationName }) {
     return () => window.removeEventListener('open_money_transfer_modal', handleOpenMoney)
   }, [])
 
-  // Polling leve (30s) para verificar se há combate ativo — evita onSnapshot de coleção inteira
-  const checkActiveCombat = useCallback(async () => {
-    try {
-      const q = query(collection(db, 'active_combats'), where('active', '==', true), limit(1))
-      const snap = await getDocs(q)
-      setHasActiveCombat(!snap.empty)
-    } catch { /* silencioso */ }
-  }, [])
-
-  useEffect(() => {
-    checkActiveCombat()
-    const interval = setInterval(checkActiveCombat, 30_000)
-    return () => clearInterval(interval)
-  }, [checkActiveCombat])
-
   function toggleWeatherFx() {
     setWeatherFxEnabled(prev => {
       const next = !prev
@@ -72,12 +58,15 @@ export default function HUD({ locationName }) {
     })
   }
 
-  // Carrega eventos do calendário via cache de sessão — evita onSnapshot permanente
+  // Carrega eventos do calendário via cache de sessão — evita requisição se já carregado
   useEffect(() => {
     const CACHE_KEY = 'zz_calendar_cache'
     const cached = sessionStorage.getItem(CACHE_KEY)
     if (cached) {
-      try { setCalendarEvents(JSON.parse(cached)) } catch { /* ignora */ }
+      try {
+        setCalendarEvents(JSON.parse(cached))
+        return // Já temos em cache de sessão, economiza a leitura da coleção
+      } catch { /* ignora */ }
     }
     getDocs(collection(db, 'calendar_events'))
       .then((snap) => {

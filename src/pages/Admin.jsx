@@ -1679,6 +1679,13 @@ export default function Admin() {
         lastImpact: activeCombatData?.lastImpact || null,
         updatedAt: new Date().toISOString()
       }, { merge: true })
+
+      // Sincroniza flag global no game_config para todos os jogadores receberem sem polling
+      await setDoc(doc(db, 'game_config', 'global'), {
+        hasActiveCombat: true,
+        activeCombatSlug: selectedCombatSlug
+      }, { merge: true })
+
       alert('Encontro de combate sincronizado com sucesso!')
     } catch (err) {
       alert('Erro ao iniciar combate: ' + err.message)
@@ -1695,6 +1702,13 @@ export default function Admin() {
         active: false,
         updatedAt: new Date().toISOString()
       }, { merge: true })
+
+      // Remove flag global no game_config
+      await setDoc(doc(db, 'game_config', 'global'), {
+        hasActiveCombat: false,
+        activeCombatSlug: null
+      }, { merge: true })
+
       setCombatEnemies([])
       alert('Combate finalizado!')
     } catch (err) {

@@ -1,21 +1,35 @@
 import { useState, useEffect } from 'react'
 import { doc, onSnapshot } from 'firebase/firestore'
-import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { useGameConfig } from '../contexts/GameConfigContext.jsx'
 import { getMaxHp } from '../utils/itemSystem'
 import { ATTRIBUTE_ICONS, COMBAT_STATUS_EFFECTS } from '../utils/combatSystem'
 
 export default function CombatHUD({ locationSlug }) {
   const { user } = useAuth()
+  const gameConfig = useGameConfig()
   const [combat, setCombat] = useState(null)
   const [loading, setLoading] = useState(true)
   const [impactAnimation, setImpactAnimation] = useState(null)
   const [floatingTexts, setFloatingTexts] = useState([])
   const [showDetails, setShowDetails] = useState(true)
 
-  // Escuta o combate ativo na locação — participantsData já vem denormalizado no documento
+  // Escuta o combate ativo na locação apenas se houver combate ativo no jogo
   useEffect(() => {
     if (!locationSlug) return
+    // Se gameConfig explicitamente indicar que não há combate ativo, nem abre conexão Firestore
+    if (gameConfig && gameConfig.hasActiveCombat === false) {
+      setCombat(null)
+      setLoading(false)
+      return
+    }
+    // Se gameConfig especificar qual sala está em combate e não for esta, economiza a leitura
+    if (gameConfig && gameConfig.activeCombatSlug && gameConfig.activeCombatSlug !== locationSlug) {
+      setCombat(null)
+      setLoading(false)
+      return
+    }
+
     const unsub = onSnapshot(doc(db, 'active_combats', locationSlug), (snap) => {
       if (snap.exists() && snap.data().active) {
         const data = snap.data()

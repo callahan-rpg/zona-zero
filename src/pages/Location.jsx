@@ -151,13 +151,33 @@ export default function Location() {
     return unsub
   }, [slug])
 
-  // Escuta Pontos de Exibição da Defesa da Base
+  // Escuta Pontos de Exibição da Defesa da Base de forma otimizada
   useEffect(() => {
     if (!slug) return
+    // Casa grande é o ponto central principal de defesa da base
+    if (slug === 'casa-grande') {
+      setIsDefenseDisplayPoint(true)
+    }
+    // Evita abrir listener em dezenas de salas normais que nunca foram pontos de defesa
+    const knownPoints = sessionStorage.getItem('zz_defense_display_points')
+    if (knownPoints) {
+      try {
+        const points = JSON.parse(knownPoints)
+        if (!points.includes(slug) && slug !== 'casa-grande') {
+          setIsDefenseDisplayPoint(false)
+          return
+        }
+      } catch (_) {}
+    }
+
     const unsub = onSnapshot(doc(db, 'base_defense', 'global'), (snap) => {
       if (snap.exists()) {
         const data = snap.data()
-        const isPoint = (data.displayPoints || []).some(pt => pt.enabled !== false && (pt.targetSlug === slug || (slug === 'casa-grande' && pt.targetSlug === 'casa-grande')))
+        const targetSlugs = (data.displayPoints || [])
+          .filter(pt => pt.enabled !== false)
+          .map(pt => pt.targetSlug)
+        sessionStorage.setItem('zz_defense_display_points', JSON.stringify(targetSlugs))
+        const isPoint = targetSlugs.includes(slug) || (slug === 'casa-grande')
         setIsDefenseDisplayPoint(isPoint)
       } else {
         setIsDefenseDisplayPoint(slug === 'casa-grande')
