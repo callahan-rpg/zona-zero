@@ -32,6 +32,7 @@ import AdminWaterSourcesEditor from '../components/AdminWaterSourcesEditor.jsx'
 import AdminNarrativeEditor from '../components/AdminNarrativeEditor.jsx'
 import { migratePlayersIndex } from '../utils/playerIndexService'
 import { saveConsolidatedCatalog, consolidateCatalogFromItemsDb } from '../utils/itemCatalogService'
+import { migrateAllBase64ToCloudinary } from '../utils/cloudinaryMigration'
 
 const WEATHER_OPTIONS = [
   { value: 'sunny',  label: 'Ensolarado', icon: '☀️' },
@@ -286,6 +287,27 @@ export default function Admin() {
     }
   }
 
+  async function handleMigrateAllImages() {
+    if (!confirm('Deseja varrer todas as imagens Base64 no banco de dados (Itens, Locais, Inimigos, Slides, Fichas) e enviá-las automaticamente para o Cloudinary (z3cr8lix)?')) return
+    setMigratingCloudinary(true)
+    setCloudinaryMigrationStatus('Iniciando migração...')
+    try {
+      const result = await migrateAllBase64ToCloudinary((msg) => {
+        setCloudinaryMigrationStatus(msg)
+      })
+      if (result.errors && result.errors.length > 0) {
+        alert(`Migração finalizada!\n${result.totalMigrated} imagens migradas para o Cloudinary.\nAvisos/Falhas (${result.errors.length}):\n` + result.errors.join('\n'))
+      } else {
+        alert(`Sucesso absoluto! Todas as imagens residuais (${result.totalMigrated}) foram convertidas e hospedadas no Cloudinary.`)
+      }
+    } catch (err) {
+      alert('Erro durante a migração para o Cloudinary: ' + err.message)
+    } finally {
+      setMigratingCloudinary(false)
+      setCloudinaryMigrationStatus('')
+    }
+  }
+
   async function handlePopulatePresets() {
     if (!confirm('Deseja cadastrar os itens padrão de sobrevivência (Cozinha, Quarto, Banheiro, Garagem, Armas) no catálogo?')) return
     try {
@@ -467,6 +489,8 @@ export default function Admin() {
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogCategoryFilter, setCatalogCategoryFilter] = useState('all')
   const [uploadingItemImage, setUploadingItemImage] = useState(false)
+  const [migratingCloudinary, setMigratingCloudinary] = useState(false)
+  const [cloudinaryMigrationStatus, setCloudinaryMigrationStatus] = useState('')
   const [catalogForm, setCatalogForm] = useState({
     itemId: '',
     name: '',
@@ -2399,6 +2423,25 @@ export default function Admin() {
                     Catálogo ({catalogItems.length})
                   </h3>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={handleMigrateAllImages}
+                      disabled={migratingCloudinary}
+                      style={{
+                        fontSize: 11,
+                        background: 'rgba(56, 189, 248, 0.2)',
+                        borderColor: '#38bdf8',
+                        color: '#7dd3fc',
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4
+                      }}
+                      title="Varre todas as coleções do banco e converte automaticamente fotos em Base64 para links do Cloudinary"
+                    >
+                      {migratingCloudinary ? '⏳ Migrando...' : '☁️ Migrar Base64 -> Cloudinary'}
+                    </button>
                     <button type="button" className="btn btn-sm" onClick={handleConsolidateCatalog} style={{ fontSize: 11, background: 'rgba(34, 197, 94, 0.15)', borderColor: '#22c55e', color: '#4ade80' }} title="Consolida todos os itens em 1 único documento no Firestore, economizando 99% das leituras">
                       ⚡ Consolidar Catálogo Único
                     </button>
@@ -2410,6 +2453,13 @@ export default function Admin() {
                     </button>
                   </div>
                 </div>
+
+                {migratingCloudinary && (
+                  <div className="glass-light" style={{ padding: '8px 12px', marginBottom: 12, borderRadius: 8, border: '1px solid #38bdf8', color: '#7dd3fc', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="spinner" style={{ width: 14, height: 14 }} />
+                    <span>{cloudinaryMigrationStatus}</span>
+                  </div>
+                )}
 
                 {/* Barra de busca + filtro de categoria */}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
