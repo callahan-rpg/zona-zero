@@ -208,6 +208,18 @@ export default function HUD({ locationName }) {
             <GameIcon name="rules" size={16} className="hud-btn-icon" />
           </button>
 
+          {/* Botão de Fórum & Grupos (Abre em outra Aba) */}
+          <button
+            type="button"
+            onClick={() => {
+              window.open('/forum', '_blank', 'noopener,noreferrer')
+            }}
+            className={`hud-btn ${location.pathname.startsWith('/forum') ? 'active' : ''}`}
+            title="💬 Fórum da Comunidade & Grupos (Abre em nova aba)"
+          >
+            <GameIcon name="forum" size={16} className="hud-btn-icon" />
+          </button>
+
           <button
             type="button"
             onClick={() => {

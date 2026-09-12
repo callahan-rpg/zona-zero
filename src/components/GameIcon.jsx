@@ -47,7 +47,9 @@ import {
   Scale,
   User,
   LogIn,
-  ChevronLeft
+  ChevronLeft,
+  MessageSquare,
+  MessageCircle
 } from 'lucide-react'
 
 // Mapeamento dos nomes mais usados no RPG para ícones vetoriais do Lucide
@@ -58,6 +60,8 @@ const ICON_MAP = {
   scroll: Scroll,
   lore: BookOpen,
   rules: Scale,
+  forum: MessageSquare,
+  chat: MessageCircle,
   user: User,
   login: LogIn,
   arrowLeft: ChevronLeft,

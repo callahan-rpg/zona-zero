@@ -31,6 +31,7 @@ import AdminCookingEditor from '../components/AdminCookingEditor.jsx'
 import AdminWaterSourcesEditor from '../components/AdminWaterSourcesEditor.jsx'
 import AdminNarrativeEditor from '../components/AdminNarrativeEditor.jsx'
 import AdminFormsEditor from '../components/AdminFormsEditor.jsx'
+import AdminForumEditor from '../components/AdminForumEditor.jsx'
 import { migratePlayersIndex } from '../utils/playerIndexService'
 import { saveConsolidatedCatalog, consolidateCatalogFromItemsDb } from '../utils/itemCatalogService'
 import { migrateAllBase64ToCloudinary } from '../utils/cloudinaryMigration'
@@ -2002,7 +2003,15 @@ export default function Admin() {
             <button className={`btn btn-sm ${activeTab === 'custom_forms' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('custom_forms')} style={{ borderColor: 'rgba(129, 140, 248, 0.5)', color: activeTab === 'custom_forms' ? '#fff' : '#a5b4fc', background: activeTab === 'custom_forms' ? '#4f46e5' : 'transparent', fontWeight: 'bold' }}>
               📝 Formulários Discord
             </button>
+            <button className={`btn btn-sm ${activeTab === 'forum' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('forum')} style={{ borderColor: 'rgba(56, 189, 248, 0.5)', color: activeTab === 'forum' ? '#000' : '#7dd3fc', background: activeTab === 'forum' ? '#38bdf8' : 'transparent', fontWeight: 'bold' }}>
+              💬 Fórum & Grupos
+            </button>
           </div>
+
+          {/* CONTEÚDO DA TAB FORUM: GERENCIADOR DO FÓRUM & GRUPOS */}
+          {activeTab === 'forum' && (
+            <AdminForumEditor />
+          )}
 
           {/* CONTEÚDO DA TAB CUSTOM FORMS: FORMULÁRIOS COM DISCORD WEBHOOK */}
           {activeTab === 'custom_forms' && (

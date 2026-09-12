@@ -15,6 +15,7 @@ import Map from './pages/Map.jsx'
 import PublicCharacter from './pages/PublicCharacter.jsx'
 import Combat from './pages/Combat.jsx'
 import Rules from './pages/Rules.jsx'
+import Forum from './pages/Forum.jsx'
 import AmbientSoundPlayer from './components/AmbientSoundPlayer.jsx'
 import { calculateGameTime, getDynamicWeather } from './utils/timeSystem'
 import { DEFAULT_WEATHER_SOUNDS } from './utils/audioSystem'
@@ -151,6 +152,8 @@ export default function App() {
         <Route path="/map/:region" element={<ProtectedRoute><Map /></ProtectedRoute>} />
         <Route path="/map/:region/:city" element={<ProtectedRoute><Map /></ProtectedRoute>} />
         <Route path="/characters/:uid" element={<ProtectedRoute><PublicCharacter /></ProtectedRoute>} />
+        <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+        <Route path="/forum/:topicId" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
 
         {/* Redirecionamentos */}
         <Route path="*" element={<Navigate to="/" replace />} />
