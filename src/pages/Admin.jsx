@@ -637,7 +637,11 @@ export default function Admin() {
       isIndoor: !!loc.isIndoor,
       isSpawnPoint: !!loc.isSpawnPoint,
       hasKitchen: loc.hasKitchen !== undefined ? !!loc.hasKitchen : true,
+      kitchenButtonImage: loc.kitchenButtonImage || '',
+      kitchenIcon: loc.kitchenIcon || '🍳',
       lootEnabled: loc.loot?.enabled !== false,
+      supplyButtonImage: loc.loot?.buttonImage || '',
+      supplyIcon: loc.loot?.icon || '🔦',
       cooldownMinutes: loc.loot?.cooldownMinutes || 30,
       emptyChance: loc.loot?.emptyChance || 0.25,
       navigationButtons: loc.navigationButtons || [],
@@ -673,7 +677,11 @@ export default function Admin() {
       isIndoor: false,
       isSpawnPoint: false,
       hasKitchen: true,
+      kitchenButtonImage: '',
+      kitchenIcon: '🍳',
       lootEnabled: true,
+      supplyButtonImage: '',
+      supplyIcon: '🔦',
       cooldownMinutes: 30,
       emptyChance: 0.25,
       navigationButtons: [],
@@ -713,8 +721,12 @@ export default function Admin() {
       isIndoor: !!locForm.isIndoor,
       isSpawnPoint: !!locForm.isSpawnPoint,
       hasKitchen: !!locForm.hasKitchen,
+      kitchenButtonImage: (locForm.kitchenButtonImage || '').trim(),
+      kitchenIcon: (locForm.kitchenIcon || '🍳').trim(),
       loot: {
         enabled: locForm.lootEnabled,
+        buttonImage: (locForm.supplyButtonImage || '').trim(),
+        icon: (locForm.supplyIcon || '🔦').trim(),
         cooldownMinutes: Number(locForm.cooldownMinutes),
         emptyChance: Number(locForm.emptyChance),
         maxItemsPerSearch: 2,
@@ -4481,20 +4493,99 @@ export default function Admin() {
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
-                    <input
-                      type="checkbox"
-                      id="hasKitchen"
-                      checked={locForm.hasKitchen !== false}
-                      onChange={(e) => setLocForm(prev => ({ ...prev, hasKitchen: e.target.checked }))}
-                      style={{ width: 'auto', cursor: 'pointer' }}
-                    />
-                    <label htmlFor="hasKitchen" style={{ margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontWeight: 600, color: '#fbbf24' }}>🍳 Estação de Cozinha / Culinária Permitida</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        Se marcado, sobreviventes neste local verão o botão "🍳 Cozinhar" para preparar refeições com seus ingredientes e utensílios equipados.
-                      </span>
-                    </label>
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <input
+                        type="checkbox"
+                        id="hasKitchen"
+                        checked={locForm.hasKitchen !== false}
+                        onChange={(e) => setLocForm(prev => ({ ...prev, hasKitchen: e.target.checked }))}
+                        style={{ width: 'auto', cursor: 'pointer' }}
+                      />
+                      <label htmlFor="hasKitchen" style={{ margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: 600, color: '#fbbf24' }}>🍳 Estação de Cozinha / Culinária Permitida</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          Se marcado, sobreviventes neste local verão o botão "Cozinhar" para preparar refeições com ingredientes.
+                        </span>
+                      </label>
+                    </div>
+
+                    {locForm.hasKitchen !== false && (
+                      <div style={{ marginLeft: 24, display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {locForm.kitchenButtonImage ? (
+                          <div style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 6,
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            background: 'rgba(0,0,0,0.4)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <img src={locForm.kitchenButtonImage} alt="Preview Cozinha" style={{ width: 26, height: 26, objectFit: 'contain' }} />
+                          </div>
+                        ) : null}
+                        <input
+                          type="text"
+                          placeholder="URL da Imagem / Ícone SVG para o botão Cozinhar..."
+                          value={locForm.kitchenButtonImage || ''}
+                          onChange={(e) => setLocForm(prev => ({ ...prev, kitchenButtonImage: e.target.value }))}
+                          style={{ flex: 1, fontSize: 11 }}
+                        />
+                        <label
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.3) 100%)',
+                            border: '1px solid #f59e0b',
+                            color: '#fde047',
+                            padding: '5px 8px',
+                            borderRadius: 6,
+                            fontSize: 10,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          📤 Upload
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+                              try {
+                                const url = await uploadImageFree(file)
+                                if (url) {
+                                  setLocForm(prev => ({ ...prev, kitchenButtonImage: url }))
+                                }
+                              } catch (err) {
+                                alert('Falha no upload: ' + err.message)
+                              }
+                            }}
+                          />
+                        </label>
+                        {locForm.kitchenButtonImage && (
+                          <button
+                            type="button"
+                            onClick={() => setLocForm(prev => ({ ...prev, kitchenButtonImage: '' }))}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.2)',
+                              border: '1px solid #ef4444',
+                              color: '#fca5a5',
+                              padding: '4px 6px',
+                              borderRadius: 6,
+                              fontSize: 10,
+                              cursor: 'pointer'
+                            }}
+                            title="Remover imagem"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -4534,6 +4625,90 @@ export default function Admin() {
                   </div>
                   {locForm.lootEnabled && (
                     <>
+                      {/* Imagem / Ícone SVG Customizado para Busca de Suprimentos */}
+                      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 10, marginBottom: 12 }}>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0', display: 'block', marginBottom: 4 }}>
+                          🖼️ Imagem ou Ícone SVG do Botão Buscar Suprimentos (Opcional)
+                        </label>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          {locForm.supplyButtonImage ? (
+                            <div style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 6,
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              background: 'rgba(0,0,0,0.4)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              <img src={locForm.supplyButtonImage} alt="Preview Suprimentos" style={{ width: 26, height: 26, objectFit: 'contain' }} />
+                            </div>
+                          ) : null}
+                          <input
+                            type="text"
+                            placeholder="URL da Imagem / Ícone SVG para o botão Buscar Suprimentos..."
+                            value={locForm.supplyButtonImage || ''}
+                            onChange={(e) => setLocForm(prev => ({ ...prev, supplyButtonImage: e.target.value }))}
+                            style={{ flex: 1, fontSize: 11 }}
+                          />
+                          <label
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.2) 0%, rgba(202, 138, 4, 0.3) 100%)',
+                              border: '1px solid #eab308',
+                              color: '#fef08a',
+                              padding: '5px 8px',
+                              borderRadius: 6,
+                              fontSize: 10,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            📤 Upload
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0]
+                                if (!file) return
+                                try {
+                                  const url = await uploadImageFree(file)
+                                  if (url) {
+                                    setLocForm(prev => ({ ...prev, supplyButtonImage: url }))
+                                  }
+                                } catch (err) {
+                                  alert('Falha no upload: ' + err.message)
+                                }
+                              }}
+                            />
+                          </label>
+                          {locForm.supplyButtonImage && (
+                            <button
+                              type="button"
+                              onClick={() => setLocForm(prev => ({ ...prev, supplyButtonImage: '' }))}
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.2)',
+                                border: '1px solid #ef4444',
+                                color: '#fca5a5',
+                                padding: '4px 6px',
+                                borderRadius: 6,
+                                fontSize: 10,
+                                cursor: 'pointer'
+                              }}
+                              title="Remover imagem"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                        <span style={{ fontSize: 9, color: 'var(--text-muted)', display: 'block', marginTop: 4 }}>
+                          Se preenchido, a imagem será o próprio botão de busca na locação.
+                        </span>
+                      </div>
+
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label style={{ fontSize: 10 }}>Tempo de Cooldown (Minutos)</label>

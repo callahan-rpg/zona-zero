@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { collection, onSnapshot, doc, runTransaction } from 'firebase/firestore'
+import { collection, onSnapshot, doc, runTransaction, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useItemCatalog } from '../utils/itemCatalogService'
 import { DEFAULT_RECIPES, COOKING_UTENSILS } from '../utils/cookingSystem'

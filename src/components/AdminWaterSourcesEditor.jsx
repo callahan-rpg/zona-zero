@@ -11,11 +11,13 @@ import { db } from '../firebase/config'
 import { useItemCatalog } from '../utils/itemCatalogService'
 import { DEFAULT_WATER_SOURCES } from '../utils/waterSystem'
 import { DEFAULT_PRESET_ITEMS } from '../utils/itemSystem'
+import { uploadImageFree } from '../utils/imageUpload'
 
 const EMPTY_FORM = {
   id: '',
   name: '',
   icon: '💧',
+  buttonImage: '',
   locationSlug: '',
   locationName: '',
   description: '',
@@ -80,6 +82,7 @@ export default function AdminWaterSourcesEditor({ locations = [] }) {
       id: source.id,
       name: source.name || '',
       icon: source.icon || '💧',
+      buttonImage: source.buttonImage || source.imageUrl || '',
       locationSlug: source.locationSlug || '',
       locationName: source.locationName || '',
       description: source.description || '',
@@ -114,6 +117,7 @@ export default function AdminWaterSourcesEditor({ locations = [] }) {
       id: sourceId,
       name: form.name.trim(),
       icon: form.icon || '💧',
+      buttonImage: (form.buttonImage || '').trim(),
       locationSlug: form.locationSlug,
       locationName: loc?.name || form.locationName || form.locationSlug,
       description: form.description.trim(),
@@ -370,7 +374,7 @@ export default function AdminWaterSourcesEditor({ locations = [] }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: '8px' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label style={{ fontSize: '10px' }}>Ícone</label>
+              <label style={{ fontSize: '10px' }}>Emoji</label>
               <input
                 type="text"
                 value={form.icon}
@@ -389,6 +393,90 @@ export default function AdminWaterSourcesEditor({ locations = [] }) {
                 required
               />
             </div>
+          </div>
+
+          {/* Imagem / Ícone SVG Customizado */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 10 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0', display: 'block', marginBottom: 4 }}>
+              🖼️ Imagem ou Ícone SVG do Botão (Opcional)
+            </label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {form.buttonImage ? (
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 6,
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'rgba(0,0,0,0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <img src={form.buttonImage} alt="Preview" style={{ width: 26, height: 26, objectFit: 'contain' }} />
+                </div>
+              ) : null}
+              <input
+                type="text"
+                placeholder="URL da imagem (PNG, SVG, WebP) ou faça upload..."
+                value={form.buttonImage || ''}
+                onChange={e => setForm(prev => ({ ...prev, buttonImage: e.target.value }))}
+                style={{ flex: 1, fontSize: 11 }}
+              />
+              <label
+                style={{
+                  background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.2) 0%, rgba(14, 116, 144, 0.3) 100%)',
+                  border: '1px solid #06b6d4',
+                  color: '#67e8f9',
+                  padding: '5px 8px',
+                  borderRadius: 6,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                📤 Upload
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    try {
+                      const url = await uploadImageFree(file)
+                      if (url) {
+                        setForm(prev => ({ ...prev, buttonImage: url }))
+                      }
+                    } catch (err) {
+                      alert('Falha no upload: ' + err.message)
+                    }
+                  }}
+                />
+              </label>
+              {form.buttonImage && (
+                <button
+                  type="button"
+                  onClick={() => setForm(prev => ({ ...prev, buttonImage: '' }))}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.2)',
+                    border: '1px solid #ef4444',
+                    color: '#fca5a5',
+                    padding: '4px 6px',
+                    borderRadius: 6,
+                    fontSize: 10,
+                    cursor: 'pointer'
+                  }}
+                  title="Remover imagem"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <span style={{ fontSize: 9, color: 'var(--text-muted)', display: 'block', marginTop: 4 }}>
+              Se preenchido, o botão exibirá apenas esta imagem/ícone.
+            </span>
           </div>
 
           <div className="form-group" style={{ marginBottom: 0 }}>

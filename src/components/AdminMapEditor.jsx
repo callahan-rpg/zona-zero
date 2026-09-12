@@ -157,6 +157,7 @@ export default function AdminMapEditor({ availableLocations = [] }) {
       } else {
         handleSaveGlobal(buildUpdatedConfig({ newDistrictImage: url }))
       }
+      alert('Imagem do mapa enviada e atualizada com sucesso via Cloudinary!')
     } catch (err) {
       alert('Erro no upload: ' + err.message)
     } finally {
@@ -296,9 +297,41 @@ export default function AdminMapEditor({ availableLocations = [] }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {/* Upload de Imagem */}
-            <label className="btn btn-sm btn-primary" style={{ cursor: 'pointer', margin: 0, fontSize: 11 }}>
-              {uploadingImage ? 'Enviando...' : '📷 Trocar Imagem'}
+            {/* Input de URL manual */}
+            <input
+              type="text"
+              placeholder="URL da Imagem do Mapa..."
+              value={currentImage || ''}
+              onChange={(e) => {
+                const val = e.target.value
+                if (isCountry) {
+                  handleSaveGlobal(buildUpdatedConfig({ newCityImage: val }))
+                } else if (isCity) {
+                  handleSaveGlobal(buildUpdatedConfig({ newCityImage: val }))
+                } else {
+                  handleSaveGlobal(buildUpdatedConfig({ newDistrictImage: val }))
+                }
+              }}
+              style={{ fontSize: 11, padding: '5px 10px', minWidth: '220px', borderRadius: 6 }}
+            />
+
+            {/* Upload de Imagem Cloudinary */}
+            <label
+              className="btn btn-sm"
+              style={{
+                cursor: uploadingImage ? 'wait' : 'pointer',
+                margin: 0,
+                fontSize: 11,
+                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(14, 165, 233, 0.3) 100%)',
+                border: '1px solid #38bdf8',
+                color: '#7dd3fc',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+            >
+              {uploadingImage ? '⏳ Enviando Cloudinary...' : '📤 Upload Cloudinary'}
               <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} disabled={uploadingImage} />
             </label>
           </div>
@@ -653,11 +686,48 @@ export default function AdminMapEditor({ availableLocations = [] }) {
                   required />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: 11 }}>URL da Imagem do Mapa (opcional)</label>
-                <input type="url" placeholder="https://..."
-                  value={newDistrictForm.mapImage}
-                  onChange={(e) => setNewDistrictForm(prev => ({ ...prev, mapImage: e.target.value }))} />
-                <small style={{ fontSize: 10, color: 'var(--text-muted)' }}>Pode trocar a imagem depois usando "📷 Trocar Imagem" ao editar o distrito.</small>
+                <label style={{ fontSize: 11 }}>Imagem do Mapa do Distrito (Cloudinary ou URL)</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="url"
+                    placeholder="https://... ou faça upload"
+                    value={newDistrictForm.mapImage}
+                    onChange={(e) => setNewDistrictForm(prev => ({ ...prev, mapImage: e.target.value }))}
+                    style={{ flex: 1, fontSize: 11 }}
+                  />
+                  <label
+                    className="btn btn-sm"
+                    style={{
+                      cursor: 'pointer',
+                      fontSize: 11,
+                      background: 'rgba(34, 197, 94, 0.15)',
+                      border: '1px solid #22c55e',
+                      color: '#4ade80',
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    📤 Upload
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        try {
+                          const url = await uploadImageFree(file)
+                          if (url) {
+                            setNewDistrictForm(prev => ({ ...prev, mapImage: url }))
+                          }
+                        } catch (err) {
+                          alert('Erro no upload: ' + err.message)
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                <small style={{ fontSize: 10, color: 'var(--text-muted)' }}>Você também poderá trocar a imagem a qualquer momento na barra superior.</small>
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>

@@ -63,11 +63,25 @@ export default function ActivityButton({ activity, character, locationSlug }) {
   }
   const colors = typeColors[activity.type] || typeColors.fishing
 
+  const imgUrl = activity.buttonImage || activity.imageUrl
+
   return (
     <>
       <button
-        className="loot-btn"
-        style={{
+        type="button"
+        className={imgUrl ? 'activity-img-btn' : 'loot-btn'}
+        style={imgUrl ? {
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          outline: 'none',
+          position: 'relative',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'transform 0.18s ease, filter 0.18s ease',
+        } : {
           background: colors.bg,
           borderColor: colors.border,
           color: colors.text,
@@ -75,19 +89,74 @@ export default function ActivityButton({ activity, character, locationSlug }) {
           boxShadow: `0 0 12px ${colors.bg}`,
           opacity: 1,
           position: 'relative',
+          padding: '8px 14px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: '44px',
+          minHeight: '44px',
         }}
         onClick={() => setShowModal(true)}
-        title={cooldownRemaining > 0 ? `Margem em cooldown (${formatDuration(cooldownRemaining)})` : hasErrors ? errors.join('\n') : activity.name}
+        title={cooldownRemaining > 0 ? `${activity.name} em cooldown (${formatDuration(cooldownRemaining)})` : hasErrors ? `${activity.name}\n${errors.join('\n')}` : activity.name}
       >
-        <span>{cooldownRemaining > 0 ? '⏳' : (activity.icon || '⚙️')}</span>
-        {activity.name} {cooldownRemaining > 0 && `(${formatDuration(cooldownRemaining)})`}
+        {imgUrl ? (
+          <img
+            src={imgUrl}
+            alt={activity.name}
+            style={{
+              width: 'auto',
+              maxHeight: 72,
+              maxWidth: 160,
+              objectFit: 'contain',
+              display: 'block',
+              filter: cooldownRemaining > 0
+                ? 'grayscale(0.85) opacity(0.55)'
+                : 'drop-shadow(0 3px 10px rgba(0,0,0,0.6))',
+              transition: 'transform 0.15s ease, filter 0.15s ease',
+            }}
+            onMouseEnter={e => {
+              if (cooldownRemaining <= 0) {
+                e.currentTarget.style.transform = 'scale(1.08)'
+                e.currentTarget.style.filter = 'drop-shadow(0 0 14px rgba(255,255,255,0.5))'
+              }
+            }}
+            onMouseLeave={e => {
+              if (cooldownRemaining <= 0) {
+                e.currentTarget.style.transform = 'scale(1)'
+                e.currentTarget.style.filter = 'drop-shadow(0 3px 10px rgba(0,0,0,0.6))'
+              }
+            }}
+          />
+        ) : (
+          <span style={{ fontSize: 20, lineHeight: 1 }}>{cooldownRemaining > 0 ? '⏳' : (activity.icon || '⚙️')}</span>
+        )}
+
+        {cooldownRemaining > 0 && (
+          <span style={{
+            position: 'absolute',
+            bottom: -4,
+            background: 'rgba(0, 0, 0, 0.85)',
+            border: `1px solid ${colors.border}`,
+            color: colors.text,
+            borderRadius: 4,
+            fontSize: 9,
+            padding: '1px 4px',
+            whiteSpace: 'nowrap',
+            fontWeight: 800,
+            lineHeight: 1.1,
+          }}>
+            {formatDuration(cooldownRemaining)}
+          </span>
+        )}
+
         {hasErrors && cooldownRemaining <= 0 && (
           <span style={{
             position: 'absolute', top: -4, right: -4,
             background: '#ef4444', color: '#fff',
-            borderRadius: '50%', width: 14, height: 14,
-            fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 900
+            borderRadius: '50%', width: 16, height: 16,
+            fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 900,
+            boxShadow: '0 0 6px #ef4444'
           }}>!</span>
         )}
       </button>

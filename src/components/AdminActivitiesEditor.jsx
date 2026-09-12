@@ -15,6 +15,7 @@ import { db } from '../firebase/config'
 import { useItemCatalog } from '../utils/itemCatalogService'
 import { ACTIVITY_TYPES } from '../utils/activitySystem'
 import { DEFAULT_PRESET_ITEMS } from '../utils/itemSystem'
+import { uploadImageFree } from '../utils/imageUpload'
 
 const DEFAULT_FISH_TABLE = [
   { itemId: 'peixe_pequeno', name: 'Peixe Pequeno', icon: '🐟', chance: 40, rarity: 'common' },
@@ -124,6 +125,7 @@ export default function AdminActivitiesEditor({ locations = [] }) {
     name: '',
     type: 'fishing',
     icon: '🎣',
+    buttonImage: '',
     locationSlug: '',
     enabled: true,
     durabilityCost: 10,
@@ -255,6 +257,7 @@ export default function AdminActivitiesEditor({ locations = [] }) {
       name: act.name || '',
       type: act.type || 'fishing',
       icon: act.icon || (act.type === 'farming' ? '🌱' : act.type === 'animal_care' ? '🐔' : '🎣'),
+      buttonImage: act.buttonImage || act.imageUrl || '',
       locationSlug: act.locationSlug || '',
       enabled: act.enabled !== false,
       durabilityCost: act.durabilityCost !== undefined ? Number(act.durabilityCost) : 10,
@@ -283,6 +286,7 @@ export default function AdminActivitiesEditor({ locations = [] }) {
       name: '',
       type: 'fishing',
       icon: '🎣',
+      buttonImage: '',
       locationSlug: locations[0]?.slug || '',
       enabled: true,
       durabilityCost: 10,
@@ -425,6 +429,7 @@ export default function AdminActivitiesEditor({ locations = [] }) {
         name: form.name || 'Nova Atividade',
         type: form.type,
         icon: form.icon || (form.type === 'farming' ? '🌱' : form.type === 'animal_care' ? '🐔' : '🎣'),
+        buttonImage: (form.buttonImage || '').trim(),
         locationSlug: form.locationSlug || '',
         enabled: Boolean(form.enabled),
         durabilityCost: Math.max(1, Number(form.durabilityCost) || 10),
@@ -709,8 +714,8 @@ export default function AdminActivitiesEditor({ locations = [] }) {
             </div>
           </div>
 
-          {/* Tipo & Ícone */}
-          <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 8 }}>
+          {/* Tipo, Ícone & Imagem/SVG do Botão */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 8 }}>
             <div>
               <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Tipo de Atividade</label>
               <select
@@ -730,7 +735,7 @@ export default function AdminActivitiesEditor({ locations = [] }) {
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Ícone</label>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Emoji</label>
               <input
                 type="text"
                 className="input-field"
@@ -739,6 +744,93 @@ export default function AdminActivitiesEditor({ locations = [] }) {
                 style={{ width: '100%', fontSize: 14, textAlign: 'center' }}
               />
             </div>
+          </div>
+
+          {/* Imagem / Ícone SVG Customizado */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 10 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', display: 'block', marginBottom: 4 }}>
+              🖼️ Imagem ou Ícone SVG do Botão (Opcional)
+            </label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {form.buttonImage ? (
+                <div style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 6,
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'rgba(0,0,0,0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <img src={form.buttonImage} alt="Preview" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+                </div>
+              ) : null}
+              <input
+                type="text"
+                className="input-field"
+                placeholder="URL da imagem (PNG, SVG, WebP) ou faça upload..."
+                value={form.buttonImage || ''}
+                onChange={e => setForm({ ...form, buttonImage: e.target.value })}
+                style={{ flex: 1, fontSize: 12 }}
+              />
+              <label
+                style={{
+                  background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(14, 165, 233, 0.3) 100%)',
+                  border: '1px solid #38bdf8',
+                  color: '#7dd3fc',
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                📤 Upload
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    try {
+                      showMsg('info', 'Fazendo upload da imagem...')
+                      const url = await uploadImageFree(file)
+                      if (url) {
+                        setForm(prev => ({ ...prev, buttonImage: url }))
+                        showMsg('success', 'Imagem enviada com sucesso!')
+                      }
+                    } catch (err) {
+                      showMsg('error', 'Falha no upload: ' + err.message)
+                    }
+                  }}
+                />
+              </label>
+              {form.buttonImage && (
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, buttonImage: '' })}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.2)',
+                    border: '1px solid #ef4444',
+                    color: '#fca5a5',
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    cursor: 'pointer'
+                  }}
+                  title="Remover imagem"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginTop: 4 }}>
+              Se definido, o botão no local exibirá exclusivamente este ícone/imagem.
+            </span>
           </div>
 
           {/* Local Vinculado */}

@@ -18,6 +18,7 @@ import CustomFormModal from '../components/CustomFormModal.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
 import { useItemCatalog } from '../utils/itemCatalogService'
+import { formatDuration } from '../utils/activitySystem'
 
 /**
  * Retorna a imagem de fundo correta baseada na hora in-game.
@@ -93,6 +94,7 @@ export default function Location() {
   const [supplySearchState, setSupplySearchState] = useState('idle') // idle | searching | result
   const [supplyLootResult, setSupplyLootResult] = useState([])
   const [supplyCooldown, setSupplyCooldown] = useState(false)
+  const [supplyCooldownRemaining, setSupplyCooldownRemaining] = useState(0)
 
   // Estados de Busca Única
   const [uniqueSearchState, setUniqueSearchState] = useState('idle') // idle | searching | choose_modal
@@ -333,22 +335,26 @@ export default function Location() {
     const checkCooldown = () => {
       if (!character?.lastLootByLocation) {
         setSupplyCooldown(false)
+        setSupplyCooldownRemaining(0)
         return
       }
       const lastLoot = character.lastLootByLocation[slug]
       if (!lastLoot) {
         setSupplyCooldown(false)
+        setSupplyCooldownRemaining(0)
         return
       }
 
       const lastDate = lastLoot.toDate ? lastLoot.toDate() : new Date(lastLoot)
       const cooldownMs = (location.loot?.cooldownMinutes || 30) * 60 * 1000
       const elapsed = Date.now() - lastDate.getTime()
-      setSupplyCooldown(elapsed < cooldownMs)
+      const remaining = Math.max(0, cooldownMs - elapsed)
+      setSupplyCooldownRemaining(remaining)
+      setSupplyCooldown(remaining > 0)
     }
 
     checkCooldown()
-    const timer = setInterval(checkCooldown, 2000)
+    const timer = setInterval(checkCooldown, 1000)
     return () => clearInterval(timer)
   }, [character, location, slug])
 
@@ -643,39 +649,126 @@ export default function Location() {
               {/* Botão de Cozinha & Preparo de Alimentos */}
               {location.hasKitchen !== false && (
                 <button
-                  className="loot-btn"
-                  style={{
+                  type="button"
+                  className={location.kitchenButtonImage ? 'activity-img-btn' : 'loot-btn'}
+                  style={location.kitchenButtonImage ? {
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    outline: 'none',
+                    position: 'relative',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'transform 0.18s ease, filter 0.18s ease',
+                  } : {
                     background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.35) 100%)',
                     borderColor: '#f59e0b',
                     color: '#facc15',
                     fontWeight: 700,
-                    boxShadow: '0 0 12px rgba(245, 158, 11, 0.25)'
+                    boxShadow: '0 0 12px rgba(245, 158, 11, 0.25)',
+                    padding: '8px 14px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '44px',
+                    minHeight: '44px',
                   }}
                   onClick={() => setShowCookingModal(true)}
-                  title="Preparar refeições e cozinhar alimentos com os itens do seu inventário"
+                  title="Cozinhar - Preparar refeições e cozinhar alimentos"
                 >
-                  <span>🍳</span>
-                  Cozinhar
+                  {location.kitchenButtonImage ? (
+                    <img
+                      src={location.kitchenButtonImage}
+                      alt="Cozinhar"
+                      style={{
+                        width: 'auto',
+                        maxHeight: 72,
+                        maxWidth: 160,
+                        objectFit: 'contain',
+                        display: 'block',
+                        filter: 'drop-shadow(0 3px 10px rgba(0,0,0,0.6))',
+                        transition: 'transform 0.15s ease, filter 0.15s ease',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = 'scale(1.08)'
+                        e.currentTarget.style.filter = 'drop-shadow(0 0 14px rgba(245, 158, 11, 0.65))'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = 'scale(1)'
+                        e.currentTarget.style.filter = 'drop-shadow(0 3px 10px rgba(0,0,0,0.6))'
+                      }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: 20, lineHeight: 1 }}>{location.kitchenIcon || '🍳'}</span>
+                  )}
                 </button>
               )}
 
               {/* Botão de Coleta de Água Natural / Poço / Rio */}
               {activeWaterSource && (
-                <button
-                  className="loot-btn"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.25) 0%, rgba(14, 116, 144, 0.35) 100%)',
-                    borderColor: '#06b6d4',
-                    color: '#67e8f9',
-                    fontWeight: 700,
-                    boxShadow: '0 0 12px rgba(6, 182, 212, 0.25)'
-                  }}
-                  onClick={() => setShowWaterModal(true)}
-                  title={`Coletar água em ${activeWaterSource.name || 'Fonte de Água'}`}
-                >
-                  <span>{activeWaterSource.icon || '💧'}</span>
-                  {activeWaterSource.name ? `Coletar Água (${activeWaterSource.name})` : 'Coletar Água'}
-                </button>
+                (() => {
+                  const waterImg = activeWaterSource.buttonImage || activeWaterSource.imageUrl
+                  return (
+                    <button
+                      type="button"
+                      className={waterImg ? 'activity-img-btn' : 'loot-btn'}
+                      style={waterImg ? {
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        position: 'relative',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'transform 0.18s ease, filter 0.18s ease',
+                      } : {
+                        background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.25) 0%, rgba(14, 116, 144, 0.35) 100%)',
+                        borderColor: '#06b6d4',
+                        color: '#67e8f9',
+                        fontWeight: 700,
+                        boxShadow: '0 0 12px rgba(6, 182, 212, 0.25)',
+                        padding: '8px 14px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '44px',
+                        minHeight: '44px',
+                      }}
+                      onClick={() => setShowWaterModal(true)}
+                      title={`Coletar Água - ${activeWaterSource.name || 'Fonte de Água'}`}
+                    >
+                      {waterImg ? (
+                        <img
+                          src={waterImg}
+                          alt={activeWaterSource.name || 'Fonte de Água'}
+                          style={{
+                            width: 'auto',
+                            maxHeight: 72,
+                            maxWidth: 160,
+                            objectFit: 'contain',
+                            display: 'block',
+                            filter: 'drop-shadow(0 3px 10px rgba(0,0,0,0.6))',
+                            transition: 'transform 0.15s ease, filter 0.15s ease',
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.transform = 'scale(1.08)'
+                            e.currentTarget.style.filter = 'drop-shadow(0 0 14px rgba(6, 182, 212, 0.65))'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.transform = 'scale(1)'
+                            e.currentTarget.style.filter = 'drop-shadow(0 3px 10px rgba(0,0,0,0.6))'
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: 20, lineHeight: 1 }}>{activeWaterSource.icon || '💧'}</span>
+                      )}
+                    </button>
+                  )
+                })()
               )}
 
               {/* Atividades de Produção Locais (Pesca, Plantação, Galinheiro, etc.) */}
@@ -710,19 +803,100 @@ export default function Location() {
 
               {/* Botão 1: Buscar Suprimentos (Repetível / Cooldown / Sucata & Comuns) */}
               {location.loot?.enabled && (
-                <button
-                  className={`loot-btn loot-btn-supply ${supplySearchState === 'searching' ? 'searching' : ''}`}
-                  onClick={handleSupplySearch}
-                  disabled={supplySearchState !== 'idle' || supplyCooldown}
-                  title={supplyCooldown ? 'Você já procurou aqui recentemente. Aguarde o cooldown.' : 'Buscar itens comuns, mantimentos e sucatas no local.'}
-                >
-                  <span>{supplySearchState === 'searching' ? '🔍' : supplyCooldown ? '⏳' : '🔦'}</span>
-                  {supplySearchState === 'searching'
-                    ? 'Vasculhando...'
-                    : supplyCooldown
-                    ? 'Cooldown Suprimentos'
-                    : 'Buscar Suprimentos'}
-                </button>
+                (() => {
+                  const supplyImg = location.loot?.buttonImage
+                  const isCooling = supplyCooldownRemaining > 0 || supplyCooldown
+                  const titleText = isCooling
+                    ? `Buscar Suprimentos em cooldown (${formatDuration(supplyCooldownRemaining)})`
+                    : supplySearchState === 'searching'
+                    ? 'Vasculhando local...'
+                    : 'Buscar Suprimentos - Itens comuns, mantimentos e sucatas'
+
+                  return (
+                    <button
+                      type="button"
+                      className={supplyImg ? 'activity-img-btn' : `loot-btn loot-btn-supply ${supplySearchState === 'searching' ? 'searching' : ''}`}
+                      style={supplyImg ? {
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        cursor: (supplySearchState !== 'idle' || isCooling) ? 'not-allowed' : 'pointer',
+                        outline: 'none',
+                        position: 'relative',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'transform 0.18s ease, filter 0.18s ease',
+                      } : {
+                        position: 'relative',
+                      }}
+                      onClick={handleSupplySearch}
+                      disabled={supplySearchState !== 'idle' || isCooling}
+                      title={titleText}
+                    >
+                      {supplyImg ? (
+                        <img
+                          src={supplyImg}
+                          alt="Buscar Suprimentos"
+                          style={{
+                            width: 'auto',
+                            maxHeight: 72,
+                            maxWidth: 160,
+                            objectFit: 'contain',
+                            display: 'block',
+                            filter: isCooling
+                              ? 'grayscale(0.85) opacity(0.55)'
+                              : supplySearchState === 'searching'
+                              ? 'brightness(1.2) drop-shadow(0 0 14px rgba(234, 179, 8, 0.8))'
+                              : 'drop-shadow(0 3px 10px rgba(0,0,0,0.6))',
+                            transition: 'transform 0.15s ease, filter 0.15s ease',
+                          }}
+                          onMouseEnter={e => {
+                            if (!isCooling && supplySearchState === 'idle') {
+                              e.currentTarget.style.transform = 'scale(1.08)'
+                              e.currentTarget.style.filter = 'drop-shadow(0 0 14px rgba(234, 179, 8, 0.65))'
+                            }
+                          }}
+                          onMouseLeave={e => {
+                            if (!isCooling && supplySearchState === 'idle') {
+                              e.currentTarget.style.transform = 'scale(1)'
+                              e.currentTarget.style.filter = 'drop-shadow(0 3px 10px rgba(0,0,0,0.6))'
+                            }
+                          }}
+                        />
+                      ) : (
+                        <>
+                          <span>{supplySearchState === 'searching' ? '🔍' : isCooling ? '⏳' : (location.loot?.icon || '🔦')}</span>
+                          {supplySearchState === 'searching'
+                            ? 'Vasculhando...'
+                            : isCooling
+                            ? `Cooldown (${formatDuration(supplyCooldownRemaining)})`
+                            : 'Buscar Suprimentos'}
+                        </>
+                      )}
+
+                      {/* Badge de Cooldown sobre a imagem */}
+                      {supplyImg && isCooling && (
+                        <span style={{
+                          position: 'absolute',
+                          bottom: -4,
+                          background: 'rgba(0, 0, 0, 0.85)',
+                          border: '1px solid #eab308',
+                          color: '#fef08a',
+                          borderRadius: 4,
+                          fontSize: 9,
+                          padding: '1px 4px',
+                          whiteSpace: 'nowrap',
+                          fontWeight: 800,
+                          lineHeight: 1.1,
+                          pointerEvents: 'none'
+                        }}>
+                          {formatDuration(supplyCooldownRemaining)}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })()
               )}
 
               {/* Botão 2: Busca Única (One-Shot / Raros, Muito Raros e Excepcionais) */}
