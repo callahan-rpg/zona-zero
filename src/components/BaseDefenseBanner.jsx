@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { doc, onSnapshot, collection, query, orderBy, limit } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { getDefenseStatusMeta, DEFAULT_BASE_DEFENSE } from '../utils/baseDefenseSystem'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function BaseDefenseBanner({
   compact = false,
   showHistory = true,
   customTitle = null
 }) {
+  const { campModifiers } = useAuth()
   const [defenseData, setDefenseData] = useState(DEFAULT_BASE_DEFENSE)
   const [logs, setLogs] = useState([])
   const [showLogModal, setShowLogModal] = useState(false)
@@ -42,8 +44,10 @@ export default function BaseDefenseBanner({
     return () => unsub()
   }, [showHistory])
 
-  const currentHp = Number(defenseData.currentHp ?? 100)
-  const maxHp = Number(defenseData.maxHp ?? 100)
+  const baseMaxHp = Number(defenseData.maxHp ?? 100)
+  const campBonusHp = Number(campModifiers?.base_defense_bonus) || 0
+  const maxHp = baseMaxHp + campBonusHp
+  const currentHp = Math.min(maxHp, Number(defenseData.currentHp ?? 100) + campBonusHp)
   const statusMeta = getDefenseStatusMeta(currentHp, maxHp)
 
   return (

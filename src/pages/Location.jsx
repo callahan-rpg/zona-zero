@@ -15,6 +15,8 @@ import BaseDefenseBanner from '../components/BaseDefenseBanner.jsx'
 import CookingModal from '../components/CookingModal.jsx'
 import WaterSourceModal from '../components/WaterSourceModal.jsx'
 import CustomFormModal from '../components/CustomFormModal.jsx'
+import CampOverviewModal from '../components/CampOverviewModal.jsx'
+import BathroomModal from '../components/BathroomModal.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
 import { useItemCatalog } from '../utils/itemCatalogService'
@@ -70,7 +72,7 @@ const DEFAULT_LOCATION = {
 
 export default function Location() {
   const { slug } = useParams()
-  const { user, character, refreshCharacter, recordUniqueSearch } = useAuth()
+  const { user, character, refreshCharacter, recordUniqueSearch, setLocationContext } = useAuth()
   const navigate = useNavigate()
 
   const [location, setLocation] = useState(null)
@@ -80,6 +82,13 @@ export default function Location() {
   const [weatherFxEnabled, setWeatherFxEnabled] = useState(() => {
     return localStorage.getItem('zz_weather_fx') !== 'false'
   })
+
+  // Sincroniza ambiente da locação com o contexto de exposição térmica
+  useEffect(() => {
+    if (location) {
+      setLocationContext?.({ isIndoor: !!location.isIndoor, slug: location.slug || slug })
+    }
+  }, [location, slug, setLocationContext])
 
   // --- Fade de imagem de fundo por período do dia ---
   const [currentBg, setCurrentBg] = useState(null)   // imagem visível agora
@@ -126,14 +135,31 @@ export default function Location() {
   const [activeWaterSource, setActiveWaterSource] = useState(null)
   const [showWaterModal, setShowWaterModal] = useState(false)
 
+  // Estados de Banheiro & Higiene Pessoal
+  const [showBathroomModal, setShowBathroomModal] = useState(false)
+
   // Estados de Formulários Customizados (Discord)
   const [locationForms, setLocationForms] = useState([])
   const [activeCustomForm, setActiveCustomForm] = useState(null)
+
+  // Estados de Melhorias do Acampamento de Sosnovka
+  const [showCampModal, setShowCampModal] = useState(false)
+  const [campHubSlug, setCampHubSlug] = useState('casa-grande')
 
   const showToast = (msg) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
   }
+
+  // Carrega o slug do hub do acampamento (configurável pelo Admin)
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'camp_config', 'global'), (snap) => {
+      if (snap.exists()) {
+        setCampHubSlug(snap.data().hubLocationSlug || 'casa-grande')
+      }
+    })
+    return unsub
+  }, [])
 
   // Escuta Pontos de Rádio vinculados a esta locação (filtrado na nuvem)
   useEffect(() => {
@@ -585,6 +611,25 @@ export default function Location() {
 
             {/* Painel de Ações de Busca (Suprimentos + Busca Única + Loja / Comércio + Recipientes de Armazenamento + Ponto de Rádio) */}
             <div className="loot-search-actions-bar">
+              {/* Botão de Evolução e Missões do Acampamento de Sosnovka */}
+              {slug === campHubSlug && (
+                <button
+                  className="loot-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.25) 0%, rgba(180, 83, 9, 0.35) 100%)',
+                    borderColor: '#f59e0b',
+                    color: '#fde047',
+                    fontWeight: 700,
+                    boxShadow: '0 0 14px rgba(234, 179, 8, 0.25)'
+                  }}
+                  onClick={() => setShowCampModal(true)}
+                  title="Consultar evolução das estruturas e missões de melhoria do Acampamento de Sosnovka"
+                >
+                  <span>🏕️</span>
+                  Melhorias do Acampamento
+                </button>
+              )}
+
               {/* Botão de Ponto de Rádio Local */}
               {activeRadioPoint && (
                 <button
@@ -769,6 +814,31 @@ export default function Location() {
                     </button>
                   )
                 })()
+              )}
+
+              {/* Botão de Banheiro & Higiene Pessoal */}
+              {location.hasBathroom !== false && (
+                <button
+                  type="button"
+                  className="loot-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.25) 0%, rgba(2, 132, 199, 0.35) 100%)',
+                    borderColor: '#38bdf8',
+                    color: '#7dd3fc',
+                    fontWeight: 700,
+                    boxShadow: '0 0 12px rgba(56, 189, 248, 0.25)',
+                    padding: '8px 14px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '44px',
+                    minHeight: '44px',
+                  }}
+                  onClick={() => setShowBathroomModal(true)}
+                  title="Banheiro & Higiene: tomar banho e abastecer o reservatório de água"
+                >
+                  <span style={{ fontSize: 20, lineHeight: 1 }}>🚿</span>
+                </button>
               )}
 
               {/* Atividades de Produção Locais (Pesca, Plantação, Galinheiro, etc.) */}
@@ -1092,6 +1162,21 @@ export default function Location() {
           user={user}
           locationName={location?.name || slug}
           onClose={() => setActiveCustomForm(null)}
+        />
+      )}
+
+      {/* Modal de Visão Geral e Missões de Evolução do Acampamento */}
+      <CampOverviewModal
+        isOpen={showCampModal}
+        onClose={() => setShowCampModal(false)}
+      />
+
+      {/* Modal de Banheiro e Higiene */}
+      {showBathroomModal && (
+        <BathroomModal
+          isOpen={showBathroomModal}
+          onClose={() => setShowBathroomModal(false)}
+          location={location}
         />
       )}
     </div>

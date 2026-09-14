@@ -54,25 +54,71 @@ export default function PublicCharacter() {
   const { map: catalogMap } = useItemCatalog()
 
   useEffect(() => {
+    // Se o usuário tentar acessar seu próprio perfil pela rota pública, redireciona para a gestão do dono
+    if (user && uid === user.uid) {
+      navigate('/character', { replace: true })
+      return
+    }
+
     async function load() {
       setLoading(true)
       try {
         const docRef = doc(db, 'users', uid)
         const docSnap = await getDoc(docRef)
         if (docSnap.exists() && docSnap.data().character?.name) {
-          setCharacter(docSnap.data().character)
-          setTargetRole(docSnap.data().role || 'player')
+          const raw = docSnap.data()
+          // Sanitização rigorosa: nunca armazena email ou credenciais confidenciais no estado público
+          const safeChar = { ...raw.character }
+          delete safeChar.email
+          setCharacter(safeChar)
+          setTargetRole(raw.role || 'player')
         } else {
-          setNotFound(true)
+          // Fallback para o índice público de sobreviventes
+          const indexSnap = await getDoc(doc(db, 'players_index', uid))
+          if (indexSnap.exists()) {
+            const idxData = indexSnap.data()
+            setCharacter({
+              name: idxData.name,
+              avatarUrl: idxData.avatarUrl,
+              age: idxData.age,
+              level: idxData.level,
+              xp: idxData.xp,
+              profession: idxData.professionId,
+              inventory: [],
+            })
+            setTargetRole(idxData.role || 'player')
+          } else {
+            setNotFound(true)
+          }
         }
       } catch {
-        setNotFound(true)
+        // Se a RLS do Firestore bloquear leitura direta de /users/{uid}, carrega do índice público
+        try {
+          const indexSnap = await getDoc(doc(db, 'players_index', uid))
+          if (indexSnap.exists()) {
+            const idxData = indexSnap.data()
+            setCharacter({
+              name: idxData.name,
+              avatarUrl: idxData.avatarUrl,
+              age: idxData.age,
+              level: idxData.level,
+              xp: idxData.xp,
+              profession: idxData.professionId,
+              inventory: [],
+            })
+            setTargetRole(idxData.role || 'player')
+          } else {
+            setNotFound(true)
+          }
+        } catch {
+          setNotFound(true)
+        }
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [uid])
+  }, [uid, user, navigate])
 
   const rawInventory = character?.inventory || []
 

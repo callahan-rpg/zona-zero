@@ -32,6 +32,10 @@ import AdminWaterSourcesEditor from '../components/AdminWaterSourcesEditor.jsx'
 import AdminNarrativeEditor from '../components/AdminNarrativeEditor.jsx'
 import AdminFormsEditor from '../components/AdminFormsEditor.jsx'
 import AdminForumEditor from '../components/AdminForumEditor.jsx'
+import AdminCampEditor from '../components/AdminCampEditor.jsx'
+import AdminDiseasesEditor from '../components/AdminDiseasesEditor.jsx'
+import { DEFAULT_DISEASES, DEFAULT_SYMPTOMS } from '../utils/diseaseDefaults'
+import { rollStageSymptoms } from '../utils/diseaseSystem'
 import { migratePlayersIndex } from '../utils/playerIndexService'
 import { saveConsolidatedCatalog, consolidateCatalogFromItemsDb } from '../utils/itemCatalogService'
 import { migrateAllBase64ToCloudinary } from '../utils/cloudinaryMigration'
@@ -564,6 +568,7 @@ export default function Admin() {
     disableWeatherSound: false, // Se verdadeiro, silencia o som do clima nesta sala
     xatIframe: '',
     isIndoor: false,
+    hasBathroom: true,
     lootEnabled: true,
     cooldownMinutes: 30,
     emptyChance: 0.25,
@@ -638,6 +643,7 @@ export default function Admin() {
       isIndoor: !!loc.isIndoor,
       isSpawnPoint: !!loc.isSpawnPoint,
       hasKitchen: loc.hasKitchen !== undefined ? !!loc.hasKitchen : true,
+      hasBathroom: loc.hasBathroom !== undefined ? !!loc.hasBathroom : true,
       kitchenButtonImage: loc.kitchenButtonImage || '',
       kitchenIcon: loc.kitchenIcon || '🍳',
       lootEnabled: loc.loot?.enabled !== false,
@@ -678,6 +684,7 @@ export default function Admin() {
       isIndoor: false,
       isSpawnPoint: false,
       hasKitchen: true,
+      hasBathroom: true,
       kitchenButtonImage: '',
       kitchenIcon: '🍳',
       lootEnabled: true,
@@ -722,6 +729,7 @@ export default function Admin() {
       isIndoor: !!locForm.isIndoor,
       isSpawnPoint: !!locForm.isSpawnPoint,
       hasKitchen: !!locForm.hasKitchen,
+      hasBathroom: locForm.hasBathroom !== false,
       kitchenButtonImage: (locForm.kitchenButtonImage || '').trim(),
       kitchenIcon: (locForm.kitchenIcon || '🍳').trim(),
       loot: {
@@ -2006,7 +2014,23 @@ export default function Admin() {
             <button className={`btn btn-sm ${activeTab === 'forum' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('forum')} style={{ borderColor: 'rgba(56, 189, 248, 0.5)', color: activeTab === 'forum' ? '#000' : '#7dd3fc', background: activeTab === 'forum' ? '#38bdf8' : 'transparent', fontWeight: 'bold' }}>
               💬 Fórum & Grupos
             </button>
+            <button className={`btn btn-sm ${activeTab === 'camp' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('camp')} style={{ borderColor: 'rgba(234, 179, 8, 0.6)', color: activeTab === 'camp' ? '#000' : '#facc15', background: activeTab === 'camp' ? '#f59e0b' : 'transparent', fontWeight: 'bold' }}>
+              🏕️ Acampamento & Melhorias
+            </button>
+            <button className={`btn btn-sm ${activeTab === 'diseases' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('diseases')} style={{ borderColor: 'rgba(239, 68, 68, 0.6)', color: activeTab === 'diseases' ? '#fff' : '#fca5a5', background: activeTab === 'diseases' ? '#dc2626' : 'transparent', fontWeight: 'bold' }}>
+              🦠 Doenças & Moodles
+            </button>
           </div>
+
+          {/* CONTEÚDO DA TAB DISEASES: GERENCIADOR DE DOENÇAS, MOODLES E REMÉDIOS */}
+          {activeTab === 'diseases' && (
+            <AdminDiseasesEditor />
+          )}
+
+          {/* CONTEÚDO DA TAB CAMP: EVOLUÇÃO E MELHORIAS DO ACAMPAMENTO */}
+          {activeTab === 'camp' && (
+            <AdminCampEditor />
+          )}
 
           {/* CONTEÚDO DA TAB FORUM: GERENCIADOR DO FÓRUM & GRUPOS */}
           {activeTab === 'forum' && (
@@ -4596,6 +4620,24 @@ export default function Admin() {
                       </div>
                     )}
                   </div>
+
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <input
+                        type="checkbox"
+                        id="hasBathroom"
+                        checked={locForm.hasBathroom !== false}
+                        onChange={(e) => setLocForm(prev => ({ ...prev, hasBathroom: e.target.checked }))}
+                        style={{ width: 'auto', cursor: 'pointer' }}
+                      />
+                      <label htmlFor="hasBathroom" style={{ margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: 600, color: '#38bdf8' }}>🚿 Banheiro & Chuveiro Disponível</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          Permite aos sobreviventes tomar banho no local (abastecendo o reservatório) para restaurar higiene e imunidade.
+                        </span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
                 {/* ============================================================ */}
@@ -5986,6 +6028,254 @@ export default function Admin() {
                               </div>
                             )
                           })}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Painel de Saúde, Doenças, Exposição e Higiene */}
+                  {(() => {
+                    const char = selectedPlayer.character || {}
+                    const activeDiseases = char.diseases || []
+                    const thermalExp = Number(char.thermalExposure || 0).toFixed(1)
+                    const hygieneVal = char.hygiene !== undefined ? Number(char.hygiene) : 100
+
+                    return (
+                      <div style={{
+                        padding: 14,
+                        background: 'rgba(239, 68, 68, 0.05)',
+                        borderRadius: 8,
+                        border: '1px solid rgba(239, 68, 68, 0.25)',
+                        marginBottom: 16
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+                          <label style={{ fontSize: 11, color: '#f87171', textTransform: 'uppercase', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span>🦠</span> Condição Clínica, Doenças & Higiene
+                          </label>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!confirm(`Restaurar higiene de ${char.name || 'jogador'} para 100%?`)) return
+                                try {
+                                  const playerRef = doc(db, 'users', selectedPlayer.uid)
+                                  await updateDoc(playerRef, { 'character.hygiene': 100 })
+                                  setSelectedPlayer(prev => ({
+                                    ...prev,
+                                    character: { ...prev.character, hygiene: 100 }
+                                  }))
+                                } catch (err) {
+                                  alert('Erro ao atualizar higiene: ' + err.message)
+                                }
+                              }}
+                              style={{ fontSize: 10.5, background: 'rgba(56, 189, 248, 0.2)', border: '1px solid rgba(56, 189, 248, 0.4)', color: '#38bdf8', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              🚿 Higiene 100%
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!confirm(`Curar todas as doenças e zerar a exposição de ${char.name || 'jogador'}?`)) return
+                                try {
+                                  const playerRef = doc(db, 'users', selectedPlayer.uid)
+                                  await updateDoc(playerRef, {
+                                    'character.diseases': [],
+                                    'character.thermalExposure': 0
+                                  })
+                                  setSelectedPlayer(prev => ({
+                                    ...prev,
+                                    character: { ...prev.character, diseases: [], thermalExposure: 0 }
+                                  }))
+                                  alert('Jogador curado com sucesso!')
+                                } catch (err) {
+                                  alert('Erro ao curar jogador: ' + err.message)
+                                }
+                              }}
+                              style={{ fontSize: 10.5, background: 'rgba(74, 222, 128, 0.2)', border: '1px solid rgba(74, 222, 128, 0.4)', color: '#4ade80', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              ✨ Curar Todas as Doenças
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Status resumido: Exposição e Higiene */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                          <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)' }}>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Exposição Térmica Acumulada:</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: Number(thermalExp) > 50 ? '#ef4444' : Number(thermalExp) > 20 ? '#f59e0b' : '#38bdf8' }}>
+                              ❄️ {thermalExp} / 100
+                            </div>
+                          </div>
+                          <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)' }}>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Nível de Higiene Pessoal:</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: hygieneVal < 30 ? '#ef4444' : hygieneVal < 60 ? '#f59e0b' : '#4ade80' }}>
+                              🧼 {hygieneVal}%
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Lista de Doenças Ativas */}
+                        <div style={{ marginBottom: 10 }}>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                            DOENÇAS ATIVAS NO CORPO ({activeDiseases.length}):
+                          </span>
+                          {activeDiseases.length === 0 ? (
+                            <div style={{ fontSize: 11, color: '#4ade80', background: 'rgba(74, 222, 128, 0.08)', padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(74, 222, 128, 0.2)' }}>
+                              🟢 Saudável — Nenhuma infecção ou doença ativa no momento.
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {activeDiseases.map((d) => (
+                                <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.4)', padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                                  <div>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fca5a5' }}>
+                                      {d.name || d.id}
+                                    </span>
+                                    <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 8 }}>
+                                      Fase: <strong style={{ color: '#fff' }}>{d.stage}</strong> ({d.progressTicks} ticks)
+                                    </span>
+                                    {d.activeSymptoms && d.activeSymptoms.length > 0 && (
+                                      <div style={{ fontSize: 10, color: '#f87171', marginTop: 2 }}>
+                                        Sintomas: {d.activeSymptoms.join(', ')}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                    {(!d.activeSymptoms || d.activeSymptoms.length === 0 || d.stageIndex === 0 || d.stage === 'incubation') && (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          const dId = d.diseaseId || d.id
+                                          const def = DEFAULT_DISEASES[dId]
+                                          const syms = rollStageSymptoms(def, 1, DEFAULT_SYMPTOMS)
+                                          const updated = activeDiseases.map(item => {
+                                            if ((item.instanceId && item.instanceId === d.instanceId) || (item.diseaseId || item.id) === dId) {
+                                              return {
+                                                ...item,
+                                                stageIndex: 1,
+                                                stage: 'stage_1',
+                                                activeSymptoms: syms
+                                              }
+                                            }
+                                            return item
+                                          })
+                                          try {
+                                            const playerRef = doc(db, 'users', selectedPlayer.uid)
+                                            await updateDoc(playerRef, { 'character.diseases': updated })
+                                            setSelectedPlayer(prev => ({
+                                              ...prev,
+                                              character: { ...prev.character, diseases: updated }
+                                            }))
+                                            alert('Sintomas da Fase 1 ativados imediatamente! Moodles visíveis no HUD.')
+                                          } catch (err) {
+                                            alert('Erro ao ativar sintomas: ' + err.message)
+                                          }
+                                        }}
+                                        style={{ fontSize: 10, background: 'rgba(234,179,8,0.2)', border: '1px solid rgba(234,179,8,0.4)', color: '#facc15', borderRadius: 4, padding: '2px 6px', cursor: 'pointer', fontWeight: 600 }}
+                                        title="Ativar sintomas da Fase 1 imediatamente para teste"
+                                      >
+                                        ⚡ Ativar Fase 1
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        const dId = d.diseaseId || d.id
+                                        const updated = activeDiseases.filter(item => (item.instanceId ? item.instanceId !== d.instanceId : (item.diseaseId || item.id) !== dId))
+                                        try {
+                                          const playerRef = doc(db, 'users', selectedPlayer.uid)
+                                          await updateDoc(playerRef, { 'character.diseases': updated })
+                                          setSelectedPlayer(prev => ({
+                                            ...prev,
+                                            character: { ...prev.character, diseases: updated }
+                                          }))
+                                        } catch (err) {
+                                          alert('Erro ao remover doença: ' + err.message)
+                                        }
+                                      }}
+                                      style={{ fontSize: 10, background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#f87171', borderRadius: 4, padding: '2px 6px', cursor: 'pointer' }}
+                                      title="Remover esta doença específica"
+                                    >
+                                      ✕ Curar
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Ação manual: Infectar com doença para testes */}
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Inocular Patologia:</span>
+                          <select
+                            id="adminInfectSelect"
+                            style={{ flex: '1 1 140px', padding: '4px 8px', fontSize: 11 }}
+                            defaultValue="resfriado"
+                          >
+                            <option value="resfriado">Resfriado Comum (Leve)</option>
+                            <option value="gripe">Gripe (Moderada)</option>
+                            <option value="pneumonia">Pneumonia (Grave)</option>
+                            <option value="gastroenterite">Gastroenterite (Água Impura)</option>
+                            <option value="infeccao_intestinal">Infecção Intestinal (Severa)</option>
+                          </select>
+                          <select
+                            id="adminInfectStage"
+                            style={{ flex: '1 1 140px', padding: '4px 8px', fontSize: 11, background: 'rgba(0,0,0,0.5)', color: '#38bdf8', borderColor: '#0284c7' }}
+                            defaultValue="stage_1"
+                          >
+                            <option value="stage_1">Fase 1 (Sintomas Iniciais — Imediato)</option>
+                            <option value="stage_2">Fase 2 (Fase Aguda / Plena)</option>
+                            <option value="incubation">Incubação (Silenciosa)</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const sel = document.getElementById('adminInfectSelect')
+                              const stageSel = document.getElementById('adminInfectStage')
+                              const diseaseId = sel?.value || 'resfriado'
+                              const chosenStage = stageSel?.value || 'stage_1'
+                              const stageIdx = chosenStage === 'incubation' ? 0 : chosenStage === 'stage_2' ? 2 : 1
+
+                              if (activeDiseases.some(d => (d.diseaseId || d.id) === diseaseId)) {
+                                alert('Jogador já possui esta patologia ativa!')
+                                return
+                              }
+                              const def = DEFAULT_DISEASES[diseaseId]
+                              const symptoms = stageIdx === 0 ? [] : rollStageSymptoms(def, stageIdx, DEFAULT_SYMPTOMS)
+
+                              const newDisease = {
+                                instanceId: `dis_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                                diseaseId,
+                                id: diseaseId,
+                                name: def?.name || diseaseId,
+                                stageIndex: stageIdx,
+                                stage: chosenStage,
+                                stageElapsedMinutes: 0,
+                                totalElapsedMinutes: 0,
+                                incubationMinutes: def?.incubationMinutes || 30,
+                                activeSymptoms: symptoms,
+                                cured: false,
+                                acquiredAt: Date.now(),
+                                startedAt: Date.now()
+                              }
+                              const updated = [...activeDiseases, newDisease]
+                              try {
+                                const playerRef = doc(db, 'users', selectedPlayer.uid)
+                                await updateDoc(playerRef, { 'character.diseases': updated })
+                                setSelectedPlayer(prev => ({
+                                  ...prev,
+                                  character: { ...prev.character, diseases: updated }
+                                }))
+                                alert(`Inoculado ${def?.name || diseaseId} (${chosenStage === 'stage_1' ? 'Fase 1 com sintomas' : chosenStage === 'stage_2' ? 'Fase 2 Aguda' : 'Incubação'}) com sucesso!`)
+                              } catch (err) {
+                                alert('Erro ao inocular: ' + err.message)
+                              }
+                            }}
+                            style={{ fontSize: 10.5, background: 'rgba(239, 68, 68, 0.25)', border: '1px solid #ef4444', color: '#fca5a5', borderRadius: 4, padding: '5px 12px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
+                          >
+                            + Inocular Doença
+                          </button>
                         </div>
                       </div>
                     )

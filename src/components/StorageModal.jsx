@@ -35,7 +35,7 @@ export default function StorageModal({
   storageId,
   initialStorageData = null
 }) {
-  const { user, character, refreshCharacter } = useAuth()
+  const { user, character, refreshCharacter, campModifiers } = useAuth()
 
   const [storageData, setStorageData] = useState(initialStorageData)
   const [baseDefenseConfig, setBaseDefenseConfig] = useState(null)
@@ -112,9 +112,17 @@ export default function StorageModal({
     return character.inventory.some(i => (i.itemId === keyId || i.id === keyId) && (i.quantity || 0) > 0)
   }, [storageData, character?.inventory])
 
-  // Capacidade e slots
+  // Capacidade e slots (incluindo bônus concedido pela Casa Grande / Acampamento)
+  const isCampStorage = storageData?.locationSlug?.includes('acampamento') ||
+                        storageData?.locationSlug?.includes('casa-grande') ||
+                        String(storageId || '').includes('casa-grande') ||
+                        String(storageId || '').includes('armazem') ||
+                        String(storageId || '').includes('acampamento')
+  const campBonusSlots = isCampStorage ? (campModifiers?.storage_capacity_bonus || 0) : 0
+
   const itemsInStorage = storageData?.items || []
-  const maxSlots = storageData?.capacity?.maxSlots || typeMeta.defaultSlots
+  const baseSlots = storageData?.capacity?.maxSlots || typeMeta.defaultSlots
+  const maxSlots = baseSlots + campBonusSlots
   const isInfiniteSlots = !!storageData?.capacity?.infinite
   const slotsUsed = itemsInStorage.length
   const slotsPercentage = isInfiniteSlots ? 0 : Math.min(100, Math.round((slotsUsed / maxSlots) * 100))
@@ -230,7 +238,8 @@ export default function StorageModal({
         userUid: user.uid,
         itemInstanceId: item.instanceId,
         quantityToDeposit: qty,
-        userName: character?.name || 'Sobrevivente'
+        userName: character?.name || 'Sobrevivente',
+        bonusSlots: campBonusSlots,
       })
       await refreshCharacter()
       setSuccessMsg(`Depositado com sucesso: ${qty}x ${item.name || item.itemId}`)

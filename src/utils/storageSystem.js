@@ -66,7 +66,7 @@ export const STORAGE_TYPES = {
 /**
  * Valida se um item pode ser depositado no container com base em regras e capacidade
  */
-export function canDepositItem(storage, item) {
+export function canDepositItem(storage, item, bonusSlots = 0) {
   if (!storage || !item) return { allowed: false, reason: 'Dados inválidos.' }
 
   if (item.isQuestItem) {
@@ -77,7 +77,8 @@ export function canDepositItem(storage, item) {
   const items = storage.items || []
   const existingItemIndex = items.findIndex(i => i.itemId === item.itemId && !i.isQuestItem)
   
-  const maxSlots = storage.capacity?.maxSlots || 12
+  const baseSlots = storage.capacity?.maxSlots || 12
+  const maxSlots = baseSlots + (Number(bonusSlots) || 0)
   const isInfinite = !!storage.capacity?.infinite
 
   if (!isInfinite && existingItemIndex === -1 && items.length >= maxSlots) {
@@ -108,7 +109,8 @@ export async function depositToStorage({
   userUid,
   itemInstanceId,
   quantityToDeposit,
-  userName = 'Sobrevivente'
+  userName = 'Sobrevivente',
+  bonusSlots = 0,
 }) {
   if (!storageId || !userUid || !itemInstanceId || quantityToDeposit <= 0) {
     throw new Error('Parâmetros inválidos para depósito.')
@@ -141,8 +143,8 @@ export async function depositToStorage({
       throw new Error(`Quantidade insuficiente. Você possui apenas ${sourceItem.quantity} unidade(s).`)
     }
 
-    // 2. Valida regras do Storage
-    const validation = canDepositItem(storageData, sourceItem)
+    // 2. Valida regras do Storage (considerando bônus de slots do acampamento se houver)
+    const validation = canDepositItem(storageData, sourceItem, bonusSlots)
     if (!validation.allowed) {
       throw new Error(validation.reason)
     }

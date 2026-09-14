@@ -88,7 +88,7 @@ const DEFAULT_SEED_CONFIGS = {
 }
 
 export default function FarmingModal({ activity, character, locationSlug, onClose }) {
-  const { user, refreshCharacter } = useAuth()
+  const { user, refreshCharacter, campModifiers } = useAuth()
   const [plots, setPlots] = useState([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
@@ -173,11 +173,15 @@ export default function FarmingModal({ activity, character, locationSlug, onClos
       const plotId = generateActivityStateId('farming', locationSlug, user.uid)
       const plotRef = doc(db, 'activity_states', plotId)
       const nowIso = new Date().toISOString()
-      const growthMs = seedCfg.growthMs
+      const rawGrowthMs = seedCfg.growthMs
         || (seedCfg.growthHours ? seedCfg.growthHours * 60 * 60 * 1000 : null)
         || (seedCfg.growthTimeUnit === 'hours' ? (seedCfg.growthTimeValue || 1) * 60 * 60 * 1000 : null)
         || (seedCfg.growthDays ? seedCfg.growthDays * 24 * 60 * 60 * 1000 : null)
         || (seedCfg.growthTimeValue ? seedCfg.growthTimeValue * 24 * 60 * 60 * 1000 : 3 * 24 * 60 * 60 * 1000)
+
+      // Multiplicador de redução de tempo concedido pela evolução da Horta de Sosnovka
+      const growthMultiplier = campModifiers?.crop_growth_time_multiplier || 1.0
+      const growthMs = Math.round(rawGrowthMs * growthMultiplier)
 
       let wormResult = null
       let toolLossResult = null

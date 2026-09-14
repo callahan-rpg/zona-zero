@@ -1,17 +1,26 @@
 /**
- * Utilitário para upload de imagens utilizando o Cloudinary (Unsigned Preset).
- * Inclui auto-compressão para evitar exceder limite de processamento e retentativa com backoff.
+ * Utilitário para upload de imagens.
+ * ARQUITETURA SEGURA: O navegador chama exclusivamente a API interna (/api/upload).
+ * Nenhuma chave, credencial ou preset do Cloudinary fica exposto no bundle do cliente.
  */
-
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'z3cr8lix'
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'zona_zero'
 
 /**
- * Redimensiona e otimiza imagens grandes no cliente antes do upload.
- * Reduz enormemente o consumo de capacidade/CPU do Cloudinary.
+ * Converte um File ou Blob para Base64 Data URL.
+ */
+function fileToDataUrl(fileOrBlob) {
+  return new Promise((resolve, reject) => {
+    if (typeof fileOrBlob === 'string') return resolve(fileOrBlob)
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = (err) => reject(err)
+    reader.readAsDataURL(fileOrBlob)
+  })
+}
+
+/**
+ * Redimensiona e otimiza imagens grandes no cliente antes do envio para a API.
  */
 async function compressImageClientSide(fileOrBase64, maxWidth = 1920, maxHeight = 1080, quality = 0.85) {
-  // Se for SVG ou GIF animado, não passa por canvas para preservar animação/vetor
   if (fileOrBase64 instanceof File && (fileOrBase64.type === 'image/svg+xml' || fileOrBase64.type === 'image/gif')) {
     return fileOrBase64
   }
@@ -26,12 +35,10 @@ async function compressImageClientSide(fileOrBase64, maxWidth = 1920, maxHeight 
     img.onload = () => {
       let { width, height } = img
 
-      // Se já for pequena, mantém
       if (width <= maxWidth && height <= maxHeight && (fileOrBase64.size && fileOrBase64.size < 500 * 1024)) {
         return resolve(fileOrBase64)
       }
 
-      // Calcula proporção
       if (width > maxWidth || height > maxHeight) {
         if (width / height > maxWidth / maxHeight) {
           height = Math.round((height * maxWidth) / width)
@@ -48,7 +55,6 @@ async function compressImageClientSide(fileOrBase64, maxWidth = 1920, maxHeight 
       const ctx = canvas.getContext('2d')
       ctx.drawImage(img, 0, 0, width, height)
 
-      // Converte para blob WebP ou JPEG
       canvas.toBlob((blob) => {
         if (blob) {
           resolve(blob)
@@ -69,69 +75,62 @@ async function compressImageClientSide(fileOrBase64, maxWidth = 1920, maxHeight 
 }
 
 /**
- * Faz upload de um arquivo de imagem (File) ou string Base64 e retorna a URL direta hospedada no Cloudinary.
- * Contém retentativas automáticas caso a conta receba "Slow Down / Capacity".
+ * Envia o arquivo de imagem para o backend seguro (/api/upload).
  * 
- * @param {File|string} fileOrBase64 - Arquivo de imagem selecionado ou string Base64
- * @param {number} maxRetries - Número de tentativas em caso de erro 429
- * @returns {Promise<string>} URL segura HTTPS do Cloudinary
+ * @param {File|string} fileOrBase64 - Arquivo ou string Base64
+ * @param {number} maxRetries - Tentativas em caso de instabilidade
+ * @returns {Promise<string>} URL segura da imagem hospedada
  */
 export async function uploadImageFree(fileOrBase64, maxRetries = 3) {
   if (!fileOrBase64) throw new Error('Nenhum arquivo fornecido.')
 
-  // Valida tipo de imagem
   if (fileOrBase64 instanceof File && !fileOrBase64.type.startsWith('image/')) {
     throw new Error('O arquivo selecionado deve ser uma imagem válida (PNG, JPG, WEBP, GIF, SVG).')
   }
 
-  // Comprime levemente antes do upload para evitar sobrecarga de processamento no Cloudinary
   const payloadFile = await compressImageClientSide(fileOrBase64)
+  const dataUrl = await fileToDataUrl(payloadFile)
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const formData = new FormData()
-      formData.append('file', payloadFile)
-      formData.append('upload_preset', UPLOAD_PRESET)
-
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+      const response = await fetch('/api/upload', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ file: dataUrl }),
       })
 
-      const data = await response.json()
+      const data = await response.json().catch(() => ({}))
 
-      if (response.ok && data.secure_url) {
-        return data.secure_url
+      if (response.ok && data.url) {
+        return data.url
       }
 
-      const errMsg = data.error?.message || ''
+      const errMsg = data.error || 'Falha ao processar upload no servidor.'
 
-      // Se for limite de capacidade / 429 / rate limit, aguarda e tenta novamente
       if (response.status === 429 || errMsg.toLowerCase().includes('capacity') || errMsg.toLowerCase().includes('slow down')) {
         if (attempt < maxRetries) {
-          const waitTime = attempt * 2000 // 2s, 4s...
-          console.warn(`Cloudinary capacidade temporariamente cheia. Tentando novamente em ${waitTime / 1000}s... (Tentativa ${attempt}/${maxRetries})`)
-          await new Promise(r => setTimeout(r, waitTime))
+          const waitTime = attempt * 2000
+          console.warn(`Capacidade temporariamente cheia. Tentando novamente em ${waitTime / 1000}s...`)
+          await new Promise((r) => setTimeout(r, waitTime))
           continue
         }
       }
 
-      console.error('Erro na resposta do Cloudinary:', data)
-      throw new Error(errMsg || 'Falha ao processar upload no Cloudinary.')
+      throw new Error(errMsg)
     } catch (err) {
       if (attempt >= maxRetries) {
         throw err
       }
       const waitTime = attempt * 2000
-      await new Promise(r => setTimeout(r, waitTime))
+      await new Promise((r) => setTimeout(r, waitTime))
     }
   }
 }
 
 /**
- * Utilitário para converter uma imagem existente em Base64 para uma URL do Cloudinary.
- * @param {string} base64String 
- * @returns {Promise<string>}
+ * Converte base64 para URL hospedada através do backend.
  */
 export async function uploadBase64ToCloudinary(base64String) {
   if (!base64String || typeof base64String !== 'string' || !base64String.startsWith('data:image')) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from './firebase/config'
 import { useAuth } from './contexts/AuthContext.jsx'
@@ -21,10 +21,14 @@ import { calculateGameTime, getDynamicWeather } from './utils/timeSystem'
 import { DEFAULT_WEATHER_SOUNDS } from './utils/audioSystem'
 import { checkAndTriggerAutoBroadcasts } from './utils/radioSystem'
 
-function ProtectedRoute({ children }) {
+/**
+ * ProtectedLayout: Proteção padrão do roteador.
+ * Todas as rotas filhas exigem login obrigatório por padrão.
+ */
+function ProtectedLayout() {
   const { user, loading } = useAuth()
   if (loading) return <div className="loading-screen"><span className="loading-dot" /></div>
-  return user ? children : <Navigate to="/login" replace />
+  return user ? <Outlet /> : <Navigate to="/login" replace />
 }
 
 function PublicRoute({ children }) {
@@ -136,26 +140,28 @@ export default function App() {
       <GlobalAmbientSound />
 
       <Routes>
-        {/* Rotas públicas */}
+        {/* ROTAS PÚBLICAS (Declaradas explicitamente) */}
         <Route path="/" element={<Home />} />
         <Route path="/rules" element={<Rules />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-        {/* Rotas protegidas */}
-        <Route path="/location/:slug" element={<ProtectedRoute><Location /></ProtectedRoute>} />
-        <Route path="/character" element={<ProtectedRoute><Character /></ProtectedRoute>} />
-        <Route path="/characters" element={<ProtectedRoute><Characters /></ProtectedRoute>} />
-        <Route path="/combat" element={<ProtectedRoute><Combat /></ProtectedRoute>} />
-        <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
-        <Route path="/map" element={<ProtectedRoute><Map /></ProtectedRoute>} />
-        <Route path="/map/:region" element={<ProtectedRoute><Map /></ProtectedRoute>} />
-        <Route path="/map/:region/:city" element={<ProtectedRoute><Map /></ProtectedRoute>} />
-        <Route path="/characters/:uid" element={<ProtectedRoute><PublicCharacter /></ProtectedRoute>} />
-        <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
-        <Route path="/forum/:topicId" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+        {/* PROTEÇÃO PADRÃO: Qualquer rota interna exige login obrigatório por padrão */}
+        <Route element={<ProtectedLayout />}>
+          <Route path="/location/:slug" element={<Location />} />
+          <Route path="/character" element={<Character />} />
+          <Route path="/characters" element={<Characters />} />
+          <Route path="/characters/:uid" element={<PublicCharacter />} />
+          <Route path="/combat" element={<Combat />} />
+          <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+          <Route path="/map" element={<Map />} />
+          <Route path="/map/:region" element={<Map />} />
+          <Route path="/map/:region/:city" element={<Map />} />
+          <Route path="/forum" element={<Forum />} />
+          <Route path="/forum/:topicId" element={<Forum />} />
+        </Route>
 
-        {/* Redirecionamentos */}
+        {/* Redirecionamento de rotas desconhecidas */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -11,6 +11,7 @@ import SettingsModal from './SettingsModal.jsx'
 import NotificationBell from './NotificationBell.jsx'
 import MoneyTransferModal from './MoneyTransferModal.jsx'
 import GameIcon from './GameIcon.jsx'
+import MoodlesContainer from './MoodlesContainer.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import {
   hasFeatureUnlocked,
@@ -321,6 +322,9 @@ export default function HUD({ locationName }) {
           </div>
         </div>
       )}
+
+      {/* Coluna flutuante de Moodles no canto direito */}
+      <MoodlesContainer />
 
       {/* Popups flutuantes */}
       {showDice && <DiceRoller onClose={() => setShowDice(false)} />}

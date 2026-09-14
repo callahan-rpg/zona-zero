@@ -23,6 +23,8 @@ import {
 } from '../utils/weightSystem'
 import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
 import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
+import { useGameConfig } from '../contexts/GameConfigContext.jsx'
+import { getActiveDiseasePenalties } from '../utils/diseaseSystem'
 
 export const INVENTORY_CATEGORIES = [
   { id: 'all',         label: 'Todos',               icon: '📦' },
@@ -128,6 +130,7 @@ export default function Character() {
     equipItem,
     unequipItem
   } = useAuth()
+  const gameConfig = useGameConfig()
 
   // Filtro de aba ativo
   const [activeCategory, setActiveCategory] = useState('all')
@@ -269,24 +272,38 @@ export default function Character() {
     return getVitalsDebuffs(character?.vitals || {})
   }, [character?.vitals])
 
-  // Combina penalidades de vitais com penalidades de sobrecarga de peso
+  // Penalidades de Doenças ativas e sintomas
+  const diseasePenalties = useMemo(() => {
+    return getActiveDiseasePenalties(character?.diseases || [], gameConfig?.diseaseConfig)
+  }, [character?.diseases, gameConfig?.diseaseConfig])
+
+  // Combina penalidades de vitais com penalidades de sobrecarga de peso e sintomas
   const combinedPenalties = useMemo(() => {
     const penalties = { ...debuffInfo.penalties }
     if (carryStats.isOverweight) {
       if (carryStats.penalties.destreza) penalties.destreza = (penalties.destreza || 0) + carryStats.penalties.destreza
       if (carryStats.penalties.agilidade) penalties.agilidade = (penalties.agilidade || 0) + carryStats.penalties.agilidade
     }
+    // Adiciona penalidades de sintomas de doenças aos atributos
+    Object.entries(diseasePenalties.penalties || {}).forEach(([attrKey, val]) => {
+      if (val !== 0) {
+        penalties[attrKey] = (penalties[attrKey] || 0) + val
+      }
+    })
     return penalties
-  }, [debuffInfo, carryStats])
+  }, [debuffInfo, carryStats, diseasePenalties])
 
-  const hasCombinedDebuffs = debuffInfo.hasDebuff || carryStats.isOverweight
+  const hasCombinedDebuffs = debuffInfo.hasDebuff || carryStats.isOverweight || diseasePenalties.reasons.length > 0
   const debuffReasons = useMemo(() => {
     const reasons = [...debuffInfo.reasons]
     if (carryStats.isOverweight && carryStats.activeTier) {
       reasons.push(`⚖️ ${carryStats.activeTier.label} (+${carryStats.excessPercent}% sobrecarga: DES ${carryStats.penalties.destreza}, AGI ${carryStats.penalties.agilidade})`)
     }
+    if (diseasePenalties.reasons.length > 0) {
+      reasons.push(...diseasePenalties.reasons)
+    }
     return reasons
-  }, [debuffInfo, carryStats])
+  }, [debuffInfo, carryStats, diseasePenalties])
 
   // Estatísticas de Equipamento e Térmica
   const equipmentStats = useMemo(() => {

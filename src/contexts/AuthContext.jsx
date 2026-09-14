@@ -14,14 +14,25 @@ import {
   serverTimestamp,
   runTransaction,
   onSnapshot,
+  collection,
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
-import { getMaxHp, DEFAULT_PRESET_ITEMS, getItemUses, hasRadio } from '../utils/itemSystem'
+import { getMaxHp, DEFAULT_PRESET_ITEMS, getItemUses, hasRadio, calculateCharacterEquipmentStats } from '../utils/itemSystem'
 import { addItemToInventory } from '../utils/activitySystem'
 import { canUnequipBackpack } from '../utils/weightSystem'
 import { syncPlayerIndex } from '../utils/playerIndexService'
 import { getCatalogItem } from '../utils/itemCatalogService'
+import { getCampActiveModifiers } from '../utils/campSystem'
+import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
+import { calculateEffectiveThermalCondition } from '../utils/thermalSystem'
+import {
+  processDiseasesTick,
+  evaluateInfectionRisk,
+  createDiseaseInstance,
+  applyMedicineTreatment,
+} from '../utils/diseaseSystem'
+import { DEFAULT_MEDICINE_TREATMENTS } from '../utils/diseaseDefaults'
 
 const AuthContext = createContext(null)
 
@@ -30,6 +41,25 @@ export function AuthProvider({ children }) {
   const [character, setCharacter] = useState(null)
   const [role, setRole] = useState('player')
   const [loading, setLoading] = useState(true)
+
+  // Modificadores de Estrutura do Acampamento de Sosnovka
+  const [campModifiers, setCampModifiers] = useState(() => getCampActiveModifiers([]))
+  const campModifiersRef = useRef(campModifiers)
+
+  useEffect(() => {
+    campModifiersRef.current = campModifiers
+  }, [campModifiers])
+
+  useEffect(() => {
+    if (!user) return
+    const unsub = onSnapshot(collection(db, 'camp_structures'), (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      const mods = getCampActiveModifiers(list)
+      setCampModifiers(mods)
+      campModifiersRef.current = mods
+    }, (err) => console.warn('Aviso no listener de camp_structures:', err))
+    return unsub
+  }, [user?.uid])
 
   // Observa mudanças de autenticação e escuta o documento do usuário em tempo real
   useEffect(() => {
@@ -127,25 +157,65 @@ export function AuthProvider({ children }) {
   // OTIMIZAÇÃO: A UI atualiza a cada 20s, mas a persistência no Firestore ocorre
   // a cada 3 minutos (ou imediatamente se a vida cair), economizando 90% de writes.
   // --------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // SISTEMA DE DEGRADAÇÃO AUTOMÁTICA DE VITAIS E PROGRESSÃO DE DOENÇAS ONLINE
+  // - Sede: -0.2% por minuto
+  // - Fome: -0.1% por minuto
+  // - Inanição/Desidratação: -0.5% de vida por minuto
+  // - Condição térmica e progressão de incubação/sintomas a cada ciclo ativo
+  // OTIMIZAÇÃO: Loop em memória a cada 20s. Persistência em lote no Firestore
+  // a cada 3 minutos (ou em eventos críticos: queda de HP, infecção, cura, unload).
+  // --------------------------------------------------------------------------
   const pendingVitalsRef = useRef(null)
+  const pendingDiseaseUpdatesRef = useRef(null)
   const lastPersistTimeRef = useRef(Date.now())
+
+  // Referência compartilhada para game_config/global
+  const gameConfigRef = useRef(null)
+  useEffect(() => {
+    if (!user) return
+    const unsub = onSnapshot(doc(db, 'game_config', 'global'), (snap) => {
+      if (snap.exists()) {
+        gameConfigRef.current = snap.data()
+      }
+    })
+    return unsub
+  }, [user?.uid])
+
+  // Referência do contexto de locação atual (isIndoor, slug)
+  const locationContextRef = useRef({ isIndoor: false, slug: '' })
+  function setLocationContext(ctx) {
+    locationContextRef.current = {
+      isIndoor: !!ctx?.isIndoor,
+      slug: ctx?.slug || ''
+    }
+  }
 
   useEffect(() => {
     if (!user) return
 
     let lastTick = Date.now()
 
-    const persistVitalsNow = async (vitalsToSave) => {
-      if (!vitalsToSave || !user) return
+    const persistCharacterStateNow = async (vitalsToSave, diseaseUpdatesToSave) => {
+      if (!user) return
+      const updates = {}
+      if (vitalsToSave) updates['character.vitals'] = vitalsToSave
+      if (diseaseUpdatesToSave) {
+        if (diseaseUpdatesToSave.diseases !== undefined) updates['character.diseases'] = diseaseUpdatesToSave.diseases
+        if (diseaseUpdatesToSave.thermalExposure !== undefined) updates['character.thermalExposure'] = diseaseUpdatesToSave.thermalExposure
+        if (diseaseUpdatesToSave.diseaseHistory !== undefined) updates['character.diseaseHistory'] = diseaseUpdatesToSave.diseaseHistory
+      }
+
+      if (Object.keys(updates).length === 0) return
+
       try {
         const userRef = doc(db, 'users', user.uid)
-        await updateDoc(userRef, {
-          'character.vitals': vitalsToSave
-        })
+        await updateDoc(userRef, updates)
         lastPersistTimeRef.current = Date.now()
         pendingVitalsRef.current = null
+        pendingDiseaseUpdatesRef.current = null
       } catch (err) {
-        console.error('Erro ao persistir vitais:', err)
+        console.error('Erro ao persistir vitais e doenças:', err)
       }
     }
 
@@ -183,6 +253,11 @@ export function AuthProvider({ children }) {
       if (perks.includes('pele_fragil')) bloodMultiplier *= 1.5
       if (perks.includes('pele_grossa')) bloodMultiplier *= 0.5
 
+      // Bônus de Estrutura do Acampamento (Chalés dos Sobreviventes)
+      const campNeedMultiplier = campModifiersRef.current?.need_consumption_multiplier || 1.0
+      thirstMultiplier *= campNeedMultiplier
+      hungerMultiplier *= campNeedMultiplier
+
       // Sede: 0.2% por min | Fome: 0.1% por min
       const thirstLoss = minutesPassed * 0.2 * thirstMultiplier
       const hungerLoss = minutesPassed * 0.1 * hungerMultiplier
@@ -196,33 +271,81 @@ export function AuthProvider({ children }) {
         newBlood = Math.max(0, parseFloat((curB - bloodLoss).toFixed(2)))
       }
 
+      let vitalsChanged = false
+      let nextVitals = currentVitals
       if (newThirst !== curT || newHunger !== curH || newBlood !== curB) {
-        const nextVitals = {
+        nextVitals = {
           hunger: newHunger,
           thirst: newThirst,
           blood: newBlood,
         }
-
-        // 1. Atualização imediata e fluida na UI local
-        setCharacter(prev => prev ? ({ ...prev, vitals: nextVitals }) : prev)
+        vitalsChanged = true
         pendingVitalsRef.current = nextVitals
+      }
 
-        // 2. Gravação no Firestore apenas se:
-        // - Passaram 3 minutos (180s) desde a última gravação OU
-        // - A vida caiu (inanição crítica que precisa ser persistida)
-        const timeSinceLastPersist = now - lastPersistTimeRef.current
-        const bloodDropped = newBlood < curB
+      // 2. Condição térmica e progressão de doenças
+      const config = gameConfigRef.current
+      const gameTime = calculateGameTime(config)
+      const weather = getDynamicWeather(config, gameTime)
+      const equipmentStats = calculateCharacterEquipmentStats(currentChar.inventory || [])
+      
+      const locCtx = locationContextRef.current
+      const isIndoor = locCtx.isIndoor || !window.location.pathname.startsWith('/location/')
 
-        if (timeSinceLastPersist >= 180000 || bloodDropped) {
-          await persistVitalsNow(nextVitals)
+      const thermalCondition = calculateEffectiveThermalCondition({
+        weatherTemp: weather.temperature,
+        weatherCondition: weather.condition,
+        isIndoor,
+        totalInsulation: equipmentStats.totalInsulation,
+      })
+
+      const diseaseResult = processDiseasesTick(
+        currentChar,
+        minutesPassed,
+        thermalCondition,
+        config?.diseaseConfig
+      )
+
+      let diseaseChanged = false
+      if (diseaseResult.hasChanges) {
+        diseaseChanged = true
+        pendingDiseaseUpdatesRef.current = {
+          diseases: diseaseResult.character.diseases,
+          thermalExposure: diseaseResult.character.thermalExposure,
+          diseaseHistory: diseaseResult.character.diseaseHistory,
         }
+      }
+
+      // Atualização imediata no estado local do personagem
+      if (vitalsChanged || diseaseChanged) {
+        setCharacter(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            ...(vitalsChanged ? { vitals: nextVitals } : {}),
+            ...(diseaseChanged ? {
+              diseases: diseaseResult.character.diseases,
+              thermalExposure: diseaseResult.character.thermalExposure,
+              diseaseHistory: diseaseResult.character.diseaseHistory,
+            } : {})
+          }
+        })
+      }
+
+      // Gravação em lote no Firestore a cada 3 minutos (ou imediatamente em eventos críticos)
+      const timeSinceLastPersist = now - lastPersistTimeRef.current
+      const bloodDropped = newBlood < curB
+      const hadCriticalDiseaseEvent = diseaseChanged && diseaseResult.character.diseases?.some(d => d.stageIndex === 1 && d.stageElapsedMinutes <= minutesPassed)
+
+      if (timeSinceLastPersist >= 180000 || bloodDropped || hadCriticalDiseaseEvent) {
+        await persistCharacterStateNow(pendingVitalsRef.current, pendingDiseaseUpdatesRef.current)
       }
     }, 20000) // Cálculo local suave a cada 20 segundos
 
     // Salva qualquer alteração pendente caso o usuário feche a aba
     const handleBeforeUnload = () => {
-      if (pendingVitalsRef.current && user) {
-        persistVitalsNow(pendingVitalsRef.current)
+      if (user && (pendingVitalsRef.current || pendingDiseaseUpdatesRef.current)) {
+        persistCharacterStateNow(pendingVitalsRef.current, pendingDiseaseUpdatesRef.current)
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
@@ -230,8 +353,8 @@ export function AuthProvider({ children }) {
     return () => {
       clearInterval(interval)
       window.removeEventListener('beforeunload', handleBeforeUnload)
-      if (pendingVitalsRef.current && user) {
-        persistVitalsNow(pendingVitalsRef.current)
+      if (user && (pendingVitalsRef.current || pendingDiseaseUpdatesRef.current)) {
+        persistCharacterStateNow(pendingVitalsRef.current, pendingDiseaseUpdatesRef.current)
       }
     }
   }, [user?.uid])
@@ -324,16 +447,24 @@ export function AuthProvider({ children }) {
     return sendPasswordResetEmail(auth, email)
   }
 
-  // Atualiza personagem
+  // Atualiza personagem com sanitização de segurança (apenas campos permitidos do dono)
   async function updateCharacter(updates) {
-    if (!user) return
+    if (!user || !user.uid) throw new Error('Operação negada: usuário não autenticado.')
+    
+    // Defesa em profundidade: remove tentativas de alterar campos restritos
+    const safeUpdates = { ...updates }
+    delete safeUpdates.role
+    delete safeUpdates.email
+    delete safeUpdates.rublos
+    delete safeUpdates.baseAttributes
+
     const docRef = doc(db, 'users', user.uid)
     const updateData = {}
-    Object.keys(updates).forEach((key) => {
-      updateData[`character.${key}`] = updates[key]
+    Object.keys(safeUpdates).forEach((key) => {
+      updateData[`character.${key}`] = safeUpdates[key]
     })
     await updateDoc(docRef, updateData)
-    setCharacter((prev) => ({ ...prev, ...updates }))
+    setCharacter((prev) => ({ ...prev, ...safeUpdates }))
   }
 
   // Recarrega dados do personagem
@@ -456,10 +587,53 @@ export function AuthProvider({ children }) {
         }
       }
 
-      transaction.update(userRef, {
+      // Aplica efeitos de Doenças (Água Impura ou Tratamento Medicamentoso)
+      let updatedDiseases = charData.diseases ? [...charData.diseases] : []
+      let updatedDiseaseHistory = charData.diseaseHistory ? [...charData.diseaseHistory] : []
+      let diseaseDataChanged = false
+
+      // 1. Consumo de Água Impura -> Exposição Gastrointestinal com Risco
+      const isImpureWater = item.itemId === 'garrafa_agua_impura' || item.name?.toLowerCase().includes('impura')
+      if (isImpureWater) {
+        const risk = evaluateInfectionRisk(charData, 'water_impure', 100, gameConfigRef.current?.diseaseConfig)
+        if (risk.infected && risk.diseaseId) {
+          const newInst = createDiseaseInstance(risk.diseaseId, 'water_impure', gameConfigRef.current?.diseaseConfig)
+          if (newInst) {
+            updatedDiseases.push(newInst)
+            updatedDiseaseHistory.unshift({
+              timestamp: Date.now(),
+              diseaseId: risk.diseaseId,
+              diseaseName: newInst.name,
+              event: 'Infecção Gastrointestinal',
+              description: risk.reason
+            })
+            diseaseDataChanged = true
+          }
+        }
+      }
+
+      // 2. Consumo de Remédio -> Aplicação de Tratamento / Cura
+      const treatmentRes = applyMedicineTreatment(
+        { ...charData, diseases: updatedDiseases, diseaseHistory: updatedDiseaseHistory },
+        item,
+        gameConfigRef.current?.diseaseConfig
+      )
+      if (treatmentRes.treated) {
+        updatedDiseases = treatmentRes.updatedDiseases
+        updatedDiseaseHistory = treatmentRes.updatedHistory
+        diseaseDataChanged = true
+      }
+
+      const updatePayload = {
         'character.inventory': inventory,
         'character.vitals': updatedVitals,
-      })
+      }
+      if (diseaseDataChanged) {
+        updatePayload['character.diseases'] = updatedDiseases
+        updatePayload['character.diseaseHistory'] = updatedDiseaseHistory.slice(0, 50)
+      }
+
+      transaction.update(userRef, updatePayload)
     })
   }
 
@@ -565,6 +739,23 @@ export function AuthProvider({ children }) {
       if (effect?.thirst) effectDesc.push(`+${effect.thirst} Sede`)
       const effectText = effectDesc.length > 0 ? ` (${effectDesc.join(', ')})` : ''
 
+      // Tratamento de doenças do paciente
+      let targetDiseases = targetChar.diseases ? [...targetChar.diseases] : []
+      let targetDiseaseHistory = targetChar.diseaseHistory ? [...targetChar.diseaseHistory] : []
+      const medRes = applyMedicineTreatment(
+        { ...targetChar, diseases: targetDiseases, diseaseHistory: targetDiseaseHistory },
+        item,
+        gameConfigRef.current?.diseaseConfig
+      )
+      let targetDiseaseChanged = false
+      if (medRes.treated) {
+        targetDiseases = medRes.updatedDiseases
+        targetDiseaseHistory = medRes.updatedHistory
+        targetDiseaseChanged = true
+      }
+
+      const cureNote = medRes.curedCount > 0 ? `\n💊 O tratamento curou sua enfermidade!` : ''
+
       const notification = {
         id: 'notif_med_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
         type: 'medical_treatment',
@@ -577,7 +768,7 @@ export function AuthProvider({ children }) {
           icon: item.icon || '🩺',
           rarity: item.rarity || 'common'
         },
-        message: `${senderChar.name || 'Um sobrevivente'} prestou socorro e aplicou ${item.name || 'um item médico'} em você!${effectText}`,
+        message: `${senderChar.name || 'Um sobrevivente'} prestou socorro e aplicou ${item.name || 'um item médico'} em você!${effectText}${cureNote}`,
         read: false,
         createdAt: new Date().toISOString()
       }
@@ -591,10 +782,16 @@ export function AuthProvider({ children }) {
         'character.inventory': senderInventory
       })
 
-      transaction.update(targetRef, {
+      const targetUpdates = {
         'character.vitals': updatedVitals,
         'character.notifications': recipientNotifications
-      })
+      }
+      if (targetDiseaseChanged) {
+        targetUpdates['character.diseases'] = targetDiseases
+        targetUpdates['character.diseaseHistory'] = targetDiseaseHistory.slice(0, 50)
+      }
+
+      transaction.update(targetRef, targetUpdates)
 
       resultSummary = {
         itemName: item.name || 'Item Médico',
@@ -1051,6 +1248,99 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Aplica exposição manual ou doença forçada em um sobrevivente (para Administração/Mestres)
+  async function applyManualExposure({ targetUid, exposureType = 'wound', severity = 40, diseaseId = null }) {
+    const uid = targetUid || user?.uid
+    if (!uid) return
+    const userRef = doc(db, 'users', uid)
+    const snap = await getDoc(userRef)
+    if (!snap.exists()) return
+
+    const charData = snap.data().character || {}
+    const config = gameConfigRef.current?.diseaseConfig
+    const diseases = [...(charData.diseases || [])]
+    const history = [...(charData.diseaseHistory || [])]
+
+    if (diseaseId) {
+      const newInst = createDiseaseInstance(diseaseId, exposureType, config)
+      if (newInst) {
+        diseases.push(newInst)
+        history.unshift({
+          timestamp: Date.now(),
+          diseaseId,
+          diseaseName: newInst.name,
+          event: 'Infecção Aplicada Manualmente',
+          description: `Infecção forçada por administrador. Origem: ${exposureType}.`
+        })
+      }
+    } else {
+      const risk = evaluateInfectionRisk(charData, exposureType, severity, config)
+      if (risk.infected && risk.diseaseId) {
+        const newInst = createDiseaseInstance(risk.diseaseId, exposureType, config)
+        if (newInst) {
+          diseases.push(newInst)
+          history.unshift({
+            timestamp: Date.now(),
+            diseaseId: risk.diseaseId,
+            diseaseName: newInst.name,
+            event: 'Exposição Narrativa',
+            description: risk.reason
+          })
+        }
+      }
+    }
+
+    await updateDoc(userRef, {
+      'character.diseases': diseases,
+      'character.diseaseHistory': history.slice(0, 50),
+    })
+
+    if (uid === user?.uid) {
+      setCharacter(prev => ({
+        ...prev,
+        diseases,
+        diseaseHistory: history.slice(0, 50)
+      }))
+    }
+  }
+
+  // Cura doenças de um sobrevivente (Administração/Mestres)
+  async function cureCharacterDiseases({ targetUid, diseaseId = null }) {
+    const uid = targetUid || user?.uid
+    if (!uid) return
+    const userRef = doc(db, 'users', uid)
+    const snap = await getDoc(userRef)
+    if (!snap.exists()) return
+
+    const charData = snap.data().character || {}
+    const diseases = (charData.diseases || []).map(d => {
+      if (!diseaseId || d.diseaseId === diseaseId) {
+        return { ...d, cured: true, curedAt: Date.now(), activeSymptoms: [] }
+      }
+      return d
+    })
+
+    const history = [...(charData.diseaseHistory || [])]
+    history.unshift({
+      timestamp: Date.now(),
+      event: 'Cura Administrativa',
+      description: diseaseId ? `Cura da doença ${diseaseId} realizada por administrador.` : 'Todas as doenças foram curadas pelo administrador.'
+    })
+
+    await updateDoc(userRef, {
+      'character.diseases': diseases,
+      'character.diseaseHistory': history.slice(0, 50),
+    })
+
+    if (uid === user?.uid) {
+      setCharacter(prev => ({
+        ...prev,
+        diseases,
+        diseaseHistory: history.slice(0, 50)
+      }))
+    }
+  }
+
   const value = {
     user,
     character,
@@ -1072,6 +1362,10 @@ export function AuthProvider({ children }) {
     recordUniqueSearch,
     markNotificationsRead,
     clearNotifications,
+    campModifiers,
+    setLocationContext,
+    applyManualExposure,
+    cureCharacterDiseases,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

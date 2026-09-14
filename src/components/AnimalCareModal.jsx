@@ -18,7 +18,7 @@ import {
 } from '../utils/activitySystem'
 
 export default function AnimalCareModal({ activity, character, locationSlug, onClose }) {
-  const { user, refreshCharacter } = useAuth()
+  const { user, refreshCharacter, campModifiers } = useAuth()
   const [coopState, setCoopState] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
@@ -31,8 +31,9 @@ export default function AnimalCareModal({ activity, character, locationSlug, onC
   // Escuta o estado compartilhado do galinheiro neste local
   useEffect(() => {
     const docRef = doc(db, 'activity_states', stateDocId)
-    // totalAnimals definido na atividade (ou 10 como fallback)
-    const configuredTotal = Number(activity?.totalAnimals) || 10
+    // totalAnimals definido na atividade + bônus de capacidade da evolução do Galinheiro
+    const chickenBonus = campModifiers?.chicken_capacity_bonus || 0
+    const configuredTotal = (Number(activity?.totalAnimals) || 10) + chickenBonus
 
     const unsubscribe = onSnapshot(
       docRef,

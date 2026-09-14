@@ -24,7 +24,7 @@ const FISH_META = {
 }
 
 export default function FishingModal({ activity, character, locationSlug, onClose }) {
-  const { user, refreshCharacter } = useAuth()
+  const { user, refreshCharacter, campModifiers } = useAuth()
 
   const [phase, setPhase] = useState('idle') // idle | fishing | result | error
   const [errors, setErrors] = useState([])
@@ -136,7 +136,9 @@ export default function FishingModal({ activity, character, locationSlug, onClos
     setErrors([])
     setErrorMsg('')
 
-    const durationMs = Number(activity.durationMs) || 10 * 60 * 1000 // 10 min padrão
+    const rawDurationMs = Number(activity.durationMs) || 10 * 60 * 1000 // 10 min padrão
+    const fishingMultiplier = campModifiers?.fishing_time_multiplier || 1.0
+    const durationMs = Math.round(rawDurationMs * fishingMultiplier)
     const startedAt = new Date().toISOString()
     const fishingInfo = {
       activityId: activity.id,

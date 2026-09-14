@@ -5,6 +5,8 @@ import { getVitalsDebuffs, getMaxHp } from '../utils/itemSystem'
 import { calculateCharacterCarryStats } from '../utils/weightSystem'
 import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
 import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
+import { useGameConfig } from '../contexts/GameConfigContext.jsx'
+import { getActiveDiseasePenalties } from '../utils/diseaseSystem'
 
 function xpForNextLevel(level) {
   return (level || 1) * 100
@@ -13,6 +15,7 @@ function xpForNextLevel(level) {
 export default function CharacterPopup({ onClose }) {
   const { character, role } = useAuth()
   const { map: catalogMap } = useItemCatalog()
+  const gameConfig = useGameConfig()
 
   // Inicia posicionado no canto superior direito abaixo da HUD (ao lado de onde o dados abre ou centralizado à direita)
   const [pos, setPos] = useState({ x: Math.max(20, window.innerWidth - 380), y: 80 })
@@ -61,14 +64,20 @@ export default function CharacterPopup({ onClose }) {
   const xpCurrent = character.xp || 0
   const xpProgress = Math.min((xpCurrent / xpMax) * 100, 100)
   const debuffInfo = getVitalsDebuffs(character.vitals || {})
+  const diseasePenalties = getActiveDiseasePenalties(character.diseases || [], gameConfig?.diseaseConfig)
 
-  // Combina penalidades de vitais com penalidades de sobrecarga
+  // Combina penalidades de vitais com penalidades de sobrecarga e sintomas
   const combinedPenalties = { ...debuffInfo.penalties }
   if (carryStats.isOverweight) {
     if (carryStats.penalties.destreza) combinedPenalties.destreza = (combinedPenalties.destreza || 0) + carryStats.penalties.destreza
     if (carryStats.penalties.agilidade) combinedPenalties.agilidade = (combinedPenalties.agilidade || 0) + carryStats.penalties.agilidade
   }
-  const hasCombinedDebuff = debuffInfo.hasDebuff || carryStats.isOverweight
+  Object.entries(diseasePenalties.penalties || {}).forEach(([attrKey, val]) => {
+    if (val !== 0) {
+      combinedPenalties[attrKey] = (combinedPenalties[attrKey] || 0) + val
+    }
+  })
+  const hasCombinedDebuff = debuffInfo.hasDebuff || carryStats.isOverweight || diseasePenalties.reasons.length > 0
 
   const handleOpenFullInventory = () => {
     onClose?.()

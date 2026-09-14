@@ -85,18 +85,24 @@ export async function sendFormToDiscord({ webhookUrl, formConfig, fieldValues, u
     embeds: [embed]
   }
 
-  const response = await fetch(webhookUrl, {
+  // O navegador despacha para o backend interno (/api/discord-webhook), nunca diretamente ao Discord
+  const response = await fetch('/api/discord-webhook', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      webhookUrl,
+      formConfig,
+      fieldValues,
+      userData
+    })
   })
 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => '')
-    console.error('Erro no Webhook Discord:', response.status, errorText)
-    throw new Error(`Erro ao enviar para o Discord (${response.status}): ${errorText || 'Verifique o link do Webhook'}`)
+    const errorData = await response.json().catch(() => ({}))
+    console.error('Erro no despacho do formulário:', response.status, errorData)
+    throw new Error(errorData.error || `Erro ao enviar para o Discord (${response.status})`)
   }
 
   return true
