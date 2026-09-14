@@ -1,0 +1,21 @@
+# Dependências
+node_modules/
+
+# Build de produção
+dist/
+
+# Variáveis de ambiente e segredos (NUNCA SUBIR)
+.env
+.env.local
+.env.*.local
+
+# Vercel e logs
+.vercel
+*.log
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Tarefas internas
+task.md
