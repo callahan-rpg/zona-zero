@@ -1,25 +1,28 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from './firebase/config'
 import { useAuth } from './contexts/AuthContext.jsx'
 import { useGameConfig } from './contexts/GameConfigContext.jsx'
-import Login from './pages/Login.jsx'
-import Register from './pages/Register.jsx'
-import Home from './pages/Home.jsx'
-import Location from './pages/Location.jsx'
-import Character from './pages/Character.jsx'
-import Characters from './pages/Characters.jsx'
-import Admin from './pages/Admin.jsx'
-import Map from './pages/Map.jsx'
-import PublicCharacter from './pages/PublicCharacter.jsx'
-import Combat from './pages/Combat.jsx'
-import Rules from './pages/Rules.jsx'
-import Forum from './pages/Forum.jsx'
 import AmbientSoundPlayer from './components/AmbientSoundPlayer.jsx'
 import { calculateGameTime, getDynamicWeather } from './utils/timeSystem'
 import { DEFAULT_WEATHER_SOUNDS } from './utils/audioSystem'
 import { checkAndTriggerAutoBroadcasts } from './utils/radioSystem'
+
+// Carregamento sob demanda (Lazy Loading): o navegador baixa o código de cada tela
+// apenas quando o jogador navega até ela, diminuindo o tempo de carregamento inicial.
+const Home = lazy(() => import('./pages/Home.jsx'))
+const Login = lazy(() => import('./pages/Login.jsx'))
+const Register = lazy(() => import('./pages/Register.jsx'))
+const Rules = lazy(() => import('./pages/Rules.jsx'))
+const Location = lazy(() => import('./pages/Location.jsx'))
+const Character = lazy(() => import('./pages/Character.jsx'))
+const Characters = lazy(() => import('./pages/Characters.jsx'))
+const PublicCharacter = lazy(() => import('./pages/PublicCharacter.jsx'))
+const Combat = lazy(() => import('./pages/Combat.jsx'))
+const Admin = lazy(() => import('./pages/Admin.jsx'))
+const Map = lazy(() => import('./pages/Map.jsx'))
+const Forum = lazy(() => import('./pages/Forum.jsx'))
 
 /**
  * ProtectedLayout: Proteção padrão do roteador.
@@ -139,31 +142,33 @@ export default function App() {
       <GlobalRadioScheduler />
       <GlobalAmbientSound />
 
-      <Routes>
-        {/* ROTAS PÚBLICAS (Declaradas explicitamente) */}
-        <Route path="/" element={<Home />} />
-        <Route path="/rules" element={<Rules />} />
-        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+      <Suspense fallback={<div className="loading-screen"><span className="loading-dot" /></div>}>
+        <Routes>
+          {/* ROTAS PÚBLICAS (Declaradas explicitamente) */}
+          <Route path="/" element={<Home />} />
+          <Route path="/rules" element={<Rules />} />
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-        {/* PROTEÇÃO PADRÃO: Qualquer rota interna exige login obrigatório por padrão */}
-        <Route element={<ProtectedLayout />}>
-          <Route path="/location/:slug" element={<Location />} />
-          <Route path="/character" element={<Character />} />
-          <Route path="/characters" element={<Characters />} />
-          <Route path="/characters/:uid" element={<PublicCharacter />} />
-          <Route path="/combat" element={<Combat />} />
-          <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
-          <Route path="/map" element={<Map />} />
-          <Route path="/map/:region" element={<Map />} />
-          <Route path="/map/:region/:city" element={<Map />} />
-          <Route path="/forum" element={<Forum />} />
-          <Route path="/forum/:topicId" element={<Forum />} />
-        </Route>
+          {/* PROTEÇÃO PADRÃO: Qualquer rota interna exige login obrigatório por padrão */}
+          <Route element={<ProtectedLayout />}>
+            <Route path="/location/:slug" element={<Location />} />
+            <Route path="/character" element={<Character />} />
+            <Route path="/characters" element={<Characters />} />
+            <Route path="/characters/:uid" element={<PublicCharacter />} />
+            <Route path="/combat" element={<Combat />} />
+            <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+            <Route path="/map" element={<Map />} />
+            <Route path="/map/:region" element={<Map />} />
+            <Route path="/map/:region/:city" element={<Map />} />
+            <Route path="/forum" element={<Forum />} />
+            <Route path="/forum/:topicId" element={<Forum />} />
+          </Route>
 
-        {/* Redirecionamento de rotas desconhecidas */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* Redirecionamento de rotas desconhecidas */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }
