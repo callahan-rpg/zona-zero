@@ -4,6 +4,8 @@
  * Nenhuma chave, credencial ou preset do Cloudinary fica exposto no bundle do cliente.
  */
 
+import { auth } from '../firebase/config'
+
 /**
  * Converte um File ou Blob para Base64 Data URL.
  */
@@ -91,13 +93,17 @@ export async function uploadImageFree(fileOrBase64, maxRetries = 3) {
   const payloadFile = await compressImageClientSide(fileOrBase64)
   const dataUrl = await fileToDataUrl(payloadFile)
 
+  // Obtém o token do usuário autenticado para proteção de cota contra abuso
+  const idToken = auth.currentUser ? await auth.currentUser.getIdToken().catch(() => '') : ''
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
+      const headers = { 'Content-Type': 'application/json' }
+      if (idToken) headers['Authorization'] = `Bearer ${idToken}`
+
       const response = await fetch('/api/upload', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ file: dataUrl }),
       })
 

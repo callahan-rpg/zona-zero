@@ -1,3 +1,5 @@
+import { auth } from '../firebase/config'
+
 /**
  * Utilitário para envio de formulários customizados para o Discord via Webhook.
  */
@@ -85,12 +87,15 @@ export async function sendFormToDiscord({ webhookUrl, formConfig, fieldValues, u
     embeds: [embed]
   }
 
+  // Obtém o token do usuário autenticado para validação de segurança no servidor
+  const idToken = auth.currentUser ? await auth.currentUser.getIdToken().catch(() => '') : ''
+  const headers = { 'Content-Type': 'application/json' }
+  if (idToken) headers['Authorization'] = `Bearer ${idToken}`
+
   // O navegador despacha para o backend interno (/api/discord-webhook), nunca diretamente ao Discord
   const response = await fetch('/api/discord-webhook', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers,
     body: JSON.stringify({
       webhookUrl,
       formConfig,
