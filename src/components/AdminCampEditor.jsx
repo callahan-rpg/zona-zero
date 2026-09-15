@@ -21,6 +21,7 @@ import {
   reviewCampMission,
 } from '../utils/campSystem'
 import { useGameConfig } from '../contexts/GameConfigContext'
+import { uploadImageFree } from '../utils/imageUpload'
 
 export default function AdminCampEditor() {
   const gameConfig = useGameConfig()
@@ -37,6 +38,7 @@ export default function AdminCampEditor() {
   const [reviewLoading, setReviewLoading] = useState(null) // missionId being reviewed
   const [rejectModal, setRejectModal] = useState(null) // { missionId, missionName }
   const [rejectReason, setRejectReason] = useState('')
+  const [uploadingBoardImg, setUploadingBoardImg] = useState(false)
 
   // Modal / Edição de Estrutura
   const [editingStructure, setEditingStructure] = useState(null)
@@ -746,7 +748,7 @@ export default function AdminCampEditor() {
                   onChange={e => setCampConfig(prev => ({ ...prev, hubLocationSlug: e.target.value }))}
                   placeholder="ex: casa-grande"
                 />
-                <small style={{ color: 'var(--text-muted)', fontSize: 10 }}>Local onde o botão do Acampamento aparece.</small>
+                <small style={{ color: 'var(--text-muted)', fontSize: 10 }}>Local onde o quadro de missões aparece.</small>
               </div>
 
               <div>
@@ -774,6 +776,89 @@ export default function AdminCampEditor() {
                 />
                 <small style={{ color: 'var(--text-muted)', fontSize: 10 }}>Tempo limite de entrega.</small>
               </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600, color: '#facc15' }}>
+                🖼️ Imagem do Quadro de Missões (Banner Clicável na Sede)
+              </label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  style={{ flex: 1, minWidth: 240 }}
+                  value={campConfig.boardImageUrl || ''}
+                  placeholder="/assets/camp_quest_board.jpg ou link externo..."
+                  onChange={e => setCampConfig(prev => ({ ...prev, boardImageUrl: e.target.value }))}
+                />
+
+                <label
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.25) 0%, rgba(14, 165, 233, 0.35) 100%)',
+                    border: '1px solid #38bdf8',
+                    color: '#7dd3fc',
+                    padding: '8px 14px',
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: uploadingBoardImg ? 'not-allowed' : 'pointer',
+                    whiteSpace: 'nowrap',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  {uploadingBoardImg ? '⏳ Enviando...' : '📤 Upload do Computador'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={uploadingBoardImg}
+                    style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      try {
+                        setUploadingBoardImg(true)
+                        showMsg('info', 'Fazendo upload da imagem do quadro...')
+                        const url = await uploadImageFree(file)
+                        if (url) {
+                          setCampConfig(prev => ({ ...prev, boardImageUrl: url }))
+                          showMsg('success', 'Imagem do quadro enviada e aplicada com sucesso!')
+                        }
+                      } catch (err) {
+                        showMsg('error', 'Falha no upload: ' + err.message)
+                      } finally {
+                        setUploadingBoardImg(false)
+                      }
+                    }}
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => {
+                    setCampConfig(prev => ({ ...prev, boardImageUrl: '/assets/camp_quest_board.jpg' }))
+                    showMsg('info', 'Restaurada imagem padrão do quadro.')
+                  }}
+                  title="Usar imagem padrão do quadro"
+                >
+                  Restaurar Padrão
+                </button>
+              </div>
+              <small style={{ color: 'var(--text-muted)', fontSize: 10, display: 'block', marginTop: 4 }}>
+                Essa imagem é exibida diretamente abaixo do chat da Sede do Acampamento (no mínimo 600px). Ao clicar nela, os sobreviventes acessam o painel de missões e evolução.
+              </small>
+
+              {campConfig.boardImageUrl && (
+                <div style={{ marginTop: 10, maxWidth: 360, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.5)', padding: 4 }}>
+                  <img
+                    src={campConfig.boardImageUrl}
+                    alt="Preview do Quadro"
+                    style={{ width: '100%', maxHeight: 200, objectFit: 'cover', display: 'block', borderRadius: 6 }}
+                  />
+                </div>
+              )}
             </div>
 
             <div>

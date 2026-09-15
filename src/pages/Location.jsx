@@ -144,6 +144,7 @@ export default function Location() {
 
   // Estados de Melhorias do Acampamento de Sosnovka
   const [showCampModal, setShowCampModal] = useState(false)
+  const [campConfig, setCampConfig] = useState(null)
   const [campHubSlug, setCampHubSlug] = useState('casa-grande')
 
   const showToast = (msg) => {
@@ -151,11 +152,13 @@ export default function Location() {
     setTimeout(() => setToastMessage(null), 3500)
   }
 
-  // Carrega o slug do hub do acampamento (configurável pelo Admin)
+  // Carrega a configuração do acampamento (configurável pelo Admin)
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'camp_config', 'global'), (snap) => {
       if (snap.exists()) {
-        setCampHubSlug(snap.data().hubLocationSlug || 'casa-grande')
+        const data = snap.data()
+        setCampConfig(data)
+        setCampHubSlug(data.hubLocationSlug || 'casa-grande')
       }
     })
     return unsub
@@ -621,26 +624,115 @@ export default function Location() {
               />
             </div>
 
+            {/* Quadro de Missões & Melhorias do Acampamento (Exibido abaixo do chat na Sede) */}
+            {slug === campHubSlug && (
+              <div
+                className="camp-quest-board-container"
+                style={{
+                  margin: '18px auto 14px auto',
+                  width: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setShowCampModal(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setShowCampModal(true)
+                    }
+                  }}
+                  title="Quadro de Missões & Melhorias do Acampamento — Clique para abrir o menu de missões e evolução"
+                  className="camp-quest-board-card"
+                  style={{
+                    cursor: 'pointer',
+                    width: '100%',
+                    maxWidth: '850px',
+                    minWidth: 'min(600px, 100%)',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    boxShadow: 'none',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}
+                >
+                  <img
+                    src={campConfig?.boardImageUrl || location?.campBoardImage || '/assets/camp_quest_board.jpg'}
+                    alt="Quadro de Missões e Melhorias do Acampamento"
+                    className="camp-quest-board-img"
+                    style={{
+                      width: '100%',
+                      minWidth: 'min(600px, 100%)',
+                      height: 'auto',
+                      maxHeight: '380px',
+                      objectFit: 'cover',
+                      display: 'block',
+                      borderRadius: '8px',
+                      border: 'none',
+                      outline: 'none',
+                      transition: 'transform 0.3s ease, filter 0.3s ease',
+                    }}
+                  />
+                  {/* Overlay interativo com badge no rodapé do quadro */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 55%, transparent 100%)',
+                      padding: '18px 22px 12px 22px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: '1.6rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))' }}>🏕️</span>
+                      <div>
+                        <div style={{ color: '#facc15', fontWeight: 800, fontSize: 16, textShadow: '0 2px 4px rgba(0,0,0,0.95)', letterSpacing: '0.5px' }}>
+                          QUADRO DE MISSÕES & MELHORIAS
+                        </div>
+                        <div style={{ color: '#cbd5e1', fontSize: 12, textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
+                          {campConfig?.campName || 'Acampamento de Sosnovka'} • Clique no quadro para interagir
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
+                        color: '#fff',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        padding: '6px 16px',
+                        borderRadius: 20,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        border: '1px solid rgba(254, 240, 138, 0.4)',
+                      }}
+                    >
+                      <span>📜</span> Acessar Missões
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Painel de Ações de Busca (Suprimentos + Busca Única + Loja / Comércio + Recipientes de Armazenamento + Ponto de Rádio) */}
             <div className="loot-search-actions-bar">
-              {/* Botão de Evolução e Missões do Acampamento de Sosnovka */}
-              {slug === campHubSlug && (
-                <button
-                  className="loot-btn"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.25) 0%, rgba(180, 83, 9, 0.35) 100%)',
-                    borderColor: '#f59e0b',
-                    color: '#fde047',
-                    fontWeight: 700,
-                    boxShadow: '0 0 14px rgba(234, 179, 8, 0.25)'
-                  }}
-                  onClick={() => setShowCampModal(true)}
-                  title="Consultar evolução das estruturas e missões de melhoria do Acampamento de Sosnovka"
-                >
-                  <span>🏕️</span>
-                  Melhorias do Acampamento
-                </button>
-              )}
 
               {/* Botão de Ponto de Rádio Local */}
               {activeRadioPoint && (

@@ -195,6 +195,7 @@ export const DEFAULT_CAMP_STRUCTURES = [
 export const DEFAULT_CAMP_CONFIG = {
   campName: 'Acampamento de Sosnovka',
   hubLocationSlug: 'casa-grande',      // Locação única onde o painel Hub fica visível
+  boardImageUrl: '/assets/camp_quest_board.jpg', // Imagem do quadro de missões
   missionLimitPerCycle: 2,
   defaultRewardPm: 5,
   defaultMissionSlots: 2,              // Vagas padrão por missão
