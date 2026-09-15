@@ -13,8 +13,26 @@ import {
 import { calculateTraitModifiers } from './traitsSystem'
 
 // =============================================================================
-// 1. CÁLCULO DE RESISTÊNCIA BIOLÓGICA DO PERSONAGEM
+// 1. CÁLCULO DE HIGIENE E RESISTÊNCIA BIOLÓGICA DO PERSONAGEM
 // =============================================================================
+
+/**
+ * Calcula o nível de higiene do personagem (0 a 100).
+ * Decai linearmente e atinge 0 após exatamente 2 dias (48 horas reais),
+ * funcionando tanto online quanto offline baseado no timestamp de lastBathTime.
+ *
+ * @param {Object} character
+ * @returns {number} 0 a 100
+ */
+export function calculateCharacterHygiene(character) {
+  if (!character) return 100
+  const rawLastBath = character.lastBathTime || character.createdAt || Date.now()
+  const lastBath = typeof rawLastBath === 'number' ? rawLastBath : new Date(rawLastBath).getTime()
+  const elapsedHours = Math.max(0, (Date.now() - (lastBath || Date.now())) / (1000 * 60 * 60))
+  // 48 horas reais = 2 dias -> decai 100% / 48h = ~2.083% por hora real
+  const currentHygiene = Math.max(0, Math.min(100, Math.round(100 - (elapsedHours / 48) * 100)))
+  return currentHygiene
+}
 
 /**
  * Calcula a resistência biológica do personagem contra doenças.
@@ -38,18 +56,15 @@ export function calculateCharacterResistance(character) {
   if (perks.includes('alta_imunidade')) perkBonus += 5
   if (perks.includes('baixa_imunidade')) perkBonus -= 5
 
-  // Bônus/Penalidade de Higiene
-  // 1 dia in-game = 12h reais (43.200.000 ms)
-  const hygiene = character?.hygiene || { level: 100, lastBathTime: Date.now() }
-  const msSinceLastBath = Date.now() - (hygiene.lastBathTime || Date.now())
-  const hoursSinceBath = msSinceLastBath / (1000 * 60 * 60)
+  // Bônus/Penalidade de Higiene (Barra de 0 a 100, decaindo até 0 em 2 dias)
+  const hygienePct = calculateCharacterHygiene(character)
   
   let hygieneBonus = 0
   let hygieneLabel = 'Higienizado'
-  if (hoursSinceBath > 24 || (hygiene.level !== undefined && hygiene.level < 25)) {
+  if (hygienePct <= 25) {
     hygieneBonus = -3
-    hygieneLabel = 'Higiene Ruim (Vulnerável)'
-  } else if (hoursSinceBath > 12 || (hygiene.level !== undefined && hygiene.level < 60)) {
+    hygieneLabel = 'Higiene Crítica / Sujo (Vulnerável)'
+  } else if (hygienePct <= 60) {
     hygieneBonus = -1
     hygieneLabel = 'Higiene Regular'
   } else {
@@ -223,9 +238,10 @@ export function processDiseasesTick(character, elapsedMinutes = 0.33, thermalCon
   let hasChanges = false
   const updatedDiseases = [...(character.diseases || [])]
   let currentExposure = Number(character.thermalExposure || 0)
+  let rainExposure = Number(character.rainExposureMinutes || 0)
   const historyLog = [...(character.diseaseHistory || [])]
 
-  // 1. PROGRESSÃO DA EXPOSIÇÃO TÉRMICA
+  // 1. PROGRESSÃO DA EXPOSIÇÃO TÉRMICA & CHUVA
   if (thermalCondition) {
     const delta = (thermalCondition.exposureDeltaPerMin || 0) * elapsedMinutes
     const nextExposure = Math.max(0, Math.min(100, Number((currentExposure + delta).toFixed(2))))
@@ -233,6 +249,48 @@ export function processDiseasesTick(character, elapsedMinutes = 0.33, thermalCon
     if (nextExposure !== currentExposure) {
       currentExposure = nextExposure
       hasChanges = true
+    }
+
+    // REGRA DE CHUVA: Ficar exposto à chuva ao ar livre por 30 minutos causa Resfriado Comum
+    const isRaining = thermalCondition.isRaining || (!thermalCondition.isIndoor && (thermalCondition.weatherCondition === 'rainy' || thermalCondition.weatherCondition === 'storm'))
+
+    if (isRaining) {
+      const nextRainExposure = Number((rainExposure + elapsedMinutes).toFixed(2))
+      if (nextRainExposure !== rainExposure) {
+        rainExposure = nextRainExposure
+        hasChanges = true
+      }
+
+      // Após 30 minutos na chuva -> Resfriado Comum automático com sintomas da Fase 1!
+      if (rainExposure >= 30) {
+        const hasColdOrRespiratory = updatedDiseases.some(d => !d.cured && ['resfriado', 'gripe', 'pneumonia'].includes(d.diseaseId || d.id))
+        if (!hasColdOrRespiratory) {
+          const coldDef = diseasesMap['resfriado'] || DEFAULT_DISEASES['resfriado']
+          const newCold = createDiseaseInstance('resfriado', 'rain', customConfig)
+          if (newCold) {
+            newCold.stageIndex = 1
+            newCold.stage = 'stage_1'
+            newCold.activeSymptoms = rollStageSymptoms(coldDef, 1, symptomsMap)
+            updatedDiseases.push(newCold)
+
+            historyLog.unshift({
+              timestamp: Date.now(),
+              diseaseId: 'resfriado',
+              diseaseName: newCold.name,
+              event: 'Resfriado Adquirido',
+              description: 'Após 30 minutos sob chuva contínua sem abrigo, o corpo sucumbiu à umidade e friagem, desenvolvendo Resfriado Comum.'
+            })
+            hasChanges = true
+          }
+        }
+        rainExposure = 0 // Reseta o acumulador após a infecção
+      }
+    } else {
+      // Se estiver abrigado em ambiente fechado ou se a chuva cessou, seca gradualmente
+      if (rainExposure > 0) {
+        rainExposure = Math.max(0, Number((rainExposure - elapsedMinutes * 2).toFixed(2)))
+        hasChanges = true
+      }
     }
 
     // Se o frio acumulou além de 25 pontos, faz teste periódico para resfriado/gripe
@@ -340,10 +398,17 @@ export function processDiseasesTick(character, elapsedMinutes = 0.33, thermalCon
     }
   })
 
-  // 3. RETORNO DO ESTADO
+  // 3. ATUALIZAÇÃO DE HIGIENE E RETORNO DO ESTADO
+  const currentHygiene = calculateCharacterHygiene(character)
+  if (character.hygiene !== currentHygiene) {
+    hasChanges = true
+  }
+
   const nextCharacter = {
     ...character,
     thermalExposure: currentExposure,
+    rainExposureMinutes: rainExposure,
+    hygiene: currentHygiene,
     diseases: updatedDiseases.filter(d => !d.cured || (Date.now() - (d.curedAt || 0) < 300000)), // Mantém curadas por 5 min para feedback
     diseaseHistory: historyLog.slice(0, 50), // Mantém histórico recente limpo
   }

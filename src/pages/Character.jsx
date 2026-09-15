@@ -24,7 +24,7 @@ import {
 import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
 import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
 import { useGameConfig } from '../contexts/GameConfigContext.jsx'
-import { getActiveDiseasePenalties } from '../utils/diseaseSystem'
+import { getActiveDiseasePenalties, calculateCharacterHygiene } from '../utils/diseaseSystem'
 
 export const INVENTORY_CATEGORIES = [
   { id: 'all',         label: 'Todos',               icon: '📦' },
@@ -671,6 +671,23 @@ export default function Character() {
                       </div>
                       <div className="vital-progress-track">
                         <div className="vital-progress-fill vital-blood" style={{ width: `${hpPercent}%` }} />
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Higiene */}
+                {(() => {
+                  const hygienePct = character.hygiene ?? calculateCharacterHygiene(character)
+                  const hygieneColor = hygienePct > 60 ? '#34d399' : hygienePct > 25 ? '#facc15' : '#ef4444'
+                  return (
+                    <div className="vital-row" style={{ marginTop: 8 }}>
+                      <div className="vital-label" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                        <span style={{ color: hygieneColor, fontWeight: 600 }}>🧼 Higiene</span>
+                        <strong style={{ color: hygieneColor }}>{hygienePct}%</strong>
+                      </div>
+                      <div className="vital-progress-track">
+                        <div className="vital-progress-fill" style={{ width: `${hygienePct}%`, background: hygieneColor }} />
                       </div>
                     </div>
                   )

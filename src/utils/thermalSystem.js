@@ -95,6 +95,8 @@ export function calculateEffectiveThermalCondition({
       icon: tier.icon,
       effectiveTemp: bufferedIndoorTemp,
       isIndoor: true,
+      weatherCondition,
+      isRaining: false,
       exposureDeltaPerMin: tier.exposureDeltaPerMin,
       wetnessPenalty: 0,
     }
@@ -103,6 +105,7 @@ export function calculateEffectiveThermalCondition({
   // 2. AMBIENTE EXTERNO (AO AR LIVRE)
   // Penalidade de umidade por chuva, neve ou tempestade
   let wetnessPenalty = 0
+  const isRaining = weatherCondition === 'rainy' || weatherCondition === 'storm'
   if (weatherCondition === 'storm') {
     wetnessPenalty = 6 // Tempestade encharca e resfria bruscamente
   } else if (weatherCondition === 'rainy') {
@@ -148,6 +151,8 @@ export function calculateEffectiveThermalCondition({
     icon: tier.icon,
     effectiveTemp,
     isIndoor: false,
+    weatherCondition,
+    isRaining,
     exposureDeltaPerMin,
     wetnessPenalty,
   }

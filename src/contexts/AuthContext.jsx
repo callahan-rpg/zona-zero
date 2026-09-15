@@ -31,6 +31,7 @@ import {
   evaluateInfectionRisk,
   createDiseaseInstance,
   applyMedicineTreatment,
+  calculateCharacterHygiene,
 } from '../utils/diseaseSystem'
 import { DEFAULT_MEDICINE_TREATMENTS } from '../utils/diseaseDefaults'
 
@@ -78,7 +79,9 @@ export function AuthProvider({ children }) {
         unsubUserDoc = onSnapshot(docRef, (docSnap) => {
           if (docSnap.exists() && isMounted) {
             const data = docSnap.data()
-            setCharacter(data.character)
+            // Calcula higiene já na leitura do Firestore para refletir decaimento offline
+            const hygieneNow = calculateCharacterHygiene(data.character)
+            setCharacter({ ...data.character, hygiene: hygieneNow })
             setRole(data.role || 'player')
           }
           if (isMounted) setLoading(false)
@@ -204,6 +207,8 @@ export function AuthProvider({ children }) {
         if (diseaseUpdatesToSave.diseases !== undefined) updates['character.diseases'] = diseaseUpdatesToSave.diseases
         if (diseaseUpdatesToSave.thermalExposure !== undefined) updates['character.thermalExposure'] = diseaseUpdatesToSave.thermalExposure
         if (diseaseUpdatesToSave.diseaseHistory !== undefined) updates['character.diseaseHistory'] = diseaseUpdatesToSave.diseaseHistory
+        if (diseaseUpdatesToSave.rainExposureMinutes !== undefined) updates['character.rainExposureMinutes'] = diseaseUpdatesToSave.rainExposureMinutes
+        if (diseaseUpdatesToSave.hygiene !== undefined) updates['character.hygiene'] = diseaseUpdatesToSave.hygiene
       }
 
       if (Object.keys(updates).length === 0) return
@@ -313,6 +318,8 @@ export function AuthProvider({ children }) {
           diseases: diseaseResult.character.diseases,
           thermalExposure: diseaseResult.character.thermalExposure,
           diseaseHistory: diseaseResult.character.diseaseHistory,
+          rainExposureMinutes: diseaseResult.character.rainExposureMinutes,
+          hygiene: diseaseResult.character.hygiene,
         }
       }
 
@@ -327,6 +334,8 @@ export function AuthProvider({ children }) {
               diseases: diseaseResult.character.diseases,
               thermalExposure: diseaseResult.character.thermalExposure,
               diseaseHistory: diseaseResult.character.diseaseHistory,
+              rainExposureMinutes: diseaseResult.character.rainExposureMinutes,
+              hygiene: diseaseResult.character.hygiene,
             } : {})
           }
         })
