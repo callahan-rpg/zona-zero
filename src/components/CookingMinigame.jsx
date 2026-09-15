@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { MINIGAME_DIFFICULTIES } from '../utils/minigameEngine'
 
 export default function CookingMinigame({
@@ -10,54 +10,69 @@ export default function CookingMinigame({
   const difficultyConfig = MINIGAME_DIFFICULTIES[session?.difficulty || recipe?.minigameDifficulty || 'normal'] || MINIGAME_DIFFICULTIES.normal
   const totalDurationSec = Math.max(3, Number(session?.durationSec || recipe?.cookDurationSec || 6))
 
-  const [heatState, setHeatState] = useState(25) // Para feedback de texto/cor reativo (atualizado de forma suave)
+  // Apenas estados visuais que precisam de re-render (atualizados de forma throttled)
+  const [heatState, setHeatState] = useState(25)
   const [inIdealZoneState, setInIdealZoneState] = useState(false)
   const [progressState, setProgressState] = useState(0)
   const [timeLeftState, setTimeLeftState] = useState(totalDurationSec)
   const [isHeating, setIsHeating] = useState(false)
   const [minigameState, setMinigameState] = useState('playing') // playing | success | failed
 
-  // Refs de alta performance para física 60 FPS sem engasgos
+  // ----- REFS DE ALTA PERFORMANCE -----
+  // Configuração da dificuldade em ref para não disparar re-execução do loop de física
+  const diffConfigRef = useRef(difficultyConfig)
+  diffConfigRef.current = difficultyConfig
+
+  // Callback de finish em ref para não disparar re-execução do loop de física
+  const onFinishRef = useRef(onFinish)
+  onFinishRef.current = onFinish
+
+  // Estado do jogo em refs (evita closure stale no rAF loop)
   const isHeatingRef = useRef(false)
   const heatRef = useRef(25)
   const velocityRef = useRef(0)
   const progressRef = useRef(0)
   const timeLeftRef = useRef(totalDurationSec)
+  const gameOverRef = useRef(false) // flag para parar o loop sem depender de state
+
+  // Refs de animação
   const animFrameRef = useRef(null)
   const lastTimeRef = useRef(null)
   const lastUiUpdateRef = useRef(0)
 
-  // Element refs para manipulação DOM ultra suave sem re-renders pesados no loop
+  // Refs de elementos DOM para manipulação direta (60 FPS sem re-renders React)
   const markerRef = useRef(null)
   const flameRef = useRef(null)
   const progressBarRef = useRef(null)
-  const progressTextRef = useRef(null)
-  const timerTextRef = useRef(null)
   const idealZoneGlowRef = useRef(null)
 
+  // Sincroniza isHeating state → ref imediatamente, sem depender do loop de efeito
   useEffect(() => {
     isHeatingRef.current = isHeating
   }, [isHeating])
 
-  // Loop de física suave com inércia / aceleração natural (Fluid Physics Engine)
+  // ----- LOOP DE FÍSICA (roda UMA vez na montagem, sem re-criações) -----
   useEffect(() => {
     lastTimeRef.current = performance.now()
+    gameOverRef.current = false
 
     const updatePhysics = (now) => {
-      if (minigameState !== 'playing') return
+      // Se o jogo acabou, para o loop sem tentar reagendar
+      if (gameOverRef.current) return
 
+      const cfg = diffConfigRef.current
       const dt = Math.min(0.05, (now - lastTimeRef.current) / 1000)
       lastTimeRef.current = now
 
-      // 1. Aceleração e Velocidade Dinâmica (Feedback gradual e orgânico ao segurar espaço)
+      // 1. Aceleração e Velocidade Dinâmica com Inércia
       const targetVel = isHeatingRef.current
-        ? difficultyConfig.heatingRate * 1.5
-        : -difficultyConfig.coolingRate * 1.2
+        ? cfg.heatingRate * 1.5
+        : -cfg.coolingRate * 1.2
 
       const accelRate = isHeatingRef.current ? 12 : 8
       velocityRef.current += (targetVel - velocityRef.current) * accelRate * dt
 
-      // 2. Atualização de Posição de Temperatura
+      // 2. Posição de Temperatura
       let currentHeat = heatRef.current + velocityRef.current * dt
       if (currentHeat <= 0) {
         currentHeat = 0
@@ -68,28 +83,28 @@ export default function CookingMinigame({
       }
       heatRef.current = currentHeat
 
-      // 3. Checagem de Zona Ideal
-      const inIdeal = currentHeat >= difficultyConfig.idealZoneMin && currentHeat <= difficultyConfig.idealZoneMax
+      // 3. Zona Ideal
+      const inIdeal = currentHeat >= cfg.idealZoneMin && currentHeat <= cfg.idealZoneMax
 
       // 4. Progresso de Cozimento
       let currentProgress = progressRef.current
       if (inIdeal) {
-        currentProgress += difficultyConfig.progressGainPerSec * dt
+        currentProgress += cfg.progressGainPerSec * dt
       }
       currentProgress = Math.max(0, Math.min(100, currentProgress))
       progressRef.current = currentProgress
 
       // 5. Tempo Restante
-      let currentTimeLeft = Math.max(0, timeLeftRef.current - dt)
+      const currentTimeLeft = Math.max(0, timeLeftRef.current - dt)
       timeLeftRef.current = currentTimeLeft
 
-      // 6. Atualização Direta no DOM (60 FPS contínuo sem lag de React re-render)
+      // 6. Atualização Direta no DOM — nunca causa re-render React
       if (markerRef.current) {
         markerRef.current.style.left = `${currentHeat}%`
         if (inIdeal) {
           markerRef.current.style.background = 'linear-gradient(180deg, #34d399 0%, #059669 100%)'
           markerRef.current.style.boxShadow = '0 0 16px #34d399, 0 0 6px #fff'
-        } else if (currentHeat > difficultyConfig.idealZoneMax) {
+        } else if (currentHeat > cfg.idealZoneMax) {
           markerRef.current.style.background = 'linear-gradient(180deg, #f87171 0%, #dc2626 100%)'
           markerRef.current.style.boxShadow = '0 0 14px #ef4444'
         } else {
@@ -109,7 +124,7 @@ export default function CookingMinigame({
         flameRef.current.style.opacity = `${opacity}`
       }
 
-      // 7. Atualização Throttled do Estado React para elementos textuais (a cada ~80ms)
+      // 7. Throttled React state update para elementos textuais (~80ms)
       if (now - lastUiUpdateRef.current > 80) {
         lastUiUpdateRef.current = now
         setHeatState(currentHeat)
@@ -118,21 +133,23 @@ export default function CookingMinigame({
         setTimeLeftState(currentTimeLeft)
       }
 
-      // 8. Checagem de Conclusão / Fim de Jogo
+      // 8. Checagem de conclusão — usa flag ref para parar sem depender de state
       if (currentProgress >= 100) {
+        gameOverRef.current = true
         setMinigameState('success')
         setProgressState(100)
         setTimeout(() => {
-          onFinish?.({ success: true, heat: currentHeat, progress: 100 })
+          onFinishRef.current?.({ success: true, heat: currentHeat, progress: 100 })
         }, 400)
         return
       }
 
       if (currentTimeLeft <= 0) {
+        gameOverRef.current = true
         setMinigameState('failed')
         setTimeLeftState(0)
         setTimeout(() => {
-          onFinish?.({ success: false, heat: currentHeat, progress: currentProgress })
+          onFinishRef.current?.({ success: false, heat: currentHeat, progress: currentProgress })
         }, 500)
         return
       }
@@ -143,15 +160,21 @@ export default function CookingMinigame({
     animFrameRef.current = requestAnimationFrame(updatePhysics)
 
     return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+      gameOverRef.current = true
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current)
+        animFrameRef.current = null
+      }
     }
-  }, [minigameState, difficultyConfig, onFinish])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // loop criado UMA vez — tudo é via refs
 
-  // Suporte a teclado ultra-responsivo
+  // ----- SUPORTE A TECLADO -----
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.code === 'Space' || e.key === ' ' || e.code === 'KeyW' || e.code === 'ArrowUp') {
         if (!e.repeat) {
+          isHeatingRef.current = true  // atualiza ref IMEDIATAMENTE (sem esperar setState)
           setIsHeating(true)
         }
         e.preventDefault()
@@ -160,6 +183,7 @@ export default function CookingMinigame({
 
     const handleKeyUp = (e) => {
       if (e.code === 'Space' || e.key === ' ' || e.code === 'KeyW' || e.code === 'ArrowUp') {
+        isHeatingRef.current = false   // atualiza ref IMEDIATAMENTE
         setIsHeating(false)
         e.preventDefault()
       }
@@ -226,7 +250,7 @@ export default function CookingMinigame({
               : inIdealZoneState
               ? 'drop-shadow(0 0 12px #f59e0b)'
               : 'drop-shadow(0 0 4px #6b7280)',
-            transition: 'transform 0.08s ease-out, opacity 0.08s ease-out',
+            transition: 'filter 0.1s ease',
             transformOrigin: 'bottom center'
           }}
         >
@@ -310,7 +334,7 @@ export default function CookingMinigame({
             </span>
           </div>
 
-          {/* INDICADOR / MARCADOR DE CALOR (Manipulado via Direct DOM para 60fps fluido sem lag de transition) */}
+          {/* INDICADOR / MARCADOR DE CALOR — manipulação direta no DOM para 60fps sem CSS transition no left */}
           <div
             ref={markerRef}
             style={{
@@ -328,7 +352,7 @@ export default function CookingMinigame({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              willChange: 'left, transform'
+              willChange: 'left'
             }}
           >
             <div style={{ width: '2px', height: '14px', background: '#fff', borderRadius: '1px' }} />
@@ -382,22 +406,36 @@ export default function CookingMinigame({
         </div>
       </div>
 
-      {/* BOTÃO PRINCIPAL DE INTERAÇÃO COM FEEDBACK TÁTIL / VISUAL */}
+      {/* BOTÃO PRINCIPAL DE INTERAÇÃO */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%', maxWidth: '360px', marginTop: '6px' }}>
         <button
           type="button"
-          onMouseDown={() => setIsHeating(true)}
-          onMouseUp={() => setIsHeating(false)}
-          onMouseLeave={() => setIsHeating(false)}
+          onMouseDown={() => {
+            isHeatingRef.current = true
+            setIsHeating(true)
+          }}
+          onMouseUp={() => {
+            isHeatingRef.current = false
+            setIsHeating(false)
+          }}
+          onMouseLeave={() => {
+            isHeatingRef.current = false
+            setIsHeating(false)
+          }}
           onTouchStart={(e) => {
             e.preventDefault()
+            isHeatingRef.current = true
             setIsHeating(true)
           }}
           onTouchEnd={(e) => {
             e.preventDefault()
+            isHeatingRef.current = false
             setIsHeating(false)
           }}
-          onTouchCancel={() => setIsHeating(false)}
+          onTouchCancel={() => {
+            isHeatingRef.current = false
+            setIsHeating(false)
+          }}
           style={{
             width: '100%',
             padding: '16px 20px',
