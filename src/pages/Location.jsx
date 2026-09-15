@@ -72,7 +72,7 @@ const DEFAULT_LOCATION = {
 
 export default function Location() {
   const { slug } = useParams()
-  const { user, character, refreshCharacter, recordUniqueSearch, setLocationContext } = useAuth()
+  const { user, character, setCharacterInventory, recordUniqueSearch, setLocationContext } = useAuth()
   const navigate = useNavigate()
 
   const [location, setLocation] = useState(null)
@@ -402,6 +402,8 @@ export default function Location() {
       const userRef = doc(db, 'users', user.uid)
 
       try {
+        let finalInventory = null
+
         await runTransaction(db, async (transaction) => {
           const snap = await transaction.get(userRef)
           if (!snap.exists()) throw new Error('Personagem não encontrado.')
@@ -435,13 +437,23 @@ export default function Location() {
             }
           }
 
+          finalInventory = inventory
+
           transaction.update(userRef, {
             'character.inventory': inventory,
             [`character.lastLootByLocation.${slug}`]: new Date()
           })
         })
 
-        await refreshCharacter()
+        // Atualiza o estado local imediatamente com o inventário final confirmado pela transação.
+        // NÃO chamar refreshCharacter() aqui: um getDoc logo após runTransaction pode retornar
+        // um snapshot desatualizado (antes da propagação completa), sobrescrevendo o inventário
+        // recém-gravado e fazendo os itens sumirem. O onSnapshot do AuthContext sincroniza
+        // automaticamente quando o Firestore confirmar a escrita.
+        if (finalInventory !== null) {
+          setCharacterInventory(finalInventory)
+        }
+
         setSupplyCooldown(true)
       } catch (err) {
         console.error('Erro ao salvar busca de suprimentos:', err)

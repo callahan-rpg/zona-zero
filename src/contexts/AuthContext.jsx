@@ -472,6 +472,16 @@ export function AuthProvider({ children }) {
     if (user) await loadCharacter(user.uid)
   }
 
+  // Atualiza o inventário local do personagem otimisticamente após uma transação confirmada.
+  // Use este método em vez de refreshCharacter() após runTransaction de inventário,
+  // pois getDoc imediato pós-transação pode retornar snapshot antigo e apagar itens recém-gravados.
+  function setCharacterInventory(newInventory) {
+    setCharacter(prev => {
+      if (!prev) return prev
+      return { ...prev, inventory: newInventory }
+    })
+  }
+
   // Consumir um item do inventário e aplicar efeitos de vitais
   async function consumeItem(instanceId, quantityToConsume = 1, consumeEffect = null) {
     if (!user) return
@@ -1352,6 +1362,7 @@ export function AuthProvider({ children }) {
     resetPassword,
     updateCharacter,
     refreshCharacter,
+    setCharacterInventory,
     transferItem,
     transferMoney,
     consumeItem,
