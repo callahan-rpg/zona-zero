@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { collection, onSnapshot, doc, runTransaction } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { canCookRecipe, getAvailableRecipes, DEFAULT_RECIPES } from '../utils/cookingSystem'
+import { canCookRecipe, getAvailableRecipes, resolveIngredientMatch, getIngredientVariants, DEFAULT_RECIPES } from '../utils/cookingSystem'
 import { consumeItemFromInventory, addItemToInventory } from '../utils/activitySystem'
 import { RARITY_META } from '../utils/itemSystem'
+import { createMiniGameSession, validateMiniGameOutcome, MINIGAME_TYPES } from '../utils/minigameEngine'
+import CookingMinigame from './CookingMinigame.jsx'
 
 export default function CookingModal({ locationSlug, onClose }) {
   const { user, character, refreshCharacter } = useAuth()
@@ -12,9 +14,12 @@ export default function CookingModal({ locationSlug, onClose }) {
   const [recipes, setRecipes] = useState([])
   const [loadingRecipes, setLoadingRecipes] = useState(true)
   const [selectedRecipe, setSelectedRecipe] = useState(null)
-  const [phase, setPhase] = useState('idle') // idle | cooking | result | error
+  const [selectedVariants, setSelectedVariants] = useState({}) // { [ingIndex]: itemId }
+  const [phase, setPhase] = useState('idle') // idle | minigame | cooking | result | failure | error
   const [cookingProgress, setCookingProgress] = useState(0)
   const [cookedItemResult, setCookedItemResult] = useState(null)
+  const [activeSession, setActiveSession] = useState(null)
+  const [failureInfo, setFailureInfo] = useState({ lostIngredients: false, message: '' })
   const [actionError, setActionError] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
 
@@ -45,7 +50,7 @@ export default function CookingModal({ locationSlug, onClose }) {
 
   const inventory = character?.inventory || []
 
-  // Filtro Estrito: Apenas receitas que o jogador PODE cozinhar agora
+  // Filtro Estrito: Apenas receitas que o jogador PODE cozinhar agora (com suporte a variações)
   const availableRecipes = getAvailableRecipes(recipes, inventory)
 
   // Se a receita selecionada não estiver mais disponível, seleciona a primeira disponível ou null
@@ -55,49 +60,93 @@ export default function CookingModal({ locationSlug, onClose }) {
       const stillAvailable = availableRecipes.find(r => r.id === selectedRecipe.id)
       if (!stillAvailable) {
         setSelectedRecipe(availableRecipes[0] || null)
+        setSelectedVariants({})
       }
     } else if (availableRecipes.length > 0) {
       setSelectedRecipe(availableRecipes[0])
+      setSelectedVariants({})
     }
   }, [availableRecipes.length, phase])
 
   async function handleStartCooking() {
-    if (!selectedRecipe || isProcessing || phase === 'cooking') return
+    if (!selectedRecipe || isProcessing || phase === 'cooking' || phase === 'minigame') return
 
-    const check = canCookRecipe(selectedRecipe, character?.inventory || [])
+    const check = canCookRecipe(selectedRecipe, character?.inventory || [], selectedVariants)
     if (!check.ok) {
       setActionError(check.reason || 'Você não atende aos requisitos desta receita.')
       return
     }
 
     setActionError('')
-    setIsProcessing(true)
-    setPhase('cooking')
-    setCookingProgress(0)
+    const useMinigame = selectedRecipe.minigame !== 'none'
 
-    const durationSec = selectedRecipe.cookDurationSec || 4
-    const totalMs = durationSec * 1000
-    const intervalMs = 100
-    const stepPercent = (intervalMs / totalMs) * 100
+    if (useMinigame) {
+      // 1. Inicia Sessão de Minigame
+      const session = createMiniGameSession({
+        type: MINIGAME_TYPES.COOKING_TEMPERATURE,
+        recipeId: selectedRecipe.id,
+        characterId: user?.uid,
+        durationSec: selectedRecipe.cookDurationSec || 6,
+        difficulty: selectedRecipe.minigameDifficulty || 'normal',
+        ingredientLossOnFailure: selectedRecipe.ingredientLossOnFailure === true
+      })
 
-    let current = 0
-    progressIntervalRef.current = setInterval(() => {
-      current += stepPercent
-      if (current >= 100) {
-        clearInterval(progressIntervalRef.current)
-        setCookingProgress(100)
-        finalizeCooking(selectedRecipe)
-      } else {
-        setCookingProgress(current)
-      }
-    }, intervalMs)
+      setActiveSession(session)
+      setPhase('minigame')
+    } else {
+      // 2. Preparo Direto sem Minigame (Legado / Configurado sem minigame)
+      setIsProcessing(true)
+      setPhase('cooking')
+      setCookingProgress(0)
+
+      const durationSec = selectedRecipe.cookDurationSec || 4
+      const totalMs = durationSec * 1000
+      const intervalMs = 100
+      const stepPercent = (intervalMs / totalMs) * 100
+
+      let current = 0
+      progressIntervalRef.current = setInterval(() => {
+        current += stepPercent
+        if (current >= 100) {
+          clearInterval(progressIntervalRef.current)
+          setCookingProgress(100)
+          finalizeCooking(selectedRecipe, { success: true })
+        } else {
+          setCookingProgress(current)
+        }
+      }, intervalMs)
+    }
   }
 
-  async function finalizeCooking(recipeToCook) {
-    if (!user?.uid || !recipeToCook) return
+  // Callback chamado quando o minigame termina (sucesso ou falha)
+  async function handleMinigameOutcome(outcome) {
+    if (!activeSession || isProcessing) return
+
+    const validation = validateMiniGameOutcome(activeSession, outcome)
+    if (!validation.ok) {
+      setActionError(validation.reason || 'Erro na validação da sessão do minigame.')
+      setPhase('error')
+      return
+    }
+
+    setIsProcessing(true)
+    await finalizeCooking(selectedRecipe, {
+      success: validation.success,
+      ingredientLossOnFailure: validation.ingredientLossOnFailure,
+      sessionId: validation.sessionId
+    })
+  }
+
+  // Finalização Atômica no Firestore com consumo das variantes corretas
+  async function finalizeCooking(recipeToCook, { success = true, ingredientLossOnFailure = false, sessionId = null } = {}) {
+    if (!user?.uid || !recipeToCook) {
+      setIsProcessing(false)
+      return
+    }
 
     try {
       let resultItemData = null
+      let lostIngredients = false
 
       await runTransaction(db, async (transaction) => {
         const userRef = doc(db, 'users', user.uid)
@@ -107,53 +156,90 @@ export default function CookingModal({ locationSlug, onClose }) {
         const charData = userSnap.data()?.character || {}
         let currentInv = [...(charData.inventory || [])]
 
-        // 1. Valida se ainda pode cozinhar
-        const check = canCookRecipe(recipeToCook, currentInv)
+        // 1. Valida se os itens/variantes ainda existem no inventário
+        const check = canCookRecipe(recipeToCook, currentInv, selectedVariants)
         if (!check.ok) {
           throw new Error(check.reason || 'Itens ou ferramentas insuficientes.')
         }
 
-        // 2. Consome os ingredientes da receita do inventário
-        const ingredients = recipeToCook.ingredients || []
-        for (const ing of ingredients) {
-          const qty = Math.max(1, Number(ing.quantity) || 1)
-          currentInv = consumeItemFromInventory(currentInv, ing.itemId, qty, ing.name)
+        const resolved = check.resolvedIngredients || []
+
+        if (success) {
+          // SUCESSO: Consome os ingredientes resolvidos (item base ou variante escolhida)
+          for (const itemSlot of resolved) {
+            const qty = Math.max(1, Number(itemSlot.quantity) || 1)
+            currentInv = consumeItemFromInventory(
+              currentInv,
+              itemSlot.matchedItem.itemId,
+              qty,
+              itemSlot.matchedItem.name
+            )
+          }
+
+          const resDef = recipeToCook.result || {}
+          resultItemData = {
+            itemId: resDef.itemId || 'comida_preparada',
+            name: resDef.name || recipeToCook.name || 'Refeição Preparada',
+            icon: resDef.icon || recipeToCook.icon || '🍲',
+            quantity: Math.max(1, Number(resDef.quantity) || 1),
+            rarity: resDef.rarity || 'uncommon',
+            category: resDef.category || 'supplies',
+            consumable: resDef.consumable !== undefined ? resDef.consumable : true,
+            consumeEffect: resDef.consumeEffect || { hunger: 40, blood: 15 },
+            description: resDef.description || recipeToCook.description || 'Comida quente e nutritiva preparada na cozinha.',
+            obtainedFrom: 'Cozinha / Culinária'
+          }
+
+          currentInv = addItemToInventory(currentInv, resultItemData)
+
+          transaction.update(userRef, {
+            'character.inventory': currentInv,
+            'character.lastCookedAt': new Date().toISOString(),
+            'character.lastCookingSessionId': sessionId || null
+          })
+        } else {
+          // FALHA: Se configurado perda, consome os itens resolvidos; caso contrário preserva
+          if (ingredientLossOnFailure) {
+            lostIngredients = true
+            for (const itemSlot of resolved) {
+              const qty = Math.max(1, Number(itemSlot.quantity) || 1)
+              currentInv = consumeItemFromInventory(
+                currentInv,
+                itemSlot.matchedItem.itemId,
+                qty,
+                itemSlot.matchedItem.name
+              )
+            }
+
+            transaction.update(userRef, {
+              'character.inventory': currentInv,
+              'character.lastCookingSessionId': sessionId || null
+            })
+          }
         }
-
-        // 3. Monta o item resultante
-        const resDef = recipeToCook.result || {}
-        resultItemData = {
-          itemId: resDef.itemId || 'comida_preparada',
-          name: resDef.name || recipeToCook.name || 'Refeição Preparada',
-          icon: resDef.icon || recipeToCook.icon || '🍲',
-          quantity: Math.max(1, Number(resDef.quantity) || 1),
-          rarity: resDef.rarity || 'uncommon',
-          category: resDef.category || 'supplies',
-          consumable: resDef.consumable !== undefined ? resDef.consumable : true,
-          consumeEffect: resDef.consumeEffect || { hunger: 40, blood: 15 },
-          description: resDef.description || recipeToCook.description || 'Comida quente e nutritiva preparada na cozinha.',
-          obtainedFrom: 'Cozinha / Culinária'
-        }
-
-        // 4. Adiciona o item pronto ao inventário
-        currentInv = addItemToInventory(currentInv, resultItemData)
-
-        // 5. Salva na ficha
-        transaction.update(userRef, {
-          'character.inventory': currentInv,
-          'character.lastCookedAt': new Date().toISOString()
-        })
       })
 
       if (refreshCharacter) await refreshCharacter()
-      setCookedItemResult(resultItemData)
-      setPhase('result')
+
+      if (success) {
+        setCookedItemResult(resultItemData)
+        setPhase('result')
+      } else {
+        setFailureInfo({
+          lostIngredients,
+          message: lostIngredients
+            ? 'Você não conseguiu atingir o ponto de cozimento a tempo. Os ingredientes foram desperdiçados.'
+            : 'Você não conseguiu atingir o ponto de cozimento a tempo, mas os ingredientes foram preservados na sua mochila.'
+        })
+        setPhase('failure')
+      }
     } catch (err) {
       console.error('Erro ao cozinhar:', err)
       setActionError(err.message || 'Erro ao processar o cozimento.')
       setPhase('error')
     } finally {
       setIsProcessing(false)
+      setActiveSession(null)
     }
   }
 
@@ -161,8 +247,14 @@ export default function CookingModal({ locationSlug, onClose }) {
     setPhase('idle')
     setCookingProgress(0)
     setCookedItemResult(null)
+    setActiveSession(null)
+    setFailureInfo({ lostIngredients: false, message: '' })
     setActionError('')
     setIsProcessing(false)
+  }
+
+  function handleCancelMinigame() {
+    handleReset()
   }
 
   return (
@@ -230,14 +322,17 @@ export default function CookingModal({ locationSlug, onClose }) {
             </div>
           </div>
           <button
-            onClick={onClose}
-            disabled={phase === 'cooking'}
+            onClick={() => {
+              if (phase === 'minigame') handleCancelMinigame()
+              onClose()
+            }}
+            disabled={isProcessing}
             style={{
               background: 'transparent',
               border: 'none',
               color: '#9ca3af',
               fontSize: '20px',
-              cursor: phase === 'cooking' ? 'not-allowed' : 'pointer',
+              cursor: isProcessing ? 'not-allowed' : 'pointer',
               padding: '4px 8px',
               borderRadius: '6px'
             }}
@@ -249,7 +344,77 @@ export default function CookingModal({ locationSlug, onClose }) {
         {/* CORPO DO MODAL */}
         <div style={{ padding: '20px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* FASE DE ERRO */}
+          {/* FASE: MINIGAME DE COZINHA */}
+          {phase === 'minigame' && selectedRecipe && (
+            <CookingMinigame
+              recipe={selectedRecipe}
+              session={activeSession}
+              onFinish={handleMinigameOutcome}
+              onCancel={handleCancelMinigame}
+            />
+          )}
+
+          {/* FASE DE FALHA NO MINIGAME */}
+          {phase === 'failure' && (
+            <div
+              style={{
+                padding: '30px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                gap: '16px',
+                background: failureInfo.lostIngredients ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                border: failureInfo.lostIngredients ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(59, 130, 246, 0.4)',
+                borderRadius: '12px'
+              }}
+            >
+              <div style={{ fontSize: '44px' }}>
+                {failureInfo.lostIngredients ? '🔥' : '🍲'}
+              </div>
+
+              <div>
+                <h3 style={{ margin: '0 0 6px', fontSize: '18px', color: failureInfo.lostIngredients ? '#f87171' : '#93c5fd', fontFamily: 'Oswald, sans-serif' }}>
+                  {failureInfo.lostIngredients ? 'Preparo Falhou — Ingredientes Perdidos' : 'Preparo Falhou — Ingredientes Preservados'}
+                </h3>
+                <p style={{ margin: 0, fontSize: '13px', color: '#e5e7eb', maxWidth: '440px', lineHeight: 1.5 }}>
+                  {failureInfo.message}
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleReset}
+                  style={{
+                    background: '#f59e0b',
+                    borderColor: '#f59e0b',
+                    color: '#000',
+                    fontWeight: 700,
+                    padding: '8px 20px',
+                    fontSize: '13px'
+                  }}
+                >
+                  🔄 Tentar Novamente
+                </button>
+                <button
+                  className="btn"
+                  onClick={onClose}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    padding: '8px 16px',
+                    fontSize: '13px'
+                  }}
+                >
+                  Fechar Cozinha
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* FASE DE ERRO INESPERADO */}
           {phase === 'error' && (
             <div
               style={{
@@ -262,8 +427,8 @@ export default function CookingModal({ locationSlug, onClose }) {
               }}
             >
               <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
-              <strong style={{ display: 'block', fontSize: '14px', marginBottom: '4px' }}>Falha no Preparo</strong>
-              <p style={{ margin: 0, fontSize: '12px' }}>{actionError || 'Ocorreu um erro ao tentar cozinhar o prato.'}</p>
+              <strong style={{ display: 'block', fontSize: '14px', marginBottom: '4px' }}>Erro de Processamento</strong>
+              <p style={{ margin: 0, fontSize: '12px' }}>{actionError || 'Ocorreu um erro ao tentar processar o cozimento.'}</p>
               <button
                 className="btn btn-primary"
                 onClick={handleReset}
@@ -274,7 +439,7 @@ export default function CookingModal({ locationSlug, onClose }) {
             </div>
           )}
 
-          {/* FASE DE ANIMAÇÃO DE COZIMENTO */}
+          {/* FASE DE ANIMAÇÃO DE COZIMENTO DIRETO (quando receita sem minigame) */}
           {phase === 'cooking' && (
             <div
               style={{
@@ -287,7 +452,6 @@ export default function CookingModal({ locationSlug, onClose }) {
                 gap: '20px'
               }}
             >
-              {/* Panela e fogo animados */}
               <div style={{ position: 'relative', width: '120px', height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div
                   style={{
@@ -308,7 +472,6 @@ export default function CookingModal({ locationSlug, onClose }) {
                 >
                   🍳
                 </div>
-                {/* Ingredientes subindo/saindo vapor */}
                 <div
                   style={{
                     position: 'absolute',
@@ -336,7 +499,6 @@ export default function CookingModal({ locationSlug, onClose }) {
                 </p>
               </div>
 
-              {/* BARRA DE PROGRESSO DE COZIMENTO */}
               <div style={{ width: '100%', maxWidth: '360px' }}>
                 <div
                   style={{
@@ -365,7 +527,7 @@ export default function CookingModal({ locationSlug, onClose }) {
             </div>
           )}
 
-          {/* FASE DE RESULTADO / PRATO PRONTO */}
+          {/* FASE DE RESULTADO / PRATO PRONTO (SUCESSO) */}
           {phase === 'result' && cookedItemResult && (
             <div
               style={{
@@ -411,7 +573,6 @@ export default function CookingModal({ locationSlug, onClose }) {
                 </p>
               </div>
 
-              {/* BENEFÍCIOS VITAIS DO PRATO */}
               {cookedItemResult.consumeEffect && (
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
                   {Boolean(cookedItemResult.consumeEffect.hunger) && (
@@ -471,7 +632,6 @@ export default function CookingModal({ locationSlug, onClose }) {
                   ⏳ Carregando livro de receitas...
                 </div>
               ) : availableRecipes.length === 0 ? (
-                /* ESTADO VAZIO: NENHUMA RECEITA DISPONÍVEL COM O INVENTÁRIO ATUAL */
                 <div
                   style={{
                     padding: '40px 24px',
@@ -490,7 +650,7 @@ export default function CookingModal({ locationSlug, onClose }) {
                     Nenhuma Receita Disponível
                   </h3>
                   <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', maxWidth: '440px', lineHeight: 1.5 }}>
-                    Você não possui os ingredientes necessários ou o utensílio culinário equipado para cozinhar no momento.
+                    Você não possui os ingredientes necessários (ou variações compatíveis) ou o utensílio culinário equipado para cozinhar no momento.
                   </p>
                   <div
                     style={{
@@ -508,8 +668,8 @@ export default function CookingModal({ locationSlug, onClose }) {
                     <strong>💡 Dicas para Cozinhar:</strong>
                     <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <li>Equipe uma <strong>Panela de Ferro / Frigideira</strong> em seu slot de Acessório ou Mãos.</li>
+                      <li>Receitas aceitam <strong>variações</strong> (ex: qualquer peixe pequeno, médio ou salmão serve para peixe grelhado).</li>
                       <li>Colete <strong>Ovos</strong> no Galinheiro ou pesque <strong>Peixes</strong> no Rio.</li>
-                      <li>Colha <strong>Tomates e Batatas</strong> em suas plantações ou busque mantimentos em residências.</li>
                     </ul>
                   </div>
                 </div>
@@ -529,7 +689,10 @@ export default function CookingModal({ locationSlug, onClose }) {
                         return (
                           <div
                             key={recipe.id}
-                            onClick={() => setSelectedRecipe(recipe)}
+                            onClick={() => {
+                              setSelectedRecipe(recipe)
+                              setSelectedVariants({})
+                            }}
                             style={{
                               padding: '12px 14px',
                               background: isSelected ? 'rgba(245, 158, 11, 0.2)' : 'rgba(0, 0, 0, 0.35)',
@@ -550,13 +713,23 @@ export default function CookingModal({ locationSlug, onClose }) {
                                   {recipe.name}
                                 </strong>
                                 <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                                  {(recipe.ingredients || []).map(i => `${i.quantity}x ${i.name || i.itemId}`).join(' + ')}
+                                  {(recipe.ingredients || []).map(i => {
+                                    const altCount = (i.alternatives || []).length
+                                    return `${i.quantity}x ${i.name || i.itemId}${altCount > 0 ? ` (+${altCount} var)` : ''}`
+                                  }).join(' + ')}
                                 </span>
                               </div>
                             </div>
-                            <span style={{ fontSize: '11px', color: '#34d399', fontWeight: 700, background: 'rgba(16, 185, 129, 0.15)', padding: '3px 8px', borderRadius: '6px' }}>
-                              ✓ Pronto
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                              <span style={{ fontSize: '11px', color: '#34d399', fontWeight: 700, background: 'rgba(16, 185, 129, 0.15)', padding: '3px 8px', borderRadius: '6px' }}>
+                                ✓ Pronto
+                              </span>
+                              {recipe.minigame !== 'none' && (
+                                <span style={{ fontSize: '9px', color: '#fbbf24', opacity: 0.8 }}>
+                                  🔥 Minigame
+                                </span>
+                              )}
+                            </div>
                           </div>
                         )
                       })}
@@ -591,18 +764,70 @@ export default function CookingModal({ locationSlug, onClose }) {
                           </div>
                         </div>
 
-                        {/* INGREDIENTES NECESSÁRIOS */}
+                        {/* INGREDIENTES NECESSÁRIOS COM SUPORTE A VARIAÇÕES */}
                         <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                           <div style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', fontWeight: 700, marginBottom: '6px' }}>
-                            Ingredientes Consumidos
+                            Ingredientes Utilizados
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            {(selectedRecipe.ingredients || []).map((ing, idx) => (
-                              <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
-                                <span>{ing.icon || '📦'} {ing.name || ing.itemId}</span>
-                                <span style={{ color: '#34d399', fontWeight: 600 }}>{ing.quantity}x</span>
-                              </div>
-                            ))}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {(selectedRecipe.ingredients || []).map((ing, idx) => {
+                              const match = resolveIngredientMatch(ing, inventory, selectedVariants[idx])
+                              const hasAlternatives = (ing.alternatives || []).length > 0
+                              const hasMultipleAvailable = match.availableVariants?.length > 1
+
+                              return (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '4px',
+                                    padding: '6px 8px',
+                                    background: 'rgba(255, 255, 255, 0.02)',
+                                    borderRadius: '6px',
+                                    border: '1px solid rgba(255, 255, 255, 0.04)'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>{match.matchedItem?.icon || ing.icon || '📦'}</span>
+                                      <strong>{match.matchedItem?.name || ing.name || ing.itemId}</strong>
+                                    </div>
+                                    <span style={{ color: '#34d399', fontWeight: 600 }}>{ing.quantity}x</span>
+                                  </div>
+
+                                  {/* SELETOR DE VARIAÇÃO SE O JOGADOR TIVER MÚLTIPLAS OPÇÕES NO INVENTÁRIO */}
+                                  {hasMultipleAvailable ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                                      <span style={{ fontSize: '10px', color: '#fbbf24' }}>🔁 Escolher variação:</span>
+                                      <select
+                                        value={match.matchedItem?.itemId}
+                                        onChange={(e) => setSelectedVariants(prev => ({ ...prev, [idx]: e.target.value }))}
+                                        style={{
+                                          fontSize: '11px',
+                                          padding: '2px 6px',
+                                          background: 'rgba(0, 0, 0, 0.5)',
+                                          border: '1px solid #fbbf24',
+                                          borderRadius: '4px',
+                                          color: '#fbbf24',
+                                          flex: 1
+                                        }}
+                                      >
+                                        {match.availableVariants.map(v => (
+                                          <option key={v.itemId} value={v.itemId}>
+                                            Usar: {v.icon || '📦'} {v.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  ) : hasAlternatives ? (
+                                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                      💡 Aceita também: {ing.alternatives.map(a => a.name).join(', ')}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
 
@@ -633,6 +858,13 @@ export default function CookingModal({ locationSlug, onClose }) {
                             </div>
                           </div>
                         )}
+
+                        {/* TAG DE RISCO DE INGREDIENTES */}
+                        {selectedRecipe.minigame !== 'none' && selectedRecipe.ingredientLossOnFailure && (
+                          <div style={{ fontSize: '10px', color: '#fca5a5', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 8px', borderRadius: '6px' }}>
+                            ⚠️ Atenção: Se você falhar no ponto de cozimento, os ingredientes serão perdidos!
+                          </div>
+                        )}
                       </div>
 
                       {/* BOTÃO COZINHAR */}
@@ -655,7 +887,9 @@ export default function CookingModal({ locationSlug, onClose }) {
                           cursor: 'pointer'
                         }}
                       >
-                        🔥 Cozinhar Agora ({selectedRecipe.cookDurationSec || 4}s)
+                        {selectedRecipe.minigame !== 'none'
+                          ? `🔥 Iniciar Preparo (Minigame ${selectedRecipe.cookDurationSec || 6}s)`
+                          : `🔥 Cozinhar Agora (${selectedRecipe.cookDurationSec || 4}s)`}
                       </button>
                     </div>
                   )}

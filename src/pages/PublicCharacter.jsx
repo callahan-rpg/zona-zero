@@ -164,7 +164,7 @@ export default function PublicCharacter() {
   }, [equipmentStats.totalInsulation])
 
   const { filteredItems, categoryCounts } = useMemo(() => {
-    const counts = { all: inventory.length, general: 0, supplies: 0, clothing: 0, melee: 0, firearms: 0, medical: 0 }
+    const counts = { all: inventory.length, general: 0, supplies: 0, clothing: 0, accessories: 0, melee: 0, firearms: 0, medical: 0 }
     const categorized = inventory.map((item) => {
       const cat = getItemCategory(item)
       if (counts[cat] !== undefined) counts[cat]++

@@ -58,6 +58,11 @@ export function getItemCategory(item) {
     }
   }
 
+  // Se o slot de equipamento for acessório (ex: accessory_1, accessory_2...)
+  if (item.equipSlot && String(item.equipSlot).startsWith('accessory')) {
+    return 'accessories'
+  }
+
   // Checa se coincide com algum preset padrão
   const preset = DEFAULT_PRESET_ITEMS.find(p => p.itemId === item.itemId)
   if (preset && preset.category) return preset.category
@@ -322,6 +327,7 @@ export default function Character() {
       general: 0,
       supplies: 0,
       clothing: 0,
+      accessories: 0,
       melee: 0,
       firearms: 0,
       medical: 0,

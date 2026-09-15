@@ -5,7 +5,8 @@
  * Princípios:
  * - Totalmente baseado em receitas configuráveis no Firestore (/recipes/{id})
  * - Reutiliza a tabela de itens (items_db / DEFAULT_PRESET_ITEMS) e o inventário padrão
- * - Filtra para exibir ao jogador APENAS receitas que ele possui os ingredientes e utensílio equipado
+ * - Suporta variações/alternativas de ingredientes para o mesmo prato (ex: peixe pequeno, médio ou salmão)
+ * - Filtra para exibir ao jogador APENAS receitas que ele possui os ingredientes (ou variações válidas) e utensílio equipado
  * - Execução atômica no Firestore via runTransaction
  */
 
@@ -27,7 +28,10 @@ export const DEFAULT_RECIPES = [
     description: 'Ferva a garrafa de água impura na panela para eliminar bactérias, impurezas e torná-la potável para hidratação.',
     enabled: true,
     requiredTool: 'panela_frigideira',
-    cookDurationSec: 4,
+    cookDurationSec: 5,
+    minigame: 'temperature',
+    minigameDifficulty: 'easy',
+    ingredientLossOnFailure: false,
     ingredients: [
       { itemId: 'garrafa_agua_impura', name: 'Garrafa de Água Impura', icon: '🧪', quantity: 1 }
     ],
@@ -51,7 +55,10 @@ export const DEFAULT_RECIPES = [
     description: 'Fatias suculentas de bacon fritas com ovos frescos na frigideira de ferro.',
     enabled: true,
     requiredTool: 'panela_frigideira',
-    cookDurationSec: 4,
+    cookDurationSec: 6,
+    minigame: 'temperature',
+    minigameDifficulty: 'normal',
+    ingredientLossOnFailure: false,
     ingredients: [
       { itemId: 'bacon', name: 'Fatias de Bacon', icon: '🥓', quantity: 1 },
       { itemId: 'ovo', name: 'Ovo de Galinha', icon: '🥚', quantity: 1 }
@@ -72,12 +79,26 @@ export const DEFAULT_RECIPES = [
     id: 'rec_peixe_grelhado',
     name: 'Peixe Grelhado',
     icon: '🐟',
-    description: 'Peixe fresco grelhado na panela com crosta dourada e suculenta.',
+    description: 'Peixe fresco grelhado na panela com crosta dourada e suculenta. Aceita qualquer tipo de peixe.',
     enabled: true,
     requiredTool: 'panela_frigideira',
-    cookDurationSec: 4,
+    cookDurationSec: 6,
+    minigame: 'temperature',
+    minigameDifficulty: 'normal',
+    ingredientLossOnFailure: false,
     ingredients: [
-      { itemId: 'peixe_pequeno', name: 'Peixe Pequeno', icon: '🐟', quantity: 1 }
+      {
+        itemId: 'peixe_pequeno',
+        name: 'Peixe Pequeno',
+        icon: '🐟',
+        quantity: 1,
+        alternatives: [
+          { itemId: 'peixe_medio', name: 'Peixe Médio', icon: '🐟' },
+          { itemId: 'peixe_grande', name: 'Peixe Grande', icon: '🐟' },
+          { itemId: 'salmao', name: 'Salmão Fresco', icon: '🐟' },
+          { itemId: 'truta', name: 'Truta', icon: '🐟' }
+        ]
+      }
     ],
     result: {
       itemId: 'peixe_grelhado',
@@ -98,7 +119,10 @@ export const DEFAULT_RECIPES = [
     description: 'Ovos batidos e fritos até ficarem macios e dourados.',
     enabled: true,
     requiredTool: 'panela_frigideira',
-    cookDurationSec: 3,
+    cookDurationSec: 5,
+    minigame: 'temperature',
+    minigameDifficulty: 'easy',
+    ingredientLossOnFailure: false,
     ingredients: [
       { itemId: 'ovo', name: 'Ovo de Galinha', icon: '🥚', quantity: 2 }
     ],
@@ -121,7 +145,10 @@ export const DEFAULT_RECIPES = [
     description: 'Sopa revigorante com pedaços de batata, tomate e caldo quente.',
     enabled: true,
     requiredTool: 'panela_frigideira',
-    cookDurationSec: 5,
+    cookDurationSec: 7,
+    minigame: 'temperature',
+    minigameDifficulty: 'normal',
+    ingredientLossOnFailure: false,
     ingredients: [
       { itemId: 'batata', name: 'Batata', icon: '🥔', quantity: 1 },
       { itemId: 'tomate', name: 'Tomate', icon: '🍅', quantity: 1 },
@@ -143,12 +170,25 @@ export const DEFAULT_RECIPES = [
     id: 'rec_ensopado_carne',
     name: 'Ensopado de Carne e Batata',
     icon: '🍲',
-    description: 'Guisado farto de carne e batatas cozidas em fogo brando.',
+    description: 'Guisado farto de carne e batatas cozidas em fogo brando. Aceita carne crua, de caçador ou enlatada.',
     enabled: true,
     requiredTool: 'panela_frigideira',
-    cookDurationSec: 5,
+    cookDurationSec: 8,
+    minigame: 'temperature',
+    minigameDifficulty: 'hard',
+    ingredientLossOnFailure: true,
     ingredients: [
-      { itemId: 'carne_crua', name: 'Carne Crua', icon: '🥩', quantity: 1 },
+      {
+        itemId: 'carne_crua',
+        name: 'Carne Crua',
+        icon: '🥩',
+        quantity: 1,
+        alternatives: [
+          { itemId: 'carne_cacador', name: 'Carne de Caçador', icon: '🥩' },
+          { itemId: 'carne_seca', name: 'Carne Seca', icon: '🥩' },
+          { itemId: 'carne_enlatada', name: 'Carne Enlatada', icon: '🥫' }
+        ]
+      },
       { itemId: 'batata', name: 'Batata', icon: '🥔', quantity: 1 }
     ],
     result: {
@@ -170,7 +210,10 @@ export const DEFAULT_RECIPES = [
     description: 'Fatias de batata tostadas e crocantes.',
     enabled: true,
     requiredTool: 'panela_frigideira',
-    cookDurationSec: 3,
+    cookDurationSec: 5,
+    minigame: 'temperature',
+    minigameDifficulty: 'easy',
+    ingredientLossOnFailure: false,
     ingredients: [
       { itemId: 'batata', name: 'Batata', icon: '🥔', quantity: 1 }
     ],
@@ -193,7 +236,10 @@ export const DEFAULT_RECIPES = [
     description: 'Espiga de milho fervida na panela.',
     enabled: true,
     requiredTool: 'panela_frigideira',
-    cookDurationSec: 3,
+    cookDurationSec: 5,
+    minigame: 'temperature',
+    minigameDifficulty: 'easy',
+    ingredientLossOnFailure: false,
     ingredients: [
       { itemId: 'milho', name: 'Milho', icon: '🌽', quantity: 1 }
     ],
@@ -212,10 +258,87 @@ export const DEFAULT_RECIPES = [
 ]
 
 /**
- * Valida se uma receita pode ser preparada com o inventário fornecido.
- * Retorna { ok, missingTool, missingIngredients, reason }
+ * Retorna todas as opções/variantes válidas para um slot de ingrediente
  */
-export function canCookRecipe(recipe, inventory = []) {
+export function getIngredientVariants(ing) {
+  if (!ing) return []
+  const main = {
+    itemId: ing.itemId,
+    name: ing.name || ing.itemId,
+    icon: ing.icon || '📦'
+  }
+  const alts = Array.isArray(ing.alternatives)
+    ? ing.alternatives.filter(a => a && a.itemId).map(a => ({
+        itemId: a.itemId,
+        name: a.name || a.itemId,
+        icon: a.icon || '📦'
+      }))
+    : []
+  return [main, ...alts]
+}
+
+/**
+ * Resolve qual variante de ingrediente o jogador possui no inventário
+ */
+export function resolveIngredientMatch(ing, inventory = [], preferredItemId = null) {
+  const variants = getIngredientVariants(ing)
+  const needed = Math.max(1, Number(ing.quantity) || 1)
+
+  // 1. Se foi indicado um item preferido pelo jogador, checa se ele está disponível
+  if (preferredItemId) {
+    const pref = variants.find(v => v.itemId === preferredItemId)
+    if (pref) {
+      const { ok, found } = checkInventoryItem(inventory, pref.itemId, needed)
+      if (ok) {
+        const availableVariants = variants.filter(v => checkInventoryItem(inventory, v.itemId, needed).ok)
+        return {
+          ok: true,
+          matchedItem: pref,
+          needed,
+          found,
+          availableVariants
+        }
+      }
+    }
+  }
+
+  // 2. Procura todas as variantes que o jogador possui em quantidade suficiente
+  const available = []
+  for (const variant of variants) {
+    const { ok, found } = checkInventoryItem(inventory, variant.itemId, needed)
+    if (ok) {
+      available.push({ variant, found })
+    }
+  }
+
+  if (available.length > 0) {
+    return {
+      ok: true,
+      matchedItem: available[0].variant,
+      needed,
+      found: available[0].found,
+      availableVariants: available.map(a => a.variant)
+    }
+  }
+
+  // 3. Nenhuma variante suficiente
+  const totalFound = variants.reduce((acc, v) => acc + checkInventoryItem(inventory, v.itemId, 1).found, 0)
+  return {
+    ok: false,
+    matchedItem: variants[0],
+    needed,
+    found: totalFound,
+    variants,
+    availableVariants: []
+  }
+}
+
+/**
+ * Valida se uma receita pode ser preparada com o inventário fornecido.
+ * Suporta resolução de variantes/alternativas de ingredientes.
+ * Retorna { ok, resolvedIngredients, missingIngredients, reason }
+ */
+export function canCookRecipe(recipe, inventory = [], selectedVariantMap = {}) {
   if (!recipe || recipe.enabled === false) {
     return { ok: false, reason: 'Receita desativada.' }
   }
@@ -233,24 +356,36 @@ export function canCookRecipe(recipe, inventory = []) {
     }
   }
 
-  // 2. Checa todos os ingredientes
+  // 2. Checa todos os ingredientes considerando alternativas
   const missingIngredients = []
+  const resolvedIngredients = []
   const ingredients = recipe.ingredients || []
 
   if (ingredients.length === 0) {
     return { ok: false, reason: 'Receita sem ingredientes cadastrados.' }
   }
 
-  for (const ing of ingredients) {
-    const needed = Math.max(1, Number(ing.quantity) || 1)
-    const { ok, found } = checkInventoryItem(inventory, ing.itemId, needed)
-    if (!ok) {
+  for (let idx = 0; idx < ingredients.length; idx++) {
+    const ing = ingredients[idx]
+    const preferred = selectedVariantMap?.[idx] || null
+    const match = resolveIngredientMatch(ing, inventory, preferred)
+
+    if (match.ok) {
+      resolvedIngredients.push({
+        index: idx,
+        original: ing,
+        matchedItem: match.matchedItem,
+        quantity: match.needed,
+        availableVariants: match.availableVariants
+      })
+    } else {
+      const variantNames = (match.variants || [ing]).map(v => v.name).join(' ou ')
       missingIngredients.push({
         itemId: ing.itemId,
-        name: ing.name || ing.itemId,
+        name: variantNames,
         icon: ing.icon || '📦',
-        needed,
-        found
+        needed: match.needed,
+        found: match.found
       })
     }
   }
@@ -263,12 +398,11 @@ export function canCookRecipe(recipe, inventory = []) {
     }
   }
 
-  return { ok: true }
+  return { ok: true, resolvedIngredients }
 }
 
 /**
  * Filtra a lista de receitas para retornar APENAS aquelas que o jogador pode cozinhar agora.
- * (Regra estrita de exibição solicitada pelo usuário)
  */
 export function getAvailableRecipes(recipes = [], inventory = []) {
   if (!Array.isArray(recipes)) return []

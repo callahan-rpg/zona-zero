@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { collection, onSnapshot, doc, runTransaction, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, onSnapshot, doc, runTransaction, setDoc, updateDoc, deleteDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useItemCatalog } from '../utils/itemCatalogService'
 import { DEFAULT_RECIPES, COOKING_UTENSILS } from '../utils/cookingSystem'
@@ -11,11 +11,14 @@ const EMPTY_RECIPE_FORM = {
   icon: '🍳',
   description: '',
   enabled: true,
-  cookDurationSec: 4,
+  cookDurationSec: 6,
+  minigame: 'temperature',
+  minigameDifficulty: 'normal',
+  ingredientLossOnFailure: false,
   requiredTool: 'panela_frigideira',
   requiredToolName: 'Panela ou Frigideira de Ferro',
   ingredients: [
-    { itemId: '', name: '', icon: '📦', quantity: 1 }
+    { itemId: '', name: '', icon: '📦', quantity: 1, alternatives: [] }
   ],
   result: {
     itemId: '',
@@ -89,14 +92,22 @@ export default function AdminCookingEditor({ catalogItems = [] }) {
       icon: recipe.icon || '🍳',
       description: recipe.description || '',
       enabled: recipe.enabled !== false,
-      cookDurationSec: recipe.cookDurationSec || 4,
+      cookDurationSec: recipe.cookDurationSec || 6,
+      minigame: recipe.minigame || 'temperature',
+      minigameDifficulty: recipe.minigameDifficulty || 'normal',
+      ingredientLossOnFailure: !!recipe.ingredientLossOnFailure,
       requiredTool: recipe.requiredTool || '',
       requiredToolName: recipe.requiredToolName || '',
       ingredients: (recipe.ingredients || []).map(ing => ({
         itemId: ing.itemId || '',
         name: ing.name || '',
         icon: ing.icon || '📦',
-        quantity: Math.max(1, Number(ing.quantity) || 1)
+        quantity: Math.max(1, Number(ing.quantity) || 1),
+        alternatives: (ing.alternatives || []).map(a => ({
+          itemId: a.itemId || '',
+          name: a.name || a.itemId || '',
+          icon: a.icon || '📦'
+        }))
       })),
       result: {
         itemId: recipe.result?.itemId || '',
@@ -126,7 +137,7 @@ export default function AdminCookingEditor({ catalogItems = [] }) {
       ...prev,
       ingredients: [
         ...prev.ingredients,
-        { itemId: '', name: '', icon: '📦', quantity: 1 }
+        { itemId: '', name: '', icon: '📦', quantity: 1, alternatives: [] }
       ]
     }))
   }
@@ -136,6 +147,41 @@ export default function AdminCookingEditor({ catalogItems = [] }) {
       ...prev,
       ingredients: prev.ingredients.filter((_, i) => i !== index)
     }))
+  }
+
+  function handleAddAlternative(ingIdx, itemId) {
+    if (!itemId) return
+    const found = supplyItems.find(i => (i.itemId || i.id) === itemId)
+    if (!found) return
+    setForm(prev => {
+      const updated = [...prev.ingredients]
+      const currentAlts = updated[ingIdx]?.alternatives || []
+      if (currentAlts.some(a => a.itemId === (found.itemId || found.id))) return prev
+      updated[ingIdx] = {
+        ...updated[ingIdx],
+        alternatives: [
+          ...currentAlts,
+          {
+            itemId: found.itemId || found.id,
+            name: found.name || itemId,
+            icon: found.icon || '📦'
+          }
+        ]
+      }
+      return { ...prev, ingredients: updated }
+    })
+  }
+
+  function handleRemoveAlternative(ingIdx, altIdx) {
+    setForm(prev => {
+      const updated = [...prev.ingredients]
+      const currentAlts = updated[ingIdx]?.alternatives || []
+      updated[ingIdx] = {
+        ...updated[ingIdx],
+        alternatives: currentAlts.filter((_, i) => i !== altIdx)
+      }
+      return { ...prev, ingredients: updated }
+    })
   }
 
   function handleIngredientChange(index, itemId) {
@@ -205,14 +251,22 @@ export default function AdminCookingEditor({ catalogItems = [] }) {
       icon: form.icon || '🍲',
       description: form.description.trim(),
       enabled: !!form.enabled,
-      cookDurationSec: Math.max(1, Number(form.cookDurationSec) || 4),
+      cookDurationSec: Math.max(1, Number(form.cookDurationSec) || 6),
+      minigame: form.minigame || 'temperature',
+      minigameDifficulty: form.minigameDifficulty || 'normal',
+      ingredientLossOnFailure: !!form.ingredientLossOnFailure,
       requiredTool: form.requiredTool || '',
       requiredToolName: COOKING_UTENSILS.find(u => u.id === form.requiredTool)?.label || (form.requiredTool ? form.requiredTool : ''),
       ingredients: form.ingredients.map(ing => ({
         itemId: ing.itemId,
         name: ing.name || ing.itemId,
         icon: ing.icon || '📦',
-        quantity: Math.max(1, Number(ing.quantity) || 1)
+        quantity: Math.max(1, Number(ing.quantity) || 1),
+        alternatives: (ing.alternatives || []).map(a => ({
+          itemId: a.itemId,
+          name: a.name || a.itemId,
+          icon: a.icon || '📦'
+        }))
       })),
       result: {
         itemId: form.result.itemId || 'prato_preparado',
@@ -380,8 +434,17 @@ export default function AdminCookingEditor({ catalogItems = [] }) {
                           <strong style={{ fontSize: '14px', color: isEnabled ? '#fff' : 'var(--text-muted)' }}>
                             {recipe.name}
                           </strong>
-                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                            ⏱️ {recipe.cookDurationSec || 4}s • 🍳 {recipe.requiredToolName || (recipe.requiredTool ? recipe.requiredTool : 'Sem ferramenta específica')}
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
+                            <span>⏱️ {recipe.cookDurationSec || 6}s</span>
+                            <span>🍳 {recipe.requiredToolName || (recipe.requiredTool ? recipe.requiredTool : 'Sem ferramenta específica')}</span>
+                            {recipe.minigame !== 'none' ? (
+                              <span style={{ color: '#fbbf24', fontWeight: 600 }}>🔥 Minigame ({recipe.minigameDifficulty || 'normal'})</span>
+                            ) : (
+                              <span style={{ color: '#9ca3af' }}>🚫 Preparo Direto</span>
+                            )}
+                            {recipe.ingredientLossOnFailure && (
+                              <span style={{ color: '#f87171', fontWeight: 600 }}>⚠️ Perde Ingredientes em Falha</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -423,11 +486,19 @@ export default function AdminCookingEditor({ catalogItems = [] }) {
                     {/* INGREDIENTES E RESULTADO */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', background: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: '6px' }}>
                       <div style={{ flex: 1, display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        {(recipe.ingredients || []).map((ing, idx) => (
-                          <span key={idx} style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', color: '#e5e7eb' }}>
-                            {ing.quantity}x {ing.icon || ''} {ing.name || ing.itemId}
-                          </span>
-                        ))}
+                        {(recipe.ingredients || []).map((ing, idx) => {
+                          const altCount = (ing.alternatives || []).length
+                          return (
+                            <span key={idx} style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', color: '#e5e7eb' }}>
+                              {ing.quantity}x {ing.icon || ''} {ing.name || ing.itemId}
+                              {altCount > 0 ? (
+                                <span style={{ color: '#fbbf24', marginLeft: '4px', fontSize: '10px' }}>
+                                  (ou {ing.alternatives.map(a => a.name).join(', ')})
+                                </span>
+                              ) : null}
+                            </span>
+                          )
+                        })}
                       </div>
                       <span style={{ color: '#fbbf24', fontWeight: 700 }}>➔</span>
                       <div style={{ color: '#34d399', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -539,6 +610,55 @@ export default function AdminCookingEditor({ catalogItems = [] }) {
             </div>
           </div>
 
+          {/* SEÇÃO: CONFIGURAÇÃO DE MINIGAME */}
+          <div style={{ padding: '10px', background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 700, color: '#fbbf24', margin: 0 }}>
+              🔥 Minigame & Mecânica de Preparo
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: '10px' }}>Tipo de Minigame</label>
+                <select
+                  value={form.minigame || 'temperature'}
+                  onChange={e => setForm(prev => ({ ...prev, minigame: e.target.value }))}
+                >
+                  <option value="temperature">🔥 Controle de Temperatura (Padrão)</option>
+                  <option value="none">🚫 Nenhum (Preparo Direto / Sem Minigame)</option>
+                </select>
+              </div>
+
+              {form.minigame !== 'none' ? (
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '10px' }}>Dificuldade do Minigame</label>
+                  <select
+                    value={form.minigameDifficulty || 'normal'}
+                    onChange={e => setForm(prev => ({ ...prev, minigameDifficulty: e.target.value }))}
+                  >
+                    <option value="easy">🟢 Fácil (Zona Ideal Ampla)</option>
+                    <option value="normal">🟡 Normal (Equilibrado)</option>
+                    <option value="hard">🔴 Difícil (Zona Estreita)</option>
+                  </select>
+                </div>
+              ) : <span />}
+            </div>
+
+            {form.minigame !== 'none' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                <input
+                  type="checkbox"
+                  id="ingredientLossOnFailureChk"
+                  checked={!!form.ingredientLossOnFailure}
+                  onChange={e => setForm(prev => ({ ...prev, ingredientLossOnFailure: e.target.checked }))}
+                  style={{ width: 'auto' }}
+                />
+                <label htmlFor="ingredientLossOnFailureChk" style={{ margin: 0, fontSize: '11px', cursor: 'pointer', color: form.ingredientLossOnFailure ? '#f87171' : '#e5e7eb' }}>
+                  Perder/desperdiçar ingredientes se o jogador falhar no minigame
+                </label>
+              </div>
+            )}
+          </div>
+
           {/* SEÇÃO: INGREDIENTES NECESSÁRIOS */}
           <div style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -555,43 +675,119 @@ export default function AdminCookingEditor({ catalogItems = [] }) {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {form.ingredients.map((ing, idx) => (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 30px', gap: '6px', alignItems: 'center' }}>
+                <div
+                  key={idx}
+                  style={{
+                    padding: '8px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 30px', gap: '6px', alignItems: 'center' }}>
                     <select
-                    value={ing.itemId}
-                    onChange={e => handleIngredientChange(idx, e.target.value)}
-                    style={{ fontSize: '11px', padding: '4px 6px' }}
-                    required
-                  >
-                    <option value="">Selecione o mantimento...</option>
-                    {supplyItems.map(it => (
-                      <option key={it.itemId || it.id} value={it.itemId || it.id}>
-                        {it.icon || '🌾'} {it.name || it.itemId || it.id}
-                      </option>
-                    ))}
-                  </select>
-
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Qtd"
-                    value={ing.quantity}
-                    onChange={e => handleIngredientQtyChange(idx, e.target.value)}
-                    style={{ fontSize: '11px', padding: '4px 6px', textAlign: 'center' }}
-                    required
-                  />
-
-                  {form.ingredients.length > 1 ? (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger"
-                      onClick={() => handleRemoveIngredientRow(idx)}
-                      style={{ padding: '2px 6px', fontSize: '10px' }}
+                      value={ing.itemId}
+                      onChange={e => handleIngredientChange(idx, e.target.value)}
+                      style={{ fontSize: '11px', padding: '4px 6px' }}
+                      required
                     >
-                      ✕
-                    </button>
-                  ) : <span />}
+                      <option value="">Selecione o mantimento base...</option>
+                      {supplyItems.map(it => (
+                        <option key={it.itemId || it.id} value={it.itemId || it.id}>
+                          {it.icon || '🌾'} {it.name || it.itemId || it.id}
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Qtd"
+                      value={ing.quantity}
+                      onChange={e => handleIngredientQtyChange(idx, e.target.value)}
+                      style={{ fontSize: '11px', padding: '4px 6px', textAlign: 'center' }}
+                      required
+                    />
+
+                    {form.ingredients.length > 1 ? (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger"
+                        onClick={() => handleRemoveIngredientRow(idx)}
+                        style={{ padding: '2px 6px', fontSize: '10px' }}
+                        title="Remover slot de ingrediente"
+                      >
+                        ✕
+                      </button>
+                    ) : <span />}
+                  </div>
+
+                  {/* VARIAÇÕES / ALTERNATIVAS PARA ESTE INGREDIENTE */}
+                  <div style={{ padding: '4px 6px', background: 'rgba(245, 158, 11, 0.04)', borderRadius: '6px', border: '1px dashed rgba(245, 158, 11, 0.2)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '9.5px', color: '#fbbf24', fontWeight: 600 }}>
+                        🔁 Variações Aceitas: {ing.alternatives?.length > 0 ? `(${ing.alternatives.length})` : 'Nenhuma'}
+                      </span>
+                    </div>
+
+                    {/* Chips de alternativas cadastradas */}
+                    {ing.alternatives?.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {ing.alternatives.map((alt, altIdx) => (
+                          <span
+                            key={altIdx}
+                            style={{
+                              fontSize: '10px',
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              color: '#fbbf24',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <span>{alt.icon || '📦'} {alt.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAlternative(idx, altIdx)}
+                              style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', padding: 0, fontSize: '10px', fontWeight: 'bold' }}
+                              title="Remover variação"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Dropdown inline para adicionar nova variante */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAddAlternative(idx, e.target.value)
+                            e.target.value = ''
+                          }
+                        }}
+                        defaultValue=""
+                        style={{ fontSize: '10px', padding: '2px 6px', flex: 1, color: '#fbbf24' }}
+                      >
+                        <option value="" disabled>➕ Adicionar variação aceita (ex: outro peixe/carne)...</option>
+                        {supplyItems.filter(it => (it.itemId || it.id) !== ing.itemId && !(ing.alternatives || []).some(a => a.itemId === (it.itemId || it.id))).map(it => (
+                          <option key={it.itemId || it.id} value={it.itemId || it.id}>
+                            {it.icon || '🌾'} {it.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
