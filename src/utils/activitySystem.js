@@ -547,6 +547,10 @@ export function addItemToInventory(inventory, itemData) {
       isQuestItem: false,
       equipped: false,
       description: itemData.description || '',
+      ...(itemData.maxUses && Number(itemData.maxUses) > 1 ? {
+        maxUses: Number(itemData.maxUses),
+        currentUses: Number(itemData.maxUses),
+      } : {}),
       obtainedAt: new Date().toISOString(),
       obtainedFrom: itemData.obtainedFrom || 'Atividade de Produção',
     })

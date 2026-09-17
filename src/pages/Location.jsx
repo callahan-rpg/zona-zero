@@ -434,6 +434,10 @@ export default function Location() {
                 isQuestItem: item.isQuestItem ?? false,
                 description: item.description || '',
                 unlocks: item.unlocks || [],
+                ...(item.maxUses && Number(item.maxUses) > 1 ? {
+                  maxUses: Number(item.maxUses),
+                  currentUses: Number(item.maxUses),
+                } : {}),
                 obtainedAt: new Date().toISOString(),
                 obtainedFrom: `Suprimentos (${slug})`,
               })

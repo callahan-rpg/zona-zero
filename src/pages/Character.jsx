@@ -194,6 +194,7 @@ export default function Character() {
         setSurvivors(filtered)
         if (filtered.length > 0) {
           setRecipientUid(filtered[0].uid)
+          setConsumeTargetUid((prev) => prev || filtered[0].uid)
         }
       } catch (err) {
         console.error('Erro ao buscar sobreviventes:', err)
@@ -203,7 +204,7 @@ export default function Character() {
     }
 
     loadSurvivors()
-  }, [showTransfer, user])
+  }, [showTransfer, showConsumeModal, user])
 
   // Utiliza o listener único compartilhado e em cache do catálogo de itens global
   const { map: catalogMap } = useItemCatalog()

@@ -1143,6 +1143,10 @@ export default function Admin() {
         consumeEffect: newItem.consumeEffect || null,
         isQuestItem: !!newItem.isQuestItem,
         description: newItem.description || '',
+        ...(newItem.maxUses && Number(newItem.maxUses) > 1 ? {
+          maxUses: Number(newItem.maxUses),
+          currentUses: Number(newItem.maxUses),
+        } : {}),
         obtainedAt: new Date().toISOString(),
         obtainedFrom: 'Admin Console'
       })
@@ -6368,7 +6372,8 @@ export default function Admin() {
                                         consumable: !!item.consumable,
                                         consumeEffect: item.consumeEffect || null,
                                         isQuestItem: !!item.isQuestItem,
-                                        description: item.description || ''
+                                        description: item.description || '',
+                                        maxUses: item.maxUses || null,
                                       })}
                                       title={item.description || item.name}
                                       style={{

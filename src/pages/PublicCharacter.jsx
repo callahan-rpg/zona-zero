@@ -177,6 +177,38 @@ export default function PublicCharacter() {
     return { filteredItems: filtered, categoryCounts: counts }
   }, [inventory, activeCategory])
 
+  // Itens médicos da mochila do usuário logado (para prestar atendimento)
+  const myMedicalItems = useMemo(() => {
+    const items = myChar?.inventory || []
+    return items
+      .map((item) => {
+        const catData = catalogMap[item.itemId]
+        const presetData = DEFAULT_PRESET_ITEMS.find((p) => p.itemId === item.itemId)
+        const category = catData?.category || item.category || presetData?.category || getItemCategory(item)
+        const maxUses = catData?.maxUses !== undefined ? Number(catData.maxUses) : item.maxUses !== undefined ? Number(item.maxUses) : (presetData?.maxUses ?? 1)
+        const currentUses = item.currentUses !== undefined ? Number(item.currentUses) : maxUses
+        const canTargetOther = catData?.canTargetOther !== undefined
+          ? !!catData.canTargetOther
+          : item.canTargetOther !== undefined
+          ? !!item.canTargetOther
+          : presetData?.canTargetOther !== undefined
+          ? !!presetData.canTargetOther
+          : category === 'medical'
+
+        return {
+          ...item,
+          name: catData?.name || item.name || presetData?.name || 'Item',
+          icon: catData?.icon || item.icon || presetData?.icon || '💉',
+          category,
+          maxUses,
+          currentUses,
+          consumeEffect: catData?.consumeEffect || item.consumeEffect,
+          canTargetOther
+        }
+      })
+      .filter((item) => item.canTargetOther || item.category === 'medical')
+  }, [myChar?.inventory, catalogMap])
+
   if (loading) {
     return <div className="loading-screen"><span className="loading-dot" /></div>
   }
@@ -211,9 +243,9 @@ export default function PublicCharacter() {
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       <HUD />
 
-      <div className="character-page-container">
+      <div className="character-page">
         {/* Topo / Voltar */}
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto 16px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button
             type="button"
             className="btn btn-sm"

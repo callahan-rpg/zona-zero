@@ -507,8 +507,10 @@ export function AuthProvider({ children }) {
       if (itemIndex === -1) throw new Error('Item não encontrado no inventário.')
 
       const item = inventory[itemIndex]
-      const usesInfo = getItemUses(item)
-      const maxUses = usesInfo.maxUses
+      // Lê maxUses diretamente do item (salvo no Firestore), com fallback para presets hardcoded.
+      // NÃO usar getItemUses() aqui pois dentro de uma transaction não temos o catalogMap do Firestore.
+      const presetDataForConsume = DEFAULT_PRESET_ITEMS.find(p => p.itemId === item.itemId)
+      const maxUses = Math.max(1, Number(item.maxUses ?? presetDataForConsume?.maxUses ?? 1))
 
       if (maxUses > 1) {
         // Item com múltiplas doses/usos (ex: Kit de Cirurgia 3x, Álcool 2x)
@@ -692,8 +694,9 @@ export function AuthProvider({ children }) {
       }
 
       const item = senderInventory[itemIndex]
-      const usesInfo = getItemUses(item)
-      const maxUses = usesInfo.maxUses
+      // Lê maxUses diretamente do item salvo no Firestore (sem catalogMap na transaction)
+      const presetDataForUseOn = DEFAULT_PRESET_ITEMS.find(p => p.itemId === item.itemId)
+      const maxUses = Math.max(1, Number(item.maxUses ?? presetDataForUseOn?.maxUses ?? 1))
 
       let remainingUses = 0
 
