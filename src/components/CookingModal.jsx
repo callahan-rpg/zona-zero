@@ -4,6 +4,7 @@ import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { canCookRecipe, getAvailableRecipes, resolveIngredientMatch, getIngredientVariants, DEFAULT_RECIPES } from '../utils/cookingSystem'
 import { consumeItemFromInventory, addItemToInventory } from '../utils/activitySystem'
+import { checkInventorySlotsAvailable } from '../utils/weightSystem'
 import { RARITY_META } from '../utils/itemSystem'
 import { createMiniGameSession, validateMiniGameOutcome, MINIGAME_TYPES } from '../utils/minigameEngine'
 import CookingMinigame from './CookingMinigame.jsx'
@@ -74,6 +75,21 @@ export default function CookingModal({ locationSlug, onClose }) {
     const check = canCookRecipe(selectedRecipe, character?.inventory || [], selectedVariants)
     if (!check.ok) {
       setActionError(check.reason || 'Você não atende aos requisitos desta receita.')
+      return
+    }
+
+    // Pré-validação de espaço no inventário
+    const resDef = selectedRecipe.result || {}
+    const resultItem = { itemId: resDef.itemId || 'comida_preparada' }
+    let simulatedInv = [...(character?.inventory || [])]
+    const resolved = check.resolvedIngredients || []
+    for (const itemSlot of resolved) {
+      const qty = Math.max(1, Number(itemSlot.quantity) || 1)
+      simulatedInv = consumeItemFromInventory(simulatedInv, itemSlot.matchedItem.itemId, qty, itemSlot.matchedItem.name)
+    }
+    const slotCheck = checkInventorySlotsAvailable({ ...character, inventory: simulatedInv }, resultItem)
+    if (!slotCheck.allowed) {
+      setActionError(slotCheck.reason || 'Seu inventário está cheio!')
       return
     }
 
@@ -188,6 +204,12 @@ export default function CookingModal({ locationSlug, onClose }) {
             consumeEffect: resDef.consumeEffect || { hunger: 40, blood: 15 },
             description: resDef.description || recipeToCook.description || 'Comida quente e nutritiva preparada na cozinha.',
             obtainedFrom: 'Cozinha / Culinária'
+          }
+
+          // Validação de espaço no inventário pós-consumo dos ingredientes
+          const slotCheckTx = checkInventorySlotsAvailable({ ...charData, inventory: currentInv }, resultItemData)
+          if (!slotCheckTx.allowed) {
+            throw new Error(slotCheckTx.reason || 'Seu inventário está cheio!')
           }
 
           currentInv = addItemToInventory(currentInv, resultItemData)

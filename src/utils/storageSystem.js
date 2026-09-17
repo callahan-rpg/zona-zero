@@ -1,5 +1,6 @@
 import { doc, runTransaction } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { checkInventorySlotsAvailable } from './weightSystem.js'
 
 /**
  * Definição dos tipos padronizados de recipientes de armazenamento
@@ -268,6 +269,12 @@ export async function withdrawFromStorage({
         quantity: (userInventory[existingIndex].quantity || 0) + quantityToWithdraw
       }
     } else {
+      // Valida se o usuário tem slots livres no inventário
+      const slotCheck = checkInventorySlotsAvailable(userData.character, { itemId: storageItem.itemId, isQuestItem: storageItem.isQuestItem })
+      if (!slotCheck.allowed) {
+        throw new Error(slotCheck.reason || 'Seu inventário está cheio! Libere espaço antes de retirar este item.')
+      }
+
       userInventory.push({
         ...storageItem,
         instanceId: Math.random().toString(36).substring(2) + Date.now().toString(36),

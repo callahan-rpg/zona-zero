@@ -28,6 +28,7 @@ import {
   getBarColor,
   FARMING_DEFAULTS,
 } from '../utils/activitySystem'
+import { checkInventorySlotsAvailable } from '../utils/weightSystem'
 
 // Sementes suportadas padrão caso não estejam customizadas na atividade
 const DEFAULT_SEED_CONFIGS = {
@@ -207,17 +208,22 @@ export default function FarmingModal({ activity, character, locationSlug, onClos
         // 3. Sorteia descoberta de minhocas ao revirar a terra no plantio
         wormResult = rollWormDiscovery(activity?.wormFindChancePlanting ?? 0.30, 1, 5)
         if (wormResult.found) {
-          inv = addItemToInventory(inv, {
-            itemId: 'minhoca',
-            name: 'Minhoca',
-            icon: '🪱',
-            quantity: wormResult.quantity,
-            category: 'general',
-            rarity: 'common',
-            consumable: false,
-            description: 'Isca viva encontrada ao revirar a terra fértil da plantação.',
-            obtainedFrom: `Horta — ${locationSlug}`,
-          })
+          const slotCheckWorm = checkInventorySlotsAvailable({ ...charData, inventory: inv }, { itemId: 'minhoca' })
+          if (slotCheckWorm.allowed) {
+            inv = addItemToInventory(inv, {
+              itemId: 'minhoca',
+              name: 'Minhoca',
+              icon: '🪱',
+              quantity: wormResult.quantity,
+              category: 'general',
+              rarity: 'common',
+              consumable: false,
+              description: 'Isca viva encontrada ao revirar a terra fértil da plantação.',
+              obtainedFrom: `Horta — ${locationSlug}`,
+            })
+          } else {
+            wormResult.found = false // Sem espaço para pegar as minhocas
+          }
         }
 
         // Cria o canteiro
@@ -328,17 +334,22 @@ export default function FarmingModal({ activity, character, locationSlug, onClos
         // Sorteia minhocas ao cuidar/regar a terra
         wormResult = rollWormDiscovery(activity?.wormFindChanceCaring ?? 0.30, 1, 5)
         if (wormResult.found) {
-          inv = addItemToInventory(inv, {
-            itemId: 'minhoca',
-            name: 'Minhoca',
-            icon: '🪱',
-            quantity: wormResult.quantity,
-            category: 'general',
-            rarity: 'common',
-            consumable: false,
-            description: 'Isca viva encontrada ao cuidar da plantação úmida.',
-            obtainedFrom: `Horta — ${locationSlug}`,
-          })
+          const slotCheckWorm = checkInventorySlotsAvailable({ ...charData, inventory: inv }, { itemId: 'minhoca' })
+          if (slotCheckWorm.allowed) {
+            inv = addItemToInventory(inv, {
+              itemId: 'minhoca',
+              name: 'Minhoca',
+              icon: '🪱',
+              quantity: wormResult.quantity,
+              category: 'general',
+              rarity: 'common',
+              consumable: false,
+              description: 'Isca viva encontrada ao cuidar da plantação úmida.',
+              obtainedFrom: `Horta — ${locationSlug}`,
+            })
+          } else {
+            wormResult.found = false // Sem espaço para pegar as minhocas
+          }
         }
 
         // Recupera saúde (+15, max 100) e renova timer de cuidado
@@ -435,6 +446,13 @@ export default function FarmingModal({ activity, character, locationSlug, onClos
       return
     }
 
+    // Pré-validação de espaço no inventário
+    const slotCheck = checkInventorySlotsAvailable(character, { itemId: plot.cropItemId })
+    if (!slotCheck.allowed) {
+      showMsg('error', slotCheck.reason || 'Seu inventário está cheio!')
+      return
+    }
+
     setActionLoading(true)
     try {
       const userRef = doc(db, 'users', user.uid)
@@ -453,10 +471,17 @@ export default function FarmingModal({ activity, character, locationSlug, onClos
         if (!computed.isReady) throw new Error('A plantação ainda não está pronta para colheita.')
         if (computed.isDead) throw new Error('A plantação morreu e não pode ser colhida.')
 
-        // Rendimento calculado baseado na qualidade e saúde
-        harvestYield = calculateHarvestYield(plotData, computed.health)
         const charData = userSnap.data().character || {}
         let inv = [...(charData.inventory || [])]
+
+        // Validação de espaço dentro da transação
+        const slotCheckTx = checkInventorySlotsAvailable(charData, { itemId: plotData.cropItemId })
+        if (!slotCheckTx.allowed) {
+          throw new Error(slotCheckTx.reason || 'Seu inventário está cheio!')
+        }
+
+        // Rendimento calculado baseado na qualidade e saúde
+        harvestYield = calculateHarvestYield(plotData, computed.health)
 
         // Adiciona a colheita ao inventário
         inv = addItemToInventory(inv, {

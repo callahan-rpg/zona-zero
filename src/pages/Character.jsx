@@ -32,6 +32,7 @@ export const INVENTORY_CATEGORIES = [
   { id: 'supplies',    label: 'Mantimentos',         icon: '🌾' },
   { id: 'clothing',    label: 'Roupas',              icon: '👕' },
   { id: 'accessories', label: 'Acessórios',          icon: '🪡' },
+  { id: 'tools',       label: 'Ferramentas',         icon: '🔧' },
   { id: 'melee',       label: 'Armas Brancas',       icon: '🗡️' },
   { id: 'firearms',    label: 'Armas de Fogo',       icon: '🔫' },
   { id: 'medical',     label: 'Suprimentos Médicos', icon: '💉' },
@@ -46,6 +47,7 @@ export function getItemCategory(item) {
     if (['accessories', 'acessorios', 'acessórios', 'acessorio', 'acessório'].includes(cat)) return 'accessories'
     if (['supplies', 'mantimentos', 'comida', 'bebida', 'alimento'].includes(cat)) return 'supplies'
     if (['clothing', 'roupas', 'roupa', 'vestimenta', 'equipamento'].includes(cat)) return 'clothing'
+    if (['tools', 'ferramentas', 'ferramenta', 'tool'].includes(cat)) return 'tools'
     if (['melee', 'armas brancas', 'branca', 'corpo a corpo'].includes(cat)) return 'melee'
     if (['firearms', 'armas de fogo', 'fogo', 'armas'].includes(cat)) return 'firearms'
     if (['medical', 'suprimentos medicos', 'medico', 'médico', 'cura'].includes(cat)) return 'medical'
@@ -98,6 +100,13 @@ export function getItemCategory(item) {
     return 'clothing'
   }
 
+  // Ferramentas
+  if (
+    /enxada|enxadão|foice|pa\b|pá\b|corda|soga|corrente|alavanca|martelo|alicate|chave de fenda|chave inglesa|serrote|serra|furadeira|prego|parafuso|vara de pesca|anzol|armadilha|ferramenta|tools|kit de ferramenta/i.test(text)
+  ) {
+    return 'tools'
+  }
+
   // Mantimentos (Comida e Bebida)
   if (
     /agua|água|comida|enlatad|cereal|cereais|cafe|café|cha|chá|mantimento|biscoito|refrigerante|suco|garrafa/i.test(text)
@@ -112,6 +121,7 @@ const CATEGORY_LABELS = {
   general:     { label: 'Item Geral',         color: 'var(--text-muted)' },
   clothing:    { label: 'Roupa / Vestuário',  color: '#70d6ff' },
   accessories: { label: 'Acessório',          color: '#eab308' },
+  tools:       { label: 'Ferramenta',         color: '#a78bfa' },
   melee:       { label: 'Arma Branca',        color: '#ff9770' },
   firearms:    { label: 'Arma de Fogo',       color: '#ff70a6' },
   medical:     { label: 'Suprimento Médico',  color: '#5cff7a' },
@@ -329,6 +339,7 @@ export default function Character() {
       supplies: 0,
       clothing: 0,
       accessories: 0,
+      tools: 0,
       melee: 0,
       firearms: 0,
       medical: 0,

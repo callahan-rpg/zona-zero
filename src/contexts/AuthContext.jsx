@@ -20,7 +20,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
 import { getMaxHp, DEFAULT_PRESET_ITEMS, getItemUses, hasRadio, calculateCharacterEquipmentStats } from '../utils/itemSystem'
 import { addItemToInventory } from '../utils/activitySystem'
-import { canUnequipBackpack } from '../utils/weightSystem'
+import { canUnequipBackpack, checkInventorySlotsAvailable } from '../utils/weightSystem'
 import { syncPlayerIndex } from '../utils/playerIndexService'
 import { getCatalogItem } from '../utils/itemCatalogService'
 import { getCampActiveModifiers } from '../utils/campSystem'
@@ -1039,6 +1039,12 @@ export function AuthProvider({ children }) {
         throw new Error('Você já realizou a Busca Única neste local.')
       }
 
+      // Valida se os itens escolhidos cabem no inventário
+      const slotCheck = checkInventorySlotsAvailable(charData, chosenItems)
+      if (!slotCheck.allowed) {
+        throw new Error(slotCheck.reason || 'Espaço insuficiente no inventário! Libere slots para receber estes itens.')
+      }
+
       uniqueSearchesDone[locationSlug] = new Date().toISOString()
       const inventory = [...(charData.inventory || [])]
 
@@ -1120,6 +1126,12 @@ export function AuthProvider({ children }) {
       if (recipientExisting) {
         recipientExisting.quantity = (recipientExisting.quantity || 1) + quantityToTransfer
       } else {
+        // Valida se o destinatário possui slot livre no inventário
+        const recipientSlotCheck = checkInventorySlotsAvailable(recipientData.character, { itemId: item.itemId, isQuestItem: item.isQuestItem })
+        if (!recipientSlotCheck.allowed) {
+          throw new Error(`O inventário de ${recipientData.character?.name || 'destinatário'} está cheio (${recipientSlotCheck.usedSlots}/${recipientSlotCheck.maxSlots} slots).`)
+        }
+
         recipientInventory.push({
           instanceId: Math.random().toString(36).substring(2) + Date.now().toString(36),
           itemId: item.itemId,

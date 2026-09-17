@@ -15,6 +15,7 @@ import {
   checkInventoryItem,
 } from '../utils/activitySystem'
 import { RARITY_META } from '../utils/itemSystem'
+import { checkInventorySlotsAvailable } from '../utils/weightSystem'
 
 // Mapeia itemIds de peixes para dados do preset
 const FISH_META = {
@@ -132,6 +133,15 @@ export default function FishingModal({ activity, character, locationSlug, onClos
       return
     }
 
+    // Validação prévia de slots no inventário
+    const slotCheck = checkInventorySlotsAvailable(character, null)
+    const minhocaItem = (character?.inventory || []).find(i => i && isItemMatching(i, 'minhoca') && (i.quantity || 1) >= 1)
+    const willFreeSlot = minhocaItem && Number(minhocaItem.quantity || 1) === 1
+    if (slotCheck.usedSlots >= slotCheck.maxSlots && !willFreeSlot) {
+      setErrorMsg(`Seu inventário está cheio (${slotCheck.usedSlots}/${slotCheck.maxSlots} slots). Libere espaço no inventário antes de pescar.`)
+      return
+    }
+
     setLoading(true)
     setErrors([])
     setErrorMsg('')
@@ -163,8 +173,15 @@ export default function FishingModal({ activity, character, locationSlug, onClos
         if (!validTool.ok) throw new Error(validTool.error)
 
         // Validação de minhocas
-        const minhocaItem = inv.find(i => i && isItemMatching(i, 'minhoca') && (i.quantity || 1) >= 1)
-        if (!minhocaItem) throw new Error('Você não possui minhocas para usar como isca.')
+        const minhocaItemTx = inv.find(i => i && isItemMatching(i, 'minhoca') && (i.quantity || 1) >= 1)
+        if (!minhocaItemTx) throw new Error('Você não possui minhocas para usar como isca.')
+
+        // Validação de espaço no inventário dentro da transação
+        const slotCheckTx = checkInventorySlotsAvailable(charData, null)
+        const willFreeSlotTx = minhocaItemTx && Number(minhocaItemTx.quantity || 1) === 1
+        if (slotCheckTx.usedSlots >= slotCheckTx.maxSlots && !willFreeSlotTx) {
+          throw new Error(`Seu inventário está cheio (${slotCheckTx.usedSlots}/${slotCheckTx.maxSlots} slots). Libere espaço para pescar.`)
+        }
 
         // Validação estrita de Cooldown na tentativa
         const lastAttempt = charData.lastFishingAttempt?.[locationSlug] ||
@@ -243,18 +260,21 @@ export default function FishingModal({ activity, character, locationSlug, onClos
 
         // 2. Adiciona recompensa se um peixe foi capturado (estritamente 1 peixe)
         if (rewardItem) {
-          const meta = FISH_META[rewardItem.itemId] || {}
-          inv = addItemToInventory(inv, {
-            itemId: rewardItem.itemId,
-            name: meta.name || rewardItem.name || 'Peixe',
-            icon: meta.icon || rewardItem.icon || '🐟',
-            quantity: 1, // Sempre 1 por tentativa
-            category: 'general',
-            rarity: meta.rarity || rewardItem.rarity || 'common',
-            consumable: true,
-            consumeEffect: rewardItem.consumeEffect || { hunger: 15, blood: 5 },
-            obtainedFrom: `Pesca — ${locationSlug}`,
-          })
+          const slotCheck = checkInventorySlotsAvailable({ ...charData, inventory: inv }, rewardItem)
+          if (slotCheck.allowed) {
+            const meta = FISH_META[rewardItem.itemId] || {}
+            inv = addItemToInventory(inv, {
+              itemId: rewardItem.itemId,
+              name: meta.name || rewardItem.name || 'Peixe',
+              icon: meta.icon || rewardItem.icon || '🐟',
+              quantity: 1, // Sempre 1 por tentativa
+              category: 'general',
+              rarity: meta.rarity || rewardItem.rarity || 'common',
+              consumable: true,
+              consumeEffect: rewardItem.consumeEffect || { hunger: 15, blood: 5 },
+              obtainedFrom: `Pesca — ${locationSlug}`,
+            })
+          }
         }
 
         tx.update(userRef, {

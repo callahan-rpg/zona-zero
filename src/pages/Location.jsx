@@ -19,6 +19,7 @@ import CampOverviewModal from '../components/CampOverviewModal.jsx'
 import BathroomModal from '../components/BathroomModal.jsx'
 import { calculateGameTime, getDynamicWeather } from '../utils/timeSystem'
 import { rollSupplyLoot, rollUniqueLoot, hasItem, RARITY_META } from '../utils/itemSystem'
+import { checkInventorySlotsAvailable } from '../utils/weightSystem'
 import { useItemCatalog } from '../utils/itemCatalogService'
 import { formatDuration } from '../utils/activitySystem'
 
@@ -114,7 +115,7 @@ export default function Location() {
   // Estados de Loja Local
   const [showShop, setShowShop] = useState(false)
   const [shopInfo, setShopInfo] = useState(null)
-  const { list: catalogItems } = useItemCatalog()
+  const { list: catalogItems, map: catalogMap } = useItemCatalog()
 
   // Estados de Armazenamento / Storages Locais
   const [locationStorages, setLocationStorages] = useState([])
@@ -394,12 +395,17 @@ export default function Location() {
   async function handleSupplySearch() {
     if (supplySearchState !== 'idle' || supplyCooldown || !location?.loot?.enabled) return
 
+    // Valida se o inventário já está no limite máximo de slots antes de iniciar a busca
+    const slotPreCheck = checkInventorySlotsAvailable(character, null, gameConfig, catalogMap)
+    if (slotPreCheck.usedSlots >= slotPreCheck.maxSlots) {
+      showToast(`Seu inventário está cheio (${slotPreCheck.usedSlots}/${slotPreCheck.maxSlots} slots)! Libere espaço antes de vasculhar.`)
+      return
+    }
+
     setSupplySearchState('searching')
     await new Promise((r) => setTimeout(r, 2000))
 
     const items = rollSupplyLoot(location.loot, character?.perks || [])
-    setSupplyLootResult(items)
-    setSupplySearchState('result')
 
     if (user) {
       const userRef = doc(db, 'users', user.uid)
@@ -412,6 +418,13 @@ export default function Location() {
           if (!snap.exists()) throw new Error('Personagem não encontrado.')
 
           const charData = snap.data().character || {}
+
+          // Validação transacional de slots disponíveis
+          const slotCheck = checkInventorySlotsAvailable(charData, items, gameConfig, catalogMap)
+          if (!slotCheck.allowed) {
+            throw new Error(slotCheck.reason || 'Seu inventário está cheio! Libere espaço no inventário.')
+          }
+
           const inventory = [...(charData.inventory || [])]
 
           // Empilha cada item encontrado com os do mesmo itemId já existentes
@@ -453,17 +466,18 @@ export default function Location() {
         })
 
         // Atualiza o estado local imediatamente com o inventário final confirmado pela transação.
-        // NÃO chamar refreshCharacter() aqui: um getDoc logo após runTransaction pode retornar
-        // um snapshot desatualizado (antes da propagação completa), sobrescrevendo o inventário
-        // recém-gravado e fazendo os itens sumirem. O onSnapshot do AuthContext sincroniza
-        // automaticamente quando o Firestore confirmar a escrita.
         if (finalInventory !== null) {
           setCharacterInventory(finalInventory)
         }
 
+        setSupplyLootResult(items)
+        setSupplySearchState('result')
         setSupplyCooldown(true)
       } catch (err) {
         console.error('Erro ao salvar busca de suprimentos:', err)
+        showToast(err.message || 'Erro ao coletar suprimentos.')
+        setSupplySearchState('idle')
+        setSupplyLootResult([])
       }
     }
   }
@@ -471,6 +485,13 @@ export default function Location() {
   // Lógica da Busca Única (One-shot - Raro, Muito Raro e Excepcional)
   async function handleUniqueSearch() {
     if (uniqueSearchState !== 'idle' || isUniqueDone || !location?.uniqueSearch?.enabled) return
+
+    // Valida se o inventário já está cheio
+    const slotPreCheck = checkInventorySlotsAvailable(character, null, gameConfig, catalogMap)
+    if (slotPreCheck.usedSlots >= slotPreCheck.maxSlots) {
+      showToast(`Seu inventário está cheio (${slotPreCheck.usedSlots}/${slotPreCheck.maxSlots} slots)! Libere espaço para realizar a Busca Única.`)
+      return
+    }
 
     setUniqueSearchState('searching')
     await new Promise((r) => setTimeout(r, 2500))
@@ -502,9 +523,17 @@ export default function Location() {
       return
     }
 
+    const chosen = selectedUniqueIndices.map(idx => uniqueFoundItems[idx])
+
+    // Valida se os itens escolhidos cabem no inventário
+    const slotCheck = checkInventorySlotsAvailable(character, chosen, gameConfig, catalogMap)
+    if (!slotCheck.allowed) {
+      showToast(slotCheck.reason || 'Espaço insuficiente no inventário! Libere slots para levar estes itens.')
+      return
+    }
+
     setUniqueSaving(true)
     try {
-      const chosen = selectedUniqueIndices.map(idx => uniqueFoundItems[idx])
       await recordUniqueSearch(slug, chosen)
       setUniqueSearchState('idle')
       setUniqueFoundItems([])

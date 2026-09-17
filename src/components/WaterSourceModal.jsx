@@ -4,6 +4,7 @@ import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { validateWaterCollection } from '../utils/waterSystem'
 import { consumeItemFromInventory, addItemToInventory } from '../utils/activitySystem'
+import { checkInventorySlotsAvailable } from '../utils/weightSystem'
 import { DEFAULT_PRESET_ITEMS, RARITY_META } from '../utils/itemSystem'
 
 export default function WaterSourceModal({ waterSource, locationSlug, onClose }) {
@@ -48,6 +49,17 @@ export default function WaterSourceModal({ waterSource, locationSlug, onClose })
     const neededTotal = collectQty * (waterSource.requiredQuantity || 1)
     if (emptyBottlesCount < neededTotal) {
       setErrorMsg(`Você precisa de ${neededTotal}x ${waterSource.requiredItemName || 'Garrafa Vazia'} para coletar esta quantidade.`)
+      return
+    }
+
+    // Pré-validação de espaço no inventário
+    const reqItemId = waterSource.requiredItem || 'garrafa_vazia'
+    const reqItemName = waterSource.requiredItemName || 'Garrafa de Água Vazia'
+    const prodItemId = waterSource.producedItem || 'garrafa_agua_impura'
+    const simulatedInv = consumeItemFromInventory([...inventory], reqItemId, neededTotal, reqItemName)
+    const slotCheck = checkInventorySlotsAvailable({ ...character, inventory: simulatedInv }, { itemId: prodItemId })
+    if (!slotCheck.allowed) {
+      setErrorMsg(slotCheck.reason || 'Seu inventário está cheio!')
       return
     }
 
@@ -110,6 +122,12 @@ export default function WaterSourceModal({ waterSource, locationSlug, onClose })
           isQuestItem: false,
           description: preset?.description || 'Água turva coletada de fonte natural. Não deve ser bebida crua. Ferva em uma panela para purificar.',
           obtainedFrom: `Coleta em ${waterSource.name || 'Fonte de Água'}`
+        }
+
+        // Validação de espaço no inventário após o consumo das garrafas vazias
+        const slotCheckTx = checkInventorySlotsAvailable({ ...charData, inventory: currentInv }, createdItem)
+        if (!slotCheckTx.allowed) {
+          throw new Error(slotCheckTx.reason || 'Seu inventário está cheio!')
         }
 
         currentInv = addItemToInventory(currentInv, createdItem)

@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import { useItemCatalog } from '../utils/itemCatalogService'
 import { RARITY_META, DEFAULT_PRESET_ITEMS } from '../utils/itemSystem.js'
 import { STORAGE_TYPES, depositToStorage, withdrawFromStorage } from '../utils/storageSystem.js'
+import { checkInventorySlotsAvailable } from '../utils/weightSystem.js'
 import { getItemCategory } from '../pages/Character.jsx'
 import GameIcon from './GameIcon.jsx'
 import BaseDefenseBanner from './BaseDefenseBanner.jsx'
@@ -256,6 +257,14 @@ export default function StorageModal({
     if (!user || actionLoading) return
     setErrorMsg('')
     setSuccessMsg('')
+
+    // Validação prévia de slots de inventário do jogador
+    const slotCheck = checkInventorySlotsAvailable(character, { itemId: item.itemId, isQuestItem: item.isQuestItem }, null, catalogMap)
+    if (!slotCheck.allowed) {
+      setErrorMsg(slotCheck.reason || 'Seu inventário está cheio! Libere espaço antes de retirar este item.')
+      return
+    }
+
     const qty = Math.max(1, Math.min(item.quantity || 1, withdrawQuantities[item.instanceId] || 1))
 
     try {

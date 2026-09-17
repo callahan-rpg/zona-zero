@@ -16,6 +16,7 @@ import {
   formatHoursAgo,
   getBarColor,
 } from '../utils/activitySystem'
+import { checkInventorySlotsAvailable } from '../utils/weightSystem'
 
 export default function AnimalCareModal({ activity, character, locationSlug, onClose }) {
   const { user, refreshCharacter, campModifiers } = useAuth()
@@ -173,12 +174,22 @@ export default function AnimalCareModal({ activity, character, locationSlug, onC
       return
     }
 
+    const { adubo } = calculateCleaningRewards(computed.aliveAnimals)
+
+    // Pré-validação de slots
+    if (adubo > 0) {
+      const slotCheck = checkInventorySlotsAvailable(character, { itemId: 'adubo' })
+      if (!slotCheck.allowed) {
+        showMsg('error', slotCheck.reason || 'Seu inventário está cheio!')
+        return
+      }
+    }
+
     setActionLoading(true)
     try {
       const userRef = doc(db, 'users', user.uid)
       const coopRef = doc(db, 'activity_states', stateDocId)
       const nowIso = new Date().toISOString()
-      const { adubo } = calculateCleaningRewards(computed.aliveAnimals)
 
       await runTransaction(db, async (tx) => {
         const userSnap = await tx.get(userRef)
@@ -188,18 +199,25 @@ export default function AnimalCareModal({ activity, character, locationSlug, onC
         const charData = userSnap.data().character || {}
         let inv = [...(charData.inventory || [])]
 
-        // Adiciona Adubo
-        inv = addItemToInventory(inv, {
-          itemId: 'adubo',
-          name: 'Adubo',
-          icon: '💩',
-          quantity: adubo,
-          category: 'general',
-          rarity: 'common',
-          consumable: false,
-          description: 'Composto orgânico do galinheiro para melhorar a saúde das plantações na horta.',
-          obtainedFrom: `Galinheiro — ${locationSlug}`,
-        })
+        if (adubo > 0) {
+          const slotCheckTx = checkInventorySlotsAvailable(charData, { itemId: 'adubo' })
+          if (!slotCheckTx.allowed) {
+            throw new Error(slotCheckTx.reason || 'Seu inventário está cheio!')
+          }
+
+          // Adiciona Adubo
+          inv = addItemToInventory(inv, {
+            itemId: 'adubo',
+            name: 'Adubo',
+            icon: '💩',
+            quantity: adubo,
+            category: 'general',
+            rarity: 'common',
+            consumable: false,
+            description: 'Composto orgânico do galinheiro para melhorar a saúde das plantações na horta.',
+            obtainedFrom: `Galinheiro — ${locationSlug}`,
+          })
+        }
 
         // Notificação
         const notifs = [
@@ -242,6 +260,13 @@ export default function AnimalCareModal({ activity, character, locationSlug, onC
   async function handleCollectEggs() {
     if (actionLoading || !coopState || eggsAvailable <= 0) return
 
+    // Pré-validação de slots
+    const slotCheck = checkInventorySlotsAvailable(character, { itemId: 'ovo' })
+    if (!slotCheck.allowed) {
+      showMsg('error', slotCheck.reason || 'Seu inventário está cheio!')
+      return
+    }
+
     setActionLoading(true)
     try {
       const userRef = doc(db, 'users', user.uid)
@@ -256,6 +281,11 @@ export default function AnimalCareModal({ activity, character, locationSlug, onC
 
         const charData = userSnap.data().character || {}
         let inv = [...(charData.inventory || [])]
+
+        const slotCheckTx = checkInventorySlotsAvailable(charData, { itemId: 'ovo' })
+        if (!slotCheckTx.allowed) {
+          throw new Error(slotCheckTx.reason || 'Seu inventário está cheio!')
+        }
 
         // Adiciona ovos
         inv = addItemToInventory(inv, {

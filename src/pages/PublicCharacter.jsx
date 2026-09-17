@@ -4,29 +4,16 @@ import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useItemCatalog } from '../utils/itemCatalogService'
 import HUD from '../components/HUD.jsx'
-import GameIcon from '../components/GameIcon.jsx'
 import EquipmentPaperdoll from '../components/EquipmentPaperdoll.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import {
-  RARITY_META,
   DEFAULT_PRESET_ITEMS,
   calculateCharacterEquipmentStats,
   calculateBodyTemperature,
-  getItemUses
 } from '../utils/itemSystem'
-import { getItemCategory, INVENTORY_CATEGORIES } from './Character.jsx'
+import { getItemCategory } from './Character.jsx'
 import { ATTRIBUTE_LIST, getProfessionData, getSpecialtyData, getDetailedAttributes } from '../utils/professionSystem'
 import { TRAITS, PERKS, calculateTraitModifiers } from '../utils/traitsSystem'
-
-const CATEGORY_LABELS = {
-  general:     { label: 'Item Geral',        color: 'var(--text-muted)' },
-  clothing:    { label: 'Roupa / Vestuário', color: '#70d6ff' },
-  accessories: { label: 'Acessório',         color: '#eab308' },
-  melee:       { label: 'Arma Branca',       color: '#ff9770' },
-  firearms:    { label: 'Arma de Fogo',      color: '#ff70a6' },
-  medical:     { label: 'Suprimento Médico', color: '#5cff7a' },
-  supplies:    { label: 'Mantimentos',       color: '#fbbf24' },
-}
 
 function xpForNextLevel(level) {
   return (level || 1) * 100
@@ -41,7 +28,6 @@ export default function PublicCharacter() {
   const [targetRole, setTargetRole] = useState('player')
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [activeCategory, setActiveCategory] = useState('all')
 
   // Modal de socorro médico
   const [showMedicalModal, setShowMedicalModal] = useState(false)
@@ -162,20 +148,6 @@ export default function PublicCharacter() {
   const thermalInfo = useMemo(() => {
     return calculateBodyTemperature(20, equipmentStats.totalInsulation)
   }, [equipmentStats.totalInsulation])
-
-  const { filteredItems, categoryCounts } = useMemo(() => {
-    const counts = { all: inventory.length, general: 0, supplies: 0, clothing: 0, accessories: 0, melee: 0, firearms: 0, medical: 0 }
-    const categorized = inventory.map((item) => {
-      const cat = getItemCategory(item)
-      if (counts[cat] !== undefined) counts[cat]++
-      else counts.general++
-      return { ...item, _category: cat }
-    })
-    const filtered = activeCategory === 'all'
-      ? categorized
-      : categorized.filter((item) => item._category === activeCategory)
-    return { filteredItems: filtered, categoryCounts: counts }
-  }, [inventory, activeCategory])
 
   // Itens médicos da mochila do usuário logado (para prestar atendimento)
   const myMedicalItems = useMemo(() => {
@@ -492,13 +464,13 @@ export default function PublicCharacter() {
             </div>
           </div>
 
-          {/* COLUNA DIREITA: Inventário (somente-leitura) */}
+          {/* COLUNA DIREITA: Equipamento & Traje Equipado (Privacidade de Inventário) */}
           <div className="character-inventory-panel">
-            <div className="inventory-header-row">
+            <div className="inventory-header-row" style={{ marginBottom: 12 }}>
               <div>
-                <p className="section-title" style={{ marginBottom: 4 }}>Mochila & Inventário</p>
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  Total de itens: <strong style={{ color: 'var(--accent)' }}>{inventory.length}</strong>
+                <p className="section-title" style={{ marginBottom: 4 }}>Equipamento & Traje</p>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Itens e vestimentas atualmente equipados no corpo do sobrevivente.
                 </span>
               </div>
             </div>
@@ -509,105 +481,6 @@ export default function PublicCharacter() {
               thermalInfo={thermalInfo}
               disabled={true}
             />
-
-            {/* Abas de Categoria */}
-            <div className="inventory-tabs">
-              {INVENTORY_CATEGORIES.map((cat) => {
-                const count = categoryCounts[cat.id] || 0
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    className={`inventory-tab-btn ${activeCategory === cat.id ? 'active' : ''}`}
-                    onClick={() => setActiveCategory(cat.id)}
-                  >
-                    <span className="tab-icon">{cat.icon}</span>
-                    <span className="tab-label">{cat.label}</span>
-                    <span className="tab-badge">{count}</span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Grid de Itens */}
-            {filteredItems.length === 0 ? (
-              <div className="inventory-empty">
-                <p className="inventory-empty-icon">
-                  {INVENTORY_CATEGORIES.find((c) => c.id === activeCategory)?.icon || '📦'}
-                </p>
-                <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  Nenhum item nesta categoria
-                </p>
-              </div>
-            ) : (
-              <div className="inventory-grid">
-                {filteredItems.map((item) => {
-                  const catMeta = CATEGORY_LABELS[item._category] || CATEGORY_LABELS.general
-                  const rMeta = RARITY_META[item.rarity] || RARITY_META.common
-                  return (
-                    <div
-                      className="inventory-item-card"
-                      key={item.instanceId}
-                      style={{
-                        borderLeft: `3px solid ${rMeta.color || 'var(--glass-border)'}`,
-                        position: 'relative'
-                      }}
-                    >
-                      <div className="inventory-item-top">
-                        <div style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: 8,
-                          background: 'rgba(0,0,0,0.35)',
-                          border: `1px solid ${rMeta.border || 'rgba(255,255,255,0.08)'}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          overflow: 'hidden',
-                          flexShrink: 0
-                        }}>
-                          <GameIcon src={item.imageUrl} emoji={item.icon || '📦'} size={24} />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                          <span
-                            className="inventory-item-category-tag"
-                            style={{ color: catMeta.color, borderColor: catMeta.color }}
-                          >
-                            {catMeta.label}
-                          </span>
-                          {rMeta && (
-                            <span style={{ fontSize: 9, color: rMeta.color, fontWeight: 'bold', textTransform: 'uppercase' }}>
-                              {rMeta.label}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="inventory-item-main">
-                        <div className="inventory-item-card-name" title={item.name} style={{ color: rMeta.color || 'inherit' }}>
-                          {item.name}
-                        </div>
-                        <div className="inventory-item-card-qty" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span>Quantidade: <strong>×{item.quantity}</strong></span>
-                          {Number(item.maxUses) > 1 && (
-                            <span style={{
-                              fontSize: 9,
-                              background: (item.currentUses ?? item.maxUses) <= 1 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(92, 255, 122, 0.15)',
-                              color: (item.currentUses ?? item.maxUses) <= 1 ? '#f87171' : '#5cff7a',
-                              padding: '1px 5px',
-                              borderRadius: 3,
-                              border: `1px solid ${(item.currentUses ?? item.maxUses) <= 1 ? 'rgba(239, 68, 68, 0.35)' : 'rgba(92, 255, 122, 0.3)'}`,
-                              fontWeight: 700
-                            }}>
-                              🩺 {item.currentUses ?? item.maxUses}/{item.maxUses} doses
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
           </div>
         </div>
       </div>

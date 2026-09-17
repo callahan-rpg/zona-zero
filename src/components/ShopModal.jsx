@@ -3,6 +3,7 @@ import { doc, onSnapshot, runTransaction } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { RARITY_META } from '../utils/itemSystem.js'
+import { checkInventorySlotsAvailable } from '../utils/weightSystem.js'
 import GameIcon from './GameIcon.jsx'
 
 export default function ShopModal({
@@ -169,8 +170,14 @@ export default function ShopModal({
   // ==========================================
   async function handleFinalizePurchase() {
     if (!user || cart.length === 0) return
-    setErrorMsg('')
-    setSuccessMsg('')
+    // Validação prévia de slots de inventário do jogador
+    const preSlotCheck = checkInventorySlotsAvailable(character, cart, null, catalogMap)
+    if (!preSlotCheck.allowed) {
+      setErrorMsg(preSlotCheck.reason || 'Espaço insuficiente no inventário! Libere slots antes de comprar.')
+      setTransactionLoading(false)
+      return
+    }
+
     setTransactionLoading(true)
 
     const shopRef = doc(db, 'shops', locationSlug)
@@ -191,6 +198,12 @@ export default function ShopModal({
         const currentChar = currentUserData.character || {}
         const currentRublos = Number(currentChar.rublos || 0)
         const currentInventory = [...(currentChar.inventory || [])]
+
+        // Validação transacional de slots do inventário
+        const slotCheck = checkInventorySlotsAvailable(currentChar, cart, null, catalogMap)
+        if (!slotCheck.allowed) {
+          throw new Error(slotCheck.reason || 'Espaço insuficiente no inventário!')
+        }
 
         // 1. Recalcula o custo total e valida saldo do jogador
         let totalCost = 0

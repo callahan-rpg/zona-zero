@@ -18,6 +18,7 @@ import {
   getDoc,
 } from 'firebase/firestore'
 import { isItemMatching, addItemToInventory } from './activitySystem.js'
+import { checkInventorySlotsAvailable } from './weightSystem.js'
 import { calculateGameTime } from './timeSystem.js'
 
 // ---------------------------------------------------------------------------
@@ -821,6 +822,11 @@ export async function completeCampMission({
 
     // Se for missão de recurso, adiciona as recompensas de materiais ao inventário
     if (missionData.type === 'resource' && Array.isArray(missionData.rewardItems)) {
+      const slotCheck = checkInventorySlotsAvailable({ ...character, inventory: updatedInventory }, missionData.rewardItems, gameConfig)
+      if (!slotCheck.allowed) {
+        throw new Error(slotCheck.reason || 'Seu inventário está cheio para receber os itens de recompensa desta missão!')
+      }
+
       for (const reward of missionData.rewardItems) {
         updatedInventory = addItemToInventory(updatedInventory, {
           itemId: reward.itemId,

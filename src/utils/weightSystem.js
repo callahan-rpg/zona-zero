@@ -323,3 +323,90 @@ export function canUnequipBackpack(inventory = [], itemOrInstanceId, character =
     neededSlots: newUsedSlots
   }
 }
+
+// =============================================================================
+// VALIDAÇÃO DE DISPONIBILIDADE DE SLOTS PARA RECEBER ITENS
+// =============================================================================
+
+/**
+ * Verifica se o personagem possui slots disponíveis no inventário para receber um ou mais itens.
+ * Itens que já existem no inventário (e não são itens de quest) podem ser empilhados sem consumir novo slot.
+ *
+ * @param {Object} character - Dados do personagem (attributes, inventory, etc.)
+ * @param {Object|Array} incomingItems - Item único ou lista de itens que o jogador está tentando pegar ({ itemId, isQuestItem, ... })
+ * @param {Object} gameConfig - Configurações globais (opcional)
+ * @param {Object} catalogMap - Mapa do catálogo de itens (opcional)
+ * @returns {{ allowed: boolean, requiredSlots: number, availableSlots: number, usedSlots: number, maxSlots: number, reason: string|null }}
+ */
+export function checkInventorySlotsAvailable(character, incomingItems, gameConfig = null, catalogMap = null) {
+  const carryStats = calculateCharacterCarryStats(character, gameConfig, catalogMap)
+  const inventory = Array.isArray(character?.inventory) ? character.inventory : []
+
+  const itemsList = Array.isArray(incomingItems) ? incomingItems : (incomingItems ? [incomingItems] : [])
+  if (itemsList.length === 0) {
+    const isFull = carryStats.usedSlots >= carryStats.maxSlots
+    return {
+      allowed: !isFull,
+      requiredSlots: 0,
+      availableSlots: carryStats.availableSlots,
+      usedSlots: carryStats.usedSlots,
+      maxSlots: carryStats.maxSlots,
+      reason: isFull ? `Seu inventário está cheio (${carryStats.usedSlots}/${carryStats.maxSlots} slots). Libere espaço no inventário.` : null
+    }
+  }
+
+  // Identifica quais itens já existem no inventário (não-equipados que podem receber stack)
+  const existingItemIds = new Set(
+    inventory
+      .filter(i => i && i.itemId && !i.isQuestItem)
+      .map(i => i.itemId)
+  )
+
+  const simulatedAddedItemIds = new Set()
+  let requiredSlots = 0
+
+  for (const item of itemsList) {
+    if (!item || !item.itemId) continue
+    const key = item.itemId
+
+    // Itens de quest nunca empilham
+    if (item.isQuestItem) {
+      requiredSlots += 1
+      continue
+    }
+
+    // Se já existe no inventário atual, empilha no slot existente (0 slots adicionais)
+    if (existingItemIds.has(key)) {
+      continue
+    }
+
+    // Se já foi considerado nesta mesma leva de novos itens, empilha junto (0 slots adicionais)
+    if (simulatedAddedItemIds.has(key)) {
+      continue
+    }
+
+    // Item novo: necessita de 1 novo slot
+    requiredSlots += 1
+    simulatedAddedItemIds.add(key)
+  }
+
+  const allowed = (carryStats.usedSlots + requiredSlots) <= carryStats.maxSlots
+
+  let reason = null
+  if (!allowed) {
+    if (carryStats.isSlotsFull || carryStats.availableSlots <= 0) {
+      reason = `Seu inventário está cheio (${carryStats.usedSlots}/${carryStats.maxSlots} slots). Libere espaço para pegar novos itens.`
+    } else {
+      reason = `Espaço insuficiente no inventário! Você precisa de ${requiredSlots} slot(s) livre(s), mas possui apenas ${carryStats.availableSlots} de ${carryStats.maxSlots}.`
+    }
+  }
+
+  return {
+    allowed,
+    requiredSlots,
+    availableSlots: carryStats.availableSlots,
+    usedSlots: carryStats.usedSlots,
+    maxSlots: carryStats.maxSlots,
+    reason
+  }
+}
