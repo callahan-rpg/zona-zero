@@ -31,13 +31,19 @@ import { formatDuration } from '../utils/activitySystem'
  * Fallback: backgroundImage geral → null
  */
 function getBgForHour(hour, location) {
+  if (!location) return null
   const isDay      = hour >= 6  && hour < 17
   const isTwilight = (hour >= 5 && hour < 6) || (hour >= 17 && hour < 18)
   // night: hour >= 18 || hour < 5
 
-  if (isDay)      return location.backgroundImageDay      || location.backgroundImage || null
-  if (isTwilight) return location.backgroundImageTwilight || location.backgroundImage || null
-  return               location.backgroundImageNight     || location.backgroundImage || null
+  const bgDay = (location.backgroundImageDay || '').trim()
+  const bgTwilight = (location.backgroundImageTwilight || '').trim()
+  const bgNight = (location.backgroundImageNight || '').trim()
+  const bgGeneral = (location.backgroundImage || '').trim()
+
+  if (isDay)      return bgDay || bgGeneral || null
+  if (isTwilight) return bgTwilight || bgGeneral || null
+  return bgNight || bgGeneral || null
 }
 
 // Locação padrão de teste (sala do hospital)
@@ -321,9 +327,9 @@ export default function Location() {
 
   // Inicializa a imagem de fundo quando a locação ou config carrega
   useEffect(() => {
-    if (!location || !gameConfig) return
-    const gt = calculateGameTime(gameConfig)
-    const bg = getBgForHour(gt.hour, location)
+    if (!location) return
+    const hour = gameConfig ? calculateGameTime(gameConfig).hour : new Date().getHours()
+    const bg = getBgForHour(hour, location)
     setCurrentBg(bg)
     setPrevBg(null)
     setFading(false)
@@ -575,7 +581,12 @@ export default function Location() {
   const maxCarry = location.uniqueSearch?.maxCarry || 1
 
   // Fallback puro quando nenhum período tiver imagem configurada
-  const hasAnyBg = !!(location.backgroundImage || location.backgroundImageDay || location.backgroundImageNight || location.backgroundImageTwilight)
+  const hasAnyBg = !!(
+    (location.backgroundImage && location.backgroundImage.trim()) ||
+    (location.backgroundImageDay && location.backgroundImageDay.trim()) ||
+    (location.backgroundImageNight && location.backgroundImageNight.trim()) ||
+    (location.backgroundImageTwilight && location.backgroundImageTwilight.trim())
+  )
 
   return (
     <div className="location-page">
@@ -590,7 +601,7 @@ export default function Location() {
       <div
         className="location-bg location-bg-prev"
         style={{
-          backgroundImage: prevBg ? `url(${prevBg})` : 'none',
+          backgroundImage: prevBg ? `url("${prevBg}")` : 'none',
           opacity: fading && prevBg ? 1 : 0,
         }}
       />
@@ -598,7 +609,7 @@ export default function Location() {
       {/* Camada atual — aparece com fade-in */}
       <div
         className={`location-bg location-bg-current ${!hasAnyBg ? 'fallback' : ''}`}
-        style={currentBg ? { backgroundImage: `url(${currentBg})`, opacity: fading ? 0 : 1 } : { opacity: fading ? 0 : 1 }}
+        style={currentBg ? { backgroundImage: `url("${currentBg}")`, opacity: fading ? 0 : 1 } : { opacity: fading ? 0 : 1 }}
       />
 
       {/* Efeitos Climáticos */}
